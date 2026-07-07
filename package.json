@@ -1,0 +1,22 @@
+{
+  "name": "warehouse-inventory",
+  "private": true,
+  "version": "1.0.0",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "npm run build -w @warehouse/shared && concurrently -n server,web -c blue,green \"npm run dev -w @warehouse/server\" \"npm run dev -w @warehouse/web\"",
+    "build": "npm run build -w @warehouse/shared && npm run build -w @warehouse/web && npm run build -w @warehouse/server",
+    "start": "npm run start -w @warehouse/server",
+    "test": "npm run build -w @warehouse/shared && npm run test -w @warehouse/shared && npm run test -w @warehouse/server"
+  },
+  "devDependencies": {
+    "concurrently": "^10.0.3",
+    "typescript": "^6.0.3"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
