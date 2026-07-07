@@ -15,21 +15,21 @@ export function PartCard({ part }: { part: InventoryPart }) {
       <div className="font-semibold text-textPri">{part.sku}</div>
       <div className="mb-2 line-clamp-2 text-sm text-textMuted">{part.description}</div>
       <div className="flex flex-wrap gap-1.5">
-        <Pill>
+        <Pill tone="chip">
           <Wrench size={12} />
           {part.manufacturer || '—'}
         </Pill>
-        <Pill>
+        <Pill tone="chip">
           <Factory size={12} />
           {part.inventorySite || '—'}
         </Pill>
-        <Pill>
+        <Pill tone="chip">
           <MapPin size={12} />
           {part.binLocation || '—'}
         </Pill>
-        <Pill>
+        <Pill tone="chip">
           <Package size={12} />
-          {part.qoh}
+          QOH: {part.qoh}
         </Pill>
       </div>
       {part.workflowStatus === 'Processing' && (

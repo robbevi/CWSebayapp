@@ -3,7 +3,7 @@ import { cn } from '../../lib/cn';
 
 interface PillProps {
   active?: boolean;
-  tone?: 'default' | 'dark';
+  tone?: 'default' | 'dark' | 'chip';
 }
 
 export function Pill({ active, tone = 'default', children }: PropsWithChildren<PillProps>) {
@@ -15,7 +15,9 @@ export function Pill({ active, tone = 'default', children }: PropsWithChildren<P
           ? 'bg-primary text-white border-primary'
           : tone === 'dark'
             ? 'bg-primaryDeep/10 text-primaryDeep border-primaryDeep/20'
-            : 'bg-surface text-textMuted border-border'
+            : tone === 'chip'
+              ? 'bg-surfaceMuted text-textMuted border-transparent'
+              : 'bg-surface text-textMuted border-border'
       )}
     >
       {children}

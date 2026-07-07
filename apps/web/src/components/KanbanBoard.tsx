@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import type { InventoryPart, WorkflowStatus } from '@warehouse/shared';
 import { useInventoryParts } from '../hooks/useInventoryParts';
-import { useUIStore } from '../state/useUIStore';
+import { useUIStore, type SortKey } from '../state/useUIStore';
 import { BucketColumn } from './BucketColumn';
 
 function matchesSearch(p: InventoryPart, query: string): boolean {
@@ -12,33 +12,41 @@ function matchesSearch(p: InventoryPart, query: string): boolean {
     .some((v) => v.toLowerCase().includes(needle));
 }
 
-const SORT_FIELD: Record<string, keyof InventoryPart> = {
-  Bin: 'binLocation',
+function matchesSet(value: string, selected: string[]): boolean {
+  return selected.length === 0 || selected.includes(value);
+}
+
+const SORT_FIELD: Record<SortKey, keyof InventoryPart> = {
   SKU: 'sku',
+  'Bin Location': 'binLocation',
   Manufacturer: 'manufacturer',
-  Site: 'inventorySite',
+  'Inventory Site': 'inventorySite',
+  'Quantity On Hand': 'qoh',
 };
 
-function sortParts(parts: InventoryPart[], sort: string): InventoryPart[] {
-  const field = SORT_FIELD[sort] ?? 'binLocation';
+function sortParts(parts: InventoryPart[], sort: SortKey): InventoryPart[] {
+  const field = SORT_FIELD[sort];
+  if (sort === 'Quantity On Hand') {
+    return [...parts].sort((a, b) => a.qoh - b.qoh);
+  }
   return [...parts].sort((a, b) => String(a[field] ?? '').localeCompare(String(b[field] ?? '')));
 }
 
 export function KanbanBoard() {
   const { data, isLoading } = useInventoryParts();
-  const { search, site, bin, mfr, sort } = useUIStore();
+  const { search, sites, bins, manufacturers, sort } = useUIStore();
 
   const filtered = useMemo(() => {
     const parts = data ?? [];
     const result = parts.filter(
       (p) =>
-        (site === 'All' || p.inventorySite === site) &&
-        (bin === 'All' || p.binLocation === bin) &&
-        (mfr === 'All' || p.manufacturer === mfr) &&
+        matchesSet(p.inventorySite, sites) &&
+        matchesSet(p.binLocation, bins) &&
+        matchesSet(p.manufacturer, manufacturers) &&
         matchesSearch(p, search)
     );
     return sortParts(result, sort);
-  }, [data, search, site, bin, mfr, sort]);
+  }, [data, search, sites, bins, manufacturers, sort]);
 
   if (isLoading) {
     return <div className="py-16 text-center text-textMuted">Loading inventory…</div>;
@@ -51,7 +59,7 @@ export function KanbanBoard() {
   };
 
   return (
-    <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+    <div className="grid grid-cols-1 gap-4 lg:h-full lg:grid-cols-3">
       <BucketColumn status="NotStarted" parts={buckets.NotStarted} />
       <BucketColumn status="Processing" parts={buckets.Processing} />
       <BucketColumn status="Completed" parts={buckets.Completed} />

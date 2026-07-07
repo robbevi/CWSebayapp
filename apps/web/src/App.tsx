@@ -1,9 +1,8 @@
 import { useEffect } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { AppBar } from './components/AppBar';
-import { BrandedHeader } from './components/BrandedHeader';
 import { ConfigBanner } from './components/ConfigBanner';
 import { FilterPanel } from './components/FilterPanel';
+import { Header } from './components/Header';
 import { ImportPanel } from './components/ImportPanel';
 import { KanbanBoard } from './components/KanbanBoard';
 import { PartDetailModal } from './components/PartDetailModal';
@@ -31,17 +30,16 @@ function DeepLinkHandler() {
 function Dashboard() {
   return (
     <>
-      <AppBar />
-      <div className="mx-auto max-w-[1280px] px-6 pb-10">
-        <BrandedHeader />
-        <div className="h-4" />
-        <FilterPanel />
-        <div className="h-4" />
-        <ConfigBanner />
-        <div className="h-4" />
-        <ImportPanel />
-        <div className="h-4" />
-        <KanbanBoard />
+      <div className="flex flex-col bg-surfaceMuted lg:h-screen lg:overflow-hidden">
+        <Header />
+        <div className="flex flex-1 flex-col gap-4 px-6 py-4 lg:min-h-0 lg:overflow-hidden">
+          <FilterPanel />
+          <ConfigBanner />
+          <ImportPanel />
+          <div className="lg:min-h-0 lg:flex-1">
+            <KanbanBoard />
+          </div>
+        </div>
       </div>
       <PartDetailModal />
       <Toast />
