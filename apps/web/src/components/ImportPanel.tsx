@@ -22,8 +22,8 @@ export function ImportPanel() {
         <div>
           <div className="font-semibold text-textPri">Import InventoryPart CSV</div>
           <div className="text-sm text-textMuted">
-            Loads the legacy export into the SharePoint list. Safe to re-run — matches existing rows by Inventory
-            Part ID / SKU.
+            Loads the legacy export into the active data backend. Safe to re-run — matches existing rows by
+            Inventory Part ID / SKU.
           </div>
         </div>
         <input

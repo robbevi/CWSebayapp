@@ -66,9 +66,26 @@ concrete backends and no plans for a third.
 Rows are identified by SKU (Sheets have no stable row-ID concept), so
 `InventoryPart.id === sku` for Google-backed data — the frontend doesn't need to know
 which backend is active. Photos are uploaded to the Drive folder and made
-"anyone with the link can view" so they can be shown via `<img src>` directly, rather
-than proxied through the server — a deliberate simplification, reasonable for photos
-destined for a public eBay listing anyway.
+"anyone with the link can view" so they can be shown via `<img src>` directly (via the
+`/thumbnail?id=...` URL form — the more common `/uc?export=view` form gets blocked by
+Chrome's Opaque Response Blocking when hotlinked), rather than proxied through the
+server — a deliberate simplification, reasonable for photos destined for a public eBay
+listing anyway.
+
+**Photo uploads need one extra step on a personal (non-Workspace) Google account**:
+service accounts have no storage quota of their own, so Drive rejects file *creation*
+from one (reading/listing is unaffected). Fix: a separate OAuth-authenticated client
+uploads on your behalf instead —
+1. Cloud Console → **APIs & Services → OAuth consent screen** → User type **External**
+   → fill in the required fields → add your own account under **Test users** (no need
+   to publish/verify, it's just for you).
+2. **APIs & Services → Credentials → Create Credentials → OAuth client ID** →
+   Application type **Desktop app** → copy the Client ID and Client Secret into
+   `GOOGLE_OAUTH_CLIENT_ID` / `GOOGLE_OAUTH_CLIENT_SECRET` in `.env`.
+3. Run `npm run google:auth -w @warehouse/server` — it prints a URL; open it, sign in,
+   approve access, and the script prints a refresh token. Put that in
+   `GOOGLE_OAUTH_REFRESH_TOKEN` in `.env`. One-time setup; the refresh token doesn't
+   expire under normal use.
 
 ### SharePoint/Graph (target)
 

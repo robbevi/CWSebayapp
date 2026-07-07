@@ -2,7 +2,16 @@ import { Readable } from 'node:stream';
 import type { Photo } from '@warehouse/shared';
 import { env } from '../config/env.js';
 import { buildPhotoFileName, extractSkuFromFileName } from '../lib/photoNaming.js';
-import { getDriveClient } from './client.js';
+import { getDriveClient, getDriveUploadClient } from './client.js';
+
+// The legacy `drive.google.com/uc?export=view` URL redirects through a response that
+// Chrome's Opaque Response Blocking (ORB) rejects when loaded from an <img> tag (it
+// works fine via curl/server-to-server, just not from a browser). The `/thumbnail`
+// endpoint returns the image directly with a real Content-Type and
+// Access-Control-Allow-Origin: *, so it actually renders.
+function buildImageUrl(fileId: string): string {
+  return `https://drive.google.com/thumbnail?id=${fileId}&sz=w1600`;
+}
 
 export async function checkAccess(): Promise<void> {
   const drive = getDriveClient();
@@ -29,7 +38,7 @@ export async function listPhotosGroupedBySku(): Promise<Map<string, Photo[]>> {
       const list = grouped.get(sku) ?? [];
       list.push({
         fileName: file.name,
-        url: `https://drive.google.com/uc?export=view&id=${file.id}`,
+        url: buildImageUrl(file.id),
         uploadedAt: file.createdTime ?? new Date().toISOString(),
       });
       grouped.set(sku, list);
@@ -41,7 +50,8 @@ export async function listPhotosGroupedBySku(): Promise<Map<string, Photo[]>> {
 }
 
 export async function uploadPhoto(sku: string, buffer: Buffer): Promise<Photo> {
-  const drive = getDriveClient();
+  // Uses the OAuth-authenticated client, not the service account — see client.ts for why.
+  const drive = getDriveUploadClient();
   const fileName = buildPhotoFileName(sku);
 
   const created = await drive.files.create({
@@ -59,7 +69,7 @@ export async function uploadPhoto(sku: string, buffer: Buffer): Promise<Photo> {
 
   return {
     fileName,
-    url: `https://drive.google.com/uc?export=view&id=${fileId}`,
+    url: buildImageUrl(fileId),
     uploadedAt: created.data.createdTime ?? new Date().toISOString(),
   };
 }
