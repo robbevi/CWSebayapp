@@ -117,6 +117,37 @@ async function readSheet(): Promise<{ headers: string[]; rows: unknown[][] }> {
   return { headers, rows };
 }
 
+// Cheap alternative to readSheet() for callers that only need the header row (e.g.
+// bulk-creating many rows) — reading the whole (growing) sheet once per created row
+// would be O(n^2) for a large import.
+async function getHeaders(): Promise<string[]> {
+  const sheets = getSheetsClient();
+  const res = await sheets.spreadsheets.values.get({ spreadsheetId: env.googleSheetId, range: `${SHEET_NAME}!1:1` });
+  return res.data.values?.[0] ?? [];
+}
+
+function buildCreateRecord(data: CreatePartFields, updatedAt: string): Partial<Record<FieldName, unknown>> {
+  return {
+    sku: data.sku,
+    description: data.description,
+    manufacturer: data.manufacturer,
+    inventorySite: data.inventorySite,
+    binLocation: data.binLocation,
+    qoh: data.qoh,
+    confirmedQoh: data.confirmedQoh,
+    boxCondition: data.boxCondition,
+    notes: data.notes,
+    photographed: false,
+    itemListed: data.itemListed ?? false,
+    itemListedDate: data.itemListedDate,
+    transferredToMarketRecovery: data.transferredToMarketRecovery ?? false,
+    catalogingStartDate: data.catalogingStartDate,
+    legacyPartId: data.legacyPartId,
+    importSequenceNumber: data.importSequenceNumber,
+    updatedAt,
+  };
+}
+
 function findRow(headers: string[], rows: unknown[][], sku: string): { rowNumber: number; row: unknown[] } | undefined {
   const skuCol = headers.indexOf('sku');
   if (skuCol === -1) return undefined;
@@ -194,27 +225,8 @@ export async function markPhotographed(sku: string): Promise<void> {
 
 export async function createPart(data: CreatePartFields): Promise<string> {
   const sheets = getSheetsClient();
-  const { headers } = await readSheet();
-
-  const record: Partial<Record<FieldName, unknown>> = {
-    sku: data.sku,
-    description: data.description,
-    manufacturer: data.manufacturer,
-    inventorySite: data.inventorySite,
-    binLocation: data.binLocation,
-    qoh: data.qoh,
-    confirmedQoh: data.confirmedQoh,
-    boxCondition: data.boxCondition,
-    notes: data.notes,
-    photographed: false,
-    itemListed: data.itemListed ?? false,
-    itemListedDate: data.itemListedDate,
-    transferredToMarketRecovery: data.transferredToMarketRecovery ?? false,
-    catalogingStartDate: data.catalogingStartDate,
-    legacyPartId: data.legacyPartId,
-    importSequenceNumber: data.importSequenceNumber,
-    updatedAt: new Date().toISOString(),
-  };
+  const headers = await getHeaders();
+  const record = buildCreateRecord(data, new Date().toISOString());
 
   await sheets.spreadsheets.values.append({
     spreadsheetId: env.googleSheetId,
@@ -225,6 +237,30 @@ export async function createPart(data: CreatePartFields): Promise<string> {
   });
 
   return data.sku;
+}
+
+// Appends many new rows in a small, fixed number of API calls instead of one call per
+// row — matters once an import gets into the hundreds/thousands of rows, since each
+// row would otherwise cost a full-sheet read (readSheet is O(current row count)).
+const APPEND_CHUNK_SIZE = 500;
+
+export async function bulkCreateParts(items: CreatePartFields[]): Promise<void> {
+  if (items.length === 0) return;
+  const sheets = getSheetsClient();
+  const headers = await getHeaders();
+  const now = new Date().toISOString();
+  const rows = items.map((data) => recordToRow(headers, buildCreateRecord(data, now)));
+
+  for (let i = 0; i < rows.length; i += APPEND_CHUNK_SIZE) {
+    const chunk = rows.slice(i, i + APPEND_CHUNK_SIZE);
+    await sheets.spreadsheets.values.append({
+      spreadsheetId: env.googleSheetId,
+      range: SHEET_NAME,
+      valueInputOption: 'USER_ENTERED',
+      insertDataOption: 'INSERT_ROWS',
+      requestBody: { values: chunk },
+    });
+  }
 }
 
 export async function updatePartFields(sku: string, data: Partial<CreatePartFields>): Promise<void> {

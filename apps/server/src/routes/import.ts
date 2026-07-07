@@ -7,10 +7,11 @@ import {
   updatePartFields as updatePartFieldsGraph,
 } from '../graph/partsService.js';
 import {
-  createPart as createPartGoogle,
+  bulkCreateParts as bulkCreatePartsGoogle,
   getAllParts as getAllPartsGoogle,
   updatePartFields as updatePartFieldsGoogle,
 } from '../google/sheetsService.js';
+import type { ImportRow } from '../lib/csv.js';
 import { parseInventoryCsv } from '../lib/csv.js';
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 25 * 1024 * 1024 } });
@@ -29,11 +30,8 @@ importRouter.post('/import', upload.single('file'), async (req, res, next) => {
       return;
     }
 
-    const getAllParts = useGoogle ? getAllPartsGoogle : getAllPartsGraph;
-    const updatePartFields = useGoogle ? updatePartFieldsGoogle : updatePartFieldsGraph;
-    const createPart = useGoogle ? createPartGoogle : createPartGraph;
-
     const rows = parseInventoryCsv(req.file.buffer.toString('utf-8'));
+    const getAllParts = useGoogle ? getAllPartsGoogle : getAllPartsGraph;
     const existing = await getAllParts();
 
     const byKey = new Map<string, string>();
@@ -46,20 +44,45 @@ importRouter.post('/import', upload.single('file'), async (req, res, next) => {
     let updated = 0;
     const errors: { sku: string; error: string }[] = [];
 
-    for (const row of rows) {
-      try {
+    if (useGoogle) {
+      // Sheets: append all new rows in one batched call instead of one API round trip
+      // per row — matters once an import gets into the hundreds/thousands of rows.
+      const toCreate: ImportRow[] = [];
+      for (const row of rows) {
         const existingId =
           (row.legacyPartId && byKey.get(`legacy:${row.legacyPartId}`)) || byKey.get(`sku:${row.sku.toUpperCase()}`);
-
         if (existingId) {
-          await updatePartFields(existingId, row);
-          updated++;
+          try {
+            await updatePartFieldsGoogle(existingId, row);
+            updated++;
+          } catch (err) {
+            errors.push({ sku: row.sku, error: (err as Error).message });
+          }
         } else {
-          await createPart(row);
-          created++;
+          toCreate.push(row);
         }
+      }
+      try {
+        await bulkCreatePartsGoogle(toCreate);
+        created += toCreate.length;
       } catch (err) {
-        errors.push({ sku: row.sku, error: (err as Error).message });
+        for (const row of toCreate) errors.push({ sku: row.sku, error: (err as Error).message });
+      }
+    } else {
+      for (const row of rows) {
+        try {
+          const existingId =
+            (row.legacyPartId && byKey.get(`legacy:${row.legacyPartId}`)) || byKey.get(`sku:${row.sku.toUpperCase()}`);
+          if (existingId) {
+            await updatePartFieldsGraph(existingId, row);
+            updated++;
+          } else {
+            await createPartGraph(row);
+            created++;
+          }
+        } catch (err) {
+          errors.push({ sku: row.sku, error: (err as Error).message });
+        }
       }
     }
 
