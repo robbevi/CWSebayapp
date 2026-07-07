@@ -1,4 +1,5 @@
 import type { Photo } from '@warehouse/shared';
+import { extractSkuFromFileName, buildPhotoFileName } from '../lib/photoNaming.js';
 import { getGraphClient } from './client.js';
 import { getResolvedContext } from './siteResolver.js';
 
@@ -8,11 +9,6 @@ function encodeFolderPath(path: string): string {
     .filter(Boolean)
     .map(encodeURIComponent)
     .join('/');
-}
-
-function extractSkuFromFileName(name: string): string | null {
-  const match = name.match(/^([^_]+)_/);
-  return match ? match[1].toUpperCase() : null;
 }
 
 export async function listPhotosGroupedBySku(): Promise<Map<string, Photo[]>> {
@@ -37,14 +33,6 @@ export async function listPhotosGroupedBySku(): Promise<Map<string, Photo[]>> {
     url = res['@odata.nextLink'];
   }
   return grouped;
-}
-
-export function buildPhotoFileName(sku: string): string {
-  const now = new Date();
-  const date = now.toISOString().slice(0, 10);
-  const time = now.toTimeString().slice(0, 8).replace(/:/g, '');
-  const safeSku = sku.replace(/[^A-Za-z0-9-]/g, '-');
-  return `${safeSku}_${date}_${time}.jpg`;
 }
 
 export async function uploadPhoto(sku: string, buffer: Buffer): Promise<Photo> {

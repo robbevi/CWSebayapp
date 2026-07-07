@@ -1,19 +1,23 @@
 import { Router } from 'express';
 import type { InventoryPartPatch } from '@warehouse/shared';
-import { isGraphConfigured } from '../config/env.js';
-import { getAllParts, updatePart } from '../graph/partsService.js';
+import { isGoogleConfigured, isGraphConfigured } from '../config/env.js';
+import { getAllParts as getAllPartsGraph, updatePart as updatePartGraph } from '../graph/partsService.js';
+import { getAllParts as getAllPartsGoogle, updatePart as updatePartGoogle } from '../google/sheetsService.js';
 import { MOCK_PARTS } from '../lib/mockData.js';
 
 export const partsRouter = Router();
 
 partsRouter.get('/parts', async (_req, res, next) => {
   try {
-    if (!isGraphConfigured()) {
-      res.json(MOCK_PARTS);
+    if (isGoogleConfigured()) {
+      res.json(await getAllPartsGoogle());
       return;
     }
-    const parts = await getAllParts();
-    res.json(parts);
+    if (isGraphConfigured()) {
+      res.json(await getAllPartsGraph());
+      return;
+    }
+    res.json(MOCK_PARTS);
   } catch (err) {
     next(err);
   }
@@ -21,13 +25,16 @@ partsRouter.get('/parts', async (_req, res, next) => {
 
 partsRouter.patch('/parts/:id', async (req, res, next) => {
   try {
-    if (!isGraphConfigured()) {
-      res.status(503).json({ error: 'Graph is not configured for this environment.' });
+    const patch = req.body as InventoryPartPatch;
+    if (isGoogleConfigured()) {
+      res.json(await updatePartGoogle(req.params.id, patch));
       return;
     }
-    const patch = req.body as InventoryPartPatch;
-    const updated = await updatePart(req.params.id, patch);
-    res.json(updated);
+    if (isGraphConfigured()) {
+      res.json(await updatePartGraph(req.params.id, patch));
+      return;
+    }
+    res.status(503).json({ error: 'No data backend is configured for this environment.' });
   } catch (err) {
     next(err);
   }

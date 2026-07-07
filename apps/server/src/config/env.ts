@@ -9,6 +9,9 @@ const rawSchema = z.object({
   SHAREPOINT_SITE_PATH: z.string().optional(),
   SHAREPOINT_LIST_NAME: z.string().optional(),
   SHAREPOINT_PHOTOS_FOLDER_PATH: z.string().optional(),
+  GOOGLE_SERVICE_ACCOUNT_KEY_FILE: z.string().optional(),
+  GOOGLE_SHEET_ID: z.string().optional(),
+  GOOGLE_DRIVE_FOLDER_ID: z.string().optional(),
   PORT: z.string().optional(),
 });
 
@@ -22,6 +25,9 @@ export const env = {
   sitePath: raw.SHAREPOINT_SITE_PATH,
   listName: raw.SHAREPOINT_LIST_NAME,
   photosFolderPath: raw.SHAREPOINT_PHOTOS_FOLDER_PATH,
+  googleServiceAccountKeyFile: raw.GOOGLE_SERVICE_ACCOUNT_KEY_FILE,
+  googleSheetId: raw.GOOGLE_SHEET_ID,
+  googleDriveFolderId: raw.GOOGLE_DRIVE_FOLDER_ID,
   port: Number(raw.PORT ?? 4000),
 };
 
@@ -35,4 +41,8 @@ export function isGraphConfigured(): boolean {
     env.listName &&
     env.photosFolderPath
   );
+}
+
+export function isGoogleConfigured(): boolean {
+  return !!(env.googleServiceAccountKeyFile && env.googleSheetId && env.googleDriveFolderId);
 }

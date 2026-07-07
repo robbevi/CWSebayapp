@@ -1,7 +1,16 @@
 import { Router } from 'express';
 import multer from 'multer';
-import { isGraphConfigured } from '../config/env.js';
-import { createPart, getAllParts, updatePartFields } from '../graph/partsService.js';
+import { isGoogleConfigured, isGraphConfigured } from '../config/env.js';
+import {
+  createPart as createPartGraph,
+  getAllParts as getAllPartsGraph,
+  updatePartFields as updatePartFieldsGraph,
+} from '../graph/partsService.js';
+import {
+  createPart as createPartGoogle,
+  getAllParts as getAllPartsGoogle,
+  updatePartFields as updatePartFieldsGoogle,
+} from '../google/sheetsService.js';
 import { parseInventoryCsv } from '../lib/csv.js';
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 25 * 1024 * 1024 } });
@@ -10,7 +19,8 @@ export const importRouter = Router();
 
 importRouter.post('/import', upload.single('file'), async (req, res, next) => {
   try {
-    if (!isGraphConfigured()) {
+    const useGoogle = isGoogleConfigured();
+    if (!useGoogle && !isGraphConfigured()) {
       res.status(503).json({ error: 'Import is not configured for this environment.' });
       return;
     }
@@ -18,6 +28,10 @@ importRouter.post('/import', upload.single('file'), async (req, res, next) => {
       res.status(400).json({ error: 'CSV file is required.' });
       return;
     }
+
+    const getAllParts = useGoogle ? getAllPartsGoogle : getAllPartsGraph;
+    const updatePartFields = useGoogle ? updatePartFieldsGoogle : updatePartFieldsGraph;
+    const createPart = useGoogle ? createPartGoogle : createPartGraph;
 
     const rows = parseInventoryCsv(req.file.buffer.toString('utf-8'));
     const existing = await getAllParts();

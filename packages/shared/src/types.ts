@@ -46,9 +46,8 @@ export type InventoryPartPatch = Partial<
 >;
 
 export interface HealthStatus {
-  graphConfigured: boolean;
-  siteResolved: boolean;
-  listResolved: boolean;
-  driveResolved: boolean;
+  backend: 'google' | 'sharepoint' | 'none';
+  configured: boolean;
+  resolved: boolean;
   error?: string;
 }
