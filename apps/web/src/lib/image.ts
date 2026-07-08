@@ -1,4 +1,4 @@
-export async function downscaleToFile(file: File, maxEdge = 1600, quality = 0.85): Promise<File> {
+export async function downscaleToFile(file: File, maxEdge = 2400, quality = 0.92): Promise<File> {
   const img = await createImageBitmap(file);
   const scale = Math.min(1, maxEdge / Math.max(img.width, img.height));
   const w = Math.round(img.width * scale);

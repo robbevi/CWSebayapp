@@ -4,13 +4,15 @@ import { env } from '../config/env.js';
 import { buildPhotoFileName, extractSkuFromFileName } from '../lib/photoNaming.js';
 import { getDriveClient, getDriveUploadClient } from './client.js';
 
-// The legacy `drive.google.com/uc?export=view` URL redirects through a response that
-// Chrome's Opaque Response Blocking (ORB) rejects when loaded from an <img> tag (it
-// works fine via curl/server-to-server, just not from a browser). The `/thumbnail`
-// endpoint returns the image directly with a real Content-Type and
-// Access-Control-Allow-Origin: *, so it actually renders.
+// Hotlinking Google's own thumbnail/uc URLs directly is fragile in practice: the
+// `uc?export=view` form gets blocked by Chrome's Opaque Response Blocking when loaded
+// from an <img> tag, and the `/thumbnail` form (which avoids that) is subject to
+// undocumented, fairly aggressive per-file rate limiting intended for occasional embed
+// use, not sustained app traffic — it can start returning 429s after only a handful of
+// loads. Proxying the bytes through our own server (see routes/photos.ts) sidesteps
+// both problems and lets us set real cache headers.
 function buildImageUrl(fileId: string): string {
-  return `https://drive.google.com/thumbnail?id=${fileId}&sz=w1600`;
+  return `/api/photos/${fileId}/content`;
 }
 
 export async function checkAccess(): Promise<void> {
@@ -47,6 +49,15 @@ export async function listPhotosGroupedBySku(): Promise<Map<string, Photo[]>> {
   } while (pageToken);
 
   return grouped;
+}
+
+// Streams the raw file bytes for the photo content proxy route. Uses the service
+// account (read-only, already has access via the shared folder) rather than the OAuth
+// upload client, since reading doesn't hit the storage-quota restriction that uploads do.
+export async function getPhotoContent(fileId: string): Promise<Readable> {
+  const drive = getDriveClient();
+  const res = await drive.files.get({ fileId, alt: 'media' }, { responseType: 'stream' });
+  return res.data as unknown as Readable;
 }
 
 export async function uploadPhoto(sku: string, buffer: Buffer): Promise<Photo> {

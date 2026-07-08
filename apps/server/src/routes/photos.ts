@@ -4,7 +4,7 @@ import { isGoogleConfigured, isGraphConfigured } from '../config/env.js';
 import { markPhotographed as markPhotographedGraph } from '../graph/partsService.js';
 import { uploadPhoto as uploadPhotoGraph } from '../graph/photosService.js';
 import { markPhotographed as markPhotographedGoogle } from '../google/sheetsService.js';
-import { uploadPhoto as uploadPhotoGoogle } from '../google/driveService.js';
+import { getPhotoContent, uploadPhoto as uploadPhotoGoogle } from '../google/driveService.js';
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 15 * 1024 * 1024 } });
 
@@ -39,6 +39,23 @@ photosRouter.post('/photos', upload.single('file'), async (req, res, next) => {
       await markPhotographedGraph(itemId).catch((err) => console.error('Failed to flag Item Photographed:', err));
     }
     res.json(photo);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Streams photo bytes through our own server instead of the client hitting Google's
+// URLs directly — see the comment above buildImageUrl in google/driveService.ts for why.
+photosRouter.get('/photos/:fileId/content', async (req, res, next) => {
+  try {
+    if (!isGoogleConfigured()) {
+      res.status(404).json({ error: 'Photo content proxy is only available for the Google backend.' });
+      return;
+    }
+    const stream = await getPhotoContent(req.params.fileId);
+    res.set('Content-Type', 'image/jpeg');
+    res.set('Cache-Control', 'public, max-age=31536000, immutable');
+    stream.on('error', next).pipe(res);
   } catch (err) {
     next(err);
   }
