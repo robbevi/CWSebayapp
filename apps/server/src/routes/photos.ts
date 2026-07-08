@@ -6,7 +6,9 @@ import { uploadPhoto as uploadPhotoGraph } from '../graph/photosService.js';
 import { markPhotographed as markPhotographedGoogle } from '../google/sheetsService.js';
 import { getPhotoContent, uploadPhoto as uploadPhotoGoogle } from '../google/driveService.js';
 
-const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 15 * 1024 * 1024 } });
+// Uploads are no longer downscaled client-side (original quality is preserved), so this
+// needs headroom for full-resolution phone camera photos.
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 35 * 1024 * 1024 } });
 
 export const photosRouter = Router();
 

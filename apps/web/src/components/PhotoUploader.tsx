@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react';
 import { Camera, Upload, X } from 'lucide-react';
 import type { Photo } from '@warehouse/shared';
-import { downscaleToFile } from '../lib/image';
+import { prepareUpload } from '../lib/image';
 import { useUploadPhoto } from '../hooks/useUploadPhoto';
 import { Pill } from './ui/Pill';
 
@@ -34,8 +34,8 @@ export function PhotoUploader({ sku, itemId, photos }: PhotoUploaderProps) {
     if (!files) return;
     for (const file of Array.from(files)) {
       try {
-        const downscaled = await downscaleToFile(file);
-        await uploadPhoto.mutateAsync({ sku, itemId, file: downscaled });
+        const prepared = await prepareUpload(file);
+        await uploadPhoto.mutateAsync({ sku, itemId, file: prepared });
       } catch (err) {
         setFailed((f) => [
           ...f,
