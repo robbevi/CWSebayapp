@@ -93,7 +93,11 @@ export function MultiSelectDropdown({ icon, label, options, selected, counts, on
                     className="h-4 w-4 shrink-0 accent-primary"
                   />
                   <span className="flex-1 truncate">{option}</span>
-                  {counts && <span className="text-textMuted">{counts[option] ?? 0}</span>}
+                  {counts && (
+                    <span className="min-w-[1.5rem] rounded-md bg-surfaceMuted px-1.5 py-0.5 text-center text-[10px] font-semibold text-textMuted">
+                      {counts[option] ?? 0}
+                    </span>
+                  )}
                 </label>
               ))
             )}

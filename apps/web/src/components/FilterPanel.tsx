@@ -89,9 +89,10 @@ export function FilterPanel() {
             onChange={(next) => set({ manufacturers: next })}
           />
         </div>
-        <div className="flex w-48 items-center gap-2">
+        <div className="flex w-56 items-center gap-2 rounded-btn border border-border bg-surface px-3 py-2">
           <ArrowUpDown size={14} className="shrink-0 text-textMuted" />
           <Dropdown
+            variant="bare"
             options={SORT_OPTIONS}
             value={sort}
             onChange={(e) => set({ sort: e.target.value as SortKey })}
