@@ -13,6 +13,15 @@ function uniqueSorted(values: (string | undefined)[]): string[] {
   return Array.from(new Set(values.filter((v): v is string => !!v))).sort();
 }
 
+function countBy(values: (string | undefined)[]): Record<string, number> {
+  const counts: Record<string, number> = {};
+  for (const v of values) {
+    if (!v) continue;
+    counts[v] = (counts[v] ?? 0) + 1;
+  }
+  return counts;
+}
+
 export function FilterPanel() {
   const { data: parts } = useInventoryParts();
   const { search, sites, bins, manufacturers, sort, set, clearAll } = useUIStore();
@@ -27,6 +36,10 @@ export function FilterPanel() {
   const siteOptions = useMemo(() => uniqueSorted((parts ?? []).map((p) => p.inventorySite)), [parts]);
   const binOptions = useMemo(() => uniqueSorted((parts ?? []).map((p) => p.binLocation)), [parts]);
   const mfrOptions = useMemo(() => uniqueSorted((parts ?? []).map((p) => p.manufacturer)), [parts]);
+
+  const siteCounts = useMemo(() => countBy((parts ?? []).map((p) => p.inventorySite)), [parts]);
+  const binCounts = useMemo(() => countBy((parts ?? []).map((p) => p.binLocation)), [parts]);
+  const mfrCounts = useMemo(() => countBy((parts ?? []).map((p) => p.manufacturer)), [parts]);
 
   const handleClearAll = () => {
     setSearchInput('');
@@ -52,6 +65,7 @@ export function FilterPanel() {
             label="Inventory Site"
             options={siteOptions}
             selected={sites}
+            counts={siteCounts}
             onChange={(next) => set({ sites: next })}
           />
         </div>
@@ -61,6 +75,7 @@ export function FilterPanel() {
             label="Bin Location"
             options={binOptions}
             selected={bins}
+            counts={binCounts}
             onChange={(next) => set({ bins: next })}
           />
         </div>
@@ -70,6 +85,7 @@ export function FilterPanel() {
             label="Manufacturer"
             options={mfrOptions}
             selected={manufacturers}
+            counts={mfrCounts}
             onChange={(next) => set({ manufacturers: next })}
           />
         </div>

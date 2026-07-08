@@ -7,10 +7,11 @@ interface MultiSelectDropdownProps {
   label: string;
   options: string[];
   selected: string[];
+  counts?: Record<string, number>;
   onChange: (next: string[]) => void;
 }
 
-export function MultiSelectDropdown({ icon, label, options, selected, onChange }: MultiSelectDropdownProps) {
+export function MultiSelectDropdown({ icon, label, options, selected, counts, onChange }: MultiSelectDropdownProps) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const containerRef = useRef<HTMLDivElement>(null);
@@ -91,7 +92,8 @@ export function MultiSelectDropdown({ icon, label, options, selected, onChange }
                     onChange={() => toggle(option)}
                     className="h-4 w-4 shrink-0 accent-primary"
                   />
-                  <span className="truncate">{option}</span>
+                  <span className="flex-1 truncate">{option}</span>
+                  {counts && <span className="text-textMuted">{counts[option] ?? 0}</span>}
                 </label>
               ))
             )}
