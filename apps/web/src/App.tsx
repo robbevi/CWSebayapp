@@ -3,7 +3,6 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ConfigBanner } from './components/ConfigBanner';
 import { FilterPanel } from './components/FilterPanel';
 import { Header } from './components/Header';
-import { ImportPanel } from './components/ImportPanel';
 import { KanbanBoard } from './components/KanbanBoard';
 import { PartDetailModal } from './components/PartDetailModal';
 import { Toast } from './components/ui/Toast';
@@ -35,7 +34,6 @@ function Dashboard() {
         <div className="flex flex-1 flex-col gap-4 px-6 py-4 lg:min-h-0 lg:overflow-hidden">
           <FilterPanel />
           <ConfigBanner />
-          <ImportPanel />
           <div className="lg:min-h-0 lg:flex-1">
             <KanbanBoard />
           </div>
