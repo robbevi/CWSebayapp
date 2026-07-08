@@ -8,19 +8,25 @@ import { useSavePart } from '../hooks/useSavePart';
 import { useUIStore } from '../state/useUIStore';
 import { Button } from './ui/Button';
 import { Dropdown } from './ui/Dropdown';
+import { Input } from './ui/Input';
 import { Textarea } from './ui/Textarea';
 import { PhotoUploader } from './PhotoUploader';
 import { QtyStepper } from './QtyStepper';
 
-const CONDITIONS = ['', 'New', 'LikeNew', 'Good', 'Fair', 'Poor', 'ForParts'];
+const ITEM_CONDITIONS = ['New', 'Like New', 'Good', 'Fair', 'Poor', 'For Parts'];
+const BOX_CONDITIONS = ['Excellent', 'Very Good', 'Good', 'Poor', 'No Box'];
+const CONDITION_PLACEHOLDER = 'Select Condition';
 
 const schema = z.object({
   confirmedQoh: z.number().min(0),
   notes: z.string().optional(),
+  itemCondition: z.string().optional(),
   boxCondition: z.string().optional(),
   transferredToMarketRecovery: z.boolean(),
+  transferId: z.string().optional(),
   itemListed: z.boolean(),
   itemListedDate: z.string().optional(),
+  ebayListingId: z.string().optional(),
 });
 type FormValues = z.infer<typeof schema>;
 
@@ -36,10 +42,13 @@ export function PartDetailModal() {
     defaultValues: {
       confirmedQoh: 0,
       notes: '',
+      itemCondition: '',
       boxCondition: '',
       transferredToMarketRecovery: false,
+      transferId: '',
       itemListed: false,
       itemListedDate: '',
+      ebayListingId: '',
     },
   });
 
@@ -48,10 +57,13 @@ export function PartDetailModal() {
       reset({
         confirmedQoh: part.confirmedQoh ?? part.qoh,
         notes: part.notes ?? '',
+        itemCondition: part.itemCondition ?? '',
         boxCondition: part.boxCondition ?? '',
         transferredToMarketRecovery: part.transferredToMarketRecovery,
+        transferId: part.transferId ?? '',
         itemListed: part.itemListed,
         itemListedDate: part.itemListedDate ?? '',
+        ebayListingId: part.ebayListingId ?? '',
       });
     }
   }, [part, reset]);
@@ -59,6 +71,7 @@ export function PartDetailModal() {
   if (!modalOpen || !part) return null;
 
   const itemListed = watch('itemListed');
+  const transferred = watch('transferredToMarketRecovery');
 
   const close = () => {
     if (formState.isDirty && !window.confirm('Discard unsaved changes?')) return;
@@ -71,10 +84,13 @@ export function PartDetailModal() {
       patch: {
         confirmedQoh: values.confirmedQoh,
         notes: values.notes,
+        itemCondition: values.itemCondition || undefined,
         boxCondition: values.boxCondition || undefined,
         transferredToMarketRecovery: values.transferredToMarketRecovery,
+        transferId: values.transferredToMarketRecovery ? values.transferId || undefined : null,
         itemListed: values.itemListed,
         itemListedDate: values.itemListed ? values.itemListedDate || new Date().toISOString() : null,
+        ebayListingId: values.itemListed ? values.ebayListingId || undefined : null,
       },
     });
     set({ modalOpen: false, selectedId: null });
@@ -85,8 +101,8 @@ export function PartDetailModal() {
       <div className="flex h-full w-full flex-col overflow-y-auto bg-surface sm:h-auto sm:max-h-[90vh] sm:w-[720px] sm:rounded-card">
         <div className="flex items-center justify-between border-b border-border p-4">
           <div>
-            <div className="text-lg font-semibold text-textPri">{part.sku}</div>
-            <div className="text-sm text-textMuted">
+            <div className="text-base font-semibold text-textPri">{part.sku}</div>
+            <div className="text-xs text-textMuted">
               Bin {part.binLocation || '—'} · {part.description}
             </div>
           </div>
@@ -96,7 +112,7 @@ export function PartDetailModal() {
         </div>
 
         <form onSubmit={onSubmit} className="flex-1 space-y-5 p-4">
-          <div className="grid grid-cols-2 gap-3 rounded-card bg-surfaceMuted p-3 text-sm sm:grid-cols-4">
+          <div className="grid grid-cols-2 gap-3 rounded-card bg-surfaceMuted p-3 text-xs sm:grid-cols-4">
             <Field label="SKU" value={part.sku} />
             <Field label="Bin" value={part.binLocation || '—'} />
             <Field label="System QOH" value={String(part.qoh)} />
@@ -121,9 +137,36 @@ export function PartDetailModal() {
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
-              <label className="mb-1 block text-xs font-semibold text-textMuted">Box Condition</label>
-              <Dropdown options={CONDITIONS} {...register('boxCondition')} />
+              <label className="mb-1 block text-xs font-semibold text-textMuted">Item Condition</label>
+              <Controller
+                control={control}
+                name="itemCondition"
+                render={({ field }) => (
+                  <Dropdown
+                    options={ITEM_CONDITIONS}
+                    placeholder={CONDITION_PLACEHOLDER}
+                    value={field.value}
+                    onChange={field.onChange}
+                  />
+                )}
+              />
             </div>
+            <div>
+              <label className="mb-1 block text-xs font-semibold text-textMuted">Box Condition</label>
+              <Controller
+                control={control}
+                name="boxCondition"
+                render={({ field }) => (
+                  <Dropdown
+                    options={BOX_CONDITIONS}
+                    placeholder={CONDITION_PLACEHOLDER}
+                    value={field.value}
+                    onChange={field.onChange}
+                  />
+                )}
+              />
+            </div>
+
             <div>
               <label className="mb-1 block text-xs font-semibold text-textMuted">Transferred To Market Recovery</label>
               <Controller
@@ -138,6 +181,13 @@ export function PartDetailModal() {
                 )}
               />
             </div>
+            {transferred && (
+              <div>
+                <label className="mb-1 block text-xs font-semibold text-textMuted">Transfer ID</label>
+                <Input placeholder="Cetaris Transfer ID" {...register('transferId')} />
+              </div>
+            )}
+
             <div>
               <label className="mb-1 block text-xs font-semibold text-textMuted">Item Listed</label>
               <Controller
@@ -154,10 +204,17 @@ export function PartDetailModal() {
             </div>
             {itemListed && (
               <div>
+                <label className="mb-1 block text-xs font-semibold text-textMuted">eBay Listing ID</label>
+                <Input placeholder="eBay Listing ID" {...register('ebayListingId')} />
+              </div>
+            )}
+
+            {itemListed && (
+              <div>
                 <label className="mb-1 block text-xs font-semibold text-textMuted">Item Listed Date</label>
                 <input
                   type="date"
-                  className="w-full rounded-btn border border-border bg-surface px-3 py-2 text-sm"
+                  className="w-full rounded-btn border border-border bg-surface px-3 py-2 text-xs"
                   {...register('itemListedDate')}
                 />
               </div>

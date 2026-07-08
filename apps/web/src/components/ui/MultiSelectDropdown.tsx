@@ -45,7 +45,7 @@ export function MultiSelectDropdown({ icon, label, options, selected, onChange }
         type="button"
         onClick={() => setOpen((o) => !o)}
         className={cn(
-          'flex w-full items-center gap-2 rounded-btn border border-border bg-surface px-3 py-2 text-left text-sm text-textPri',
+          'flex w-full items-center gap-2 rounded-btn border border-border bg-surface px-3 py-2 text-left text-xs text-textPri',
           open && 'ring-2 ring-primary/40'
         )}
       >
@@ -62,7 +62,7 @@ export function MultiSelectDropdown({ icon, label, options, selected, onChange }
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder={`Search ${label.toLowerCase()}s…`}
-              className="w-full rounded-btn border border-primary/40 py-1.5 pl-8 pr-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+              className="w-full rounded-btn border border-primary/40 py-1.5 pl-8 pr-2 text-xs focus:outline-none focus:ring-2 focus:ring-primary/40"
             />
           </div>
 
@@ -78,12 +78,12 @@ export function MultiSelectDropdown({ icon, label, options, selected, onChange }
 
           <div className="max-h-56 overflow-y-auto">
             {filteredOptions.length === 0 ? (
-              <div className="px-2 py-3 text-center text-sm text-textMuted">No matches</div>
+              <div className="px-2 py-3 text-center text-xs text-textMuted">No matches</div>
             ) : (
               filteredOptions.map((option) => (
                 <label
                   key={option}
-                  className="flex cursor-pointer items-center gap-2 rounded-btn px-2 py-1.5 text-sm hover:bg-surfaceMuted"
+                  className="flex cursor-pointer items-center gap-2 rounded-btn px-2 py-1.5 text-xs hover:bg-surfaceMuted"
                 >
                   <input
                     type="checkbox"

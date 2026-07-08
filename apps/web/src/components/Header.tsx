@@ -6,8 +6,8 @@ export function Header() {
     <header className="flex shrink-0 items-center gap-4 bg-primaryDeep px-6 py-6">
       <img src={calfracLogo} alt="Calfrac" className="h-16 w-16 shrink-0 object-contain" />
       <div>
-        <h1 className="text-2xl font-bold text-white">Calfrac eBay Inventory App</h1>
-        <p className="text-sm text-white/80">Inventory search, status tracking, and photo capture for warehouse parts</p>
+        <h1 className="text-xl font-bold text-white">Calfrac eBay Inventory App</h1>
+        <p className="text-xs text-white/80">Inventory search, status tracking, and photo capture for warehouse parts</p>
       </div>
       <button
         type="button"

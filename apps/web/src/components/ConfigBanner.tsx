@@ -14,7 +14,7 @@ export function ConfigBanner() {
         : 'Could not resolve the SharePoint site, list, or photo library. Check the SHAREPOINT_* environment variables.');
 
   return (
-    <div className="flex items-start gap-3 rounded-card border-l-4 border-red-500 bg-red-50 p-4 text-sm text-red-800">
+    <div className="flex items-start gap-3 rounded-card border-l-4 border-red-500 bg-red-50 p-4 text-xs text-red-800">
       <AlertTriangle size={18} className="mt-0.5 shrink-0" />
       <p>{message}</p>
     </div>

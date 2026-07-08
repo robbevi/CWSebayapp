@@ -33,11 +33,14 @@ function mapItemToPart(
       ? null
       : Number(confirmedQohRaw),
     notes: (get('notes') as string) ?? undefined,
+    itemCondition: (get('itemCondition') as string) ?? undefined,
     boxCondition: (get('boxCondition') as string) ?? undefined,
     photographed: Boolean(get('photographed')) || photos.length > 0,
     itemListed: Boolean(get('itemListed')),
     itemListedDate: (get('itemListedDate') as string) ?? null,
+    ebayListingId: (get('ebayListingId') as string) ?? null,
     transferredToMarketRecovery: Boolean(get('transferredToMarketRecovery')),
+    transferId: (get('transferId') as string) ?? null,
     catalogingStartDate: (get('catalogingStartDate') as string) ?? null,
     legacyPartId: (get('legacyPartId') as string) ?? undefined,
     importSequenceNumber: get('importSequenceNumber') != null ? Number(get('importSequenceNumber')) : null,
@@ -86,11 +89,14 @@ export async function updatePart(itemId: string, patch: InventoryPartPatch): Pro
 
   setIfPresent('confirmedQoh', patch.confirmedQoh);
   setIfPresent('notes', patch.notes);
+  setIfPresent('itemCondition', patch.itemCondition);
   setIfPresent('boxCondition', patch.boxCondition);
   setIfPresent('photographed', patch.photographed);
   setIfPresent('itemListed', patch.itemListed);
   setIfPresent('itemListedDate', patch.itemListedDate);
+  setIfPresent('ebayListingId', patch.ebayListingId);
   setIfPresent('transferredToMarketRecovery', patch.transferredToMarketRecovery);
+  setIfPresent('transferId', patch.transferId);
   setIfPresent('catalogingStartDate', patch.catalogingStartDate);
 
   if (Object.keys(fieldsPayload).length > 0) {
@@ -116,12 +122,15 @@ export interface CreatePartFields {
   binLocation?: string;
   qoh?: number;
   confirmedQoh?: number | null;
+  itemCondition?: string;
   boxCondition?: string;
   notes?: string;
   photographed?: boolean;
   itemListed?: boolean;
   itemListedDate?: string | null;
+  ebayListingId?: string | null;
   transferredToMarketRecovery?: boolean;
+  transferId?: string | null;
   catalogingStartDate?: string | null;
   legacyPartId?: string;
   importSequenceNumber?: number | null;
@@ -143,12 +152,15 @@ export async function createPart(data: CreatePartFields): Promise<string> {
   set('binLocation', data.binLocation);
   set('qoh', data.qoh);
   set('confirmedQoh', data.confirmedQoh);
+  set('itemCondition', data.itemCondition);
   set('boxCondition', data.boxCondition);
   set('notes', data.notes);
   set('photographed', data.photographed ?? false);
   set('itemListed', data.itemListed ?? false);
   set('itemListedDate', data.itemListedDate);
+  set('ebayListingId', data.ebayListingId);
   set('transferredToMarketRecovery', data.transferredToMarketRecovery ?? false);
+  set('transferId', data.transferId);
   set('catalogingStartDate', data.catalogingStartDate);
   set('legacyPartId', data.legacyPartId);
   set('importSequenceNumber', data.importSequenceNumber);
@@ -172,11 +184,14 @@ export async function updatePartFields(itemId: string, data: Partial<CreatePartF
   set('binLocation', data.binLocation);
   set('qoh', data.qoh);
   set('confirmedQoh', data.confirmedQoh);
+  set('itemCondition', data.itemCondition);
   set('boxCondition', data.boxCondition);
   set('notes', data.notes);
   set('itemListed', data.itemListed);
   set('itemListedDate', data.itemListedDate);
+  set('ebayListingId', data.ebayListingId);
   set('transferredToMarketRecovery', data.transferredToMarketRecovery);
+  set('transferId', data.transferId);
   set('catalogingStartDate', data.catalogingStartDate);
   set('importSequenceNumber', data.importSequenceNumber);
 

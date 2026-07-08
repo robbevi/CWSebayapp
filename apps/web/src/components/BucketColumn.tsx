@@ -17,14 +17,14 @@ export function BucketColumn({ status, parts }: { status: WorkflowStatus; parts:
         <div className={`flex h-10 w-10 items-center justify-center rounded-full ${meta.badgeBg} ${meta.iconColor}`}>
           {meta.icon}
         </div>
-        <span className="font-semibold text-textPri">{meta.label}</span>
+        <span className="text-sm font-semibold text-textPri">{meta.label}</span>
         <span className="ml-auto rounded-pill border border-border bg-surface px-2.5 py-1 text-xs font-semibold text-textMuted">
           {parts.length}
         </span>
       </div>
       <div className="flex flex-1 flex-col gap-3 p-4 lg:min-h-0 lg:overflow-y-auto">
         {parts.length === 0 ? (
-          <div className="flex flex-1 items-center justify-center rounded-card border border-dashed border-border p-8 text-center text-sm text-textMuted">
+          <div className="flex flex-1 items-center justify-center rounded-card border border-dashed border-border p-8 text-center text-xs text-textMuted">
             No parts match the selected filters in this bucket.
           </div>
         ) : (

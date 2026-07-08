@@ -85,7 +85,7 @@ export function FilterPanel() {
         <button
           type="button"
           onClick={handleClearAll}
-          className="flex items-center gap-1.5 rounded-btn border border-border bg-surface px-3 py-2 text-sm text-textMuted hover:bg-white hover:text-primary"
+          className="flex items-center gap-1.5 rounded-btn border border-border bg-surface px-3 py-2 text-xs text-textMuted hover:bg-white hover:text-primary"
         >
           <X size={14} />
           Clear All
@@ -93,7 +93,7 @@ export function FilterPanel() {
 
         <button
           onClick={() => qc.invalidateQueries({ queryKey: PARTS_QUERY_KEY })}
-          className="ml-auto flex items-center gap-1.5 rounded-btn border border-border bg-surface px-3 py-2 text-sm text-textMuted hover:bg-white hover:text-primary"
+          className="ml-auto flex items-center gap-1.5 rounded-btn border border-border bg-surface px-3 py-2 text-xs text-textMuted hover:bg-white hover:text-primary"
           aria-label="Refresh"
           title="Refresh"
         >

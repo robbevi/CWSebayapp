@@ -80,14 +80,14 @@ export function PhotoUploader({ sku, itemId, photos }: PhotoUploaderProps) {
         <button
           type="button"
           onClick={() => takeInputRef.current?.click()}
-          className="flex flex-1 items-center justify-center gap-2 rounded-btn bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primaryHover"
+          className="flex flex-1 items-center justify-center gap-2 rounded-btn bg-primary px-4 py-2 text-xs font-medium text-white hover:bg-primaryHover"
         >
           <Camera size={16} /> Take Photo
         </button>
         <button
           type="button"
           onClick={() => uploadInputRef.current?.click()}
-          className="flex flex-1 items-center justify-center gap-2 rounded-btn border border-border px-4 py-2 text-sm font-medium text-textPri hover:bg-surfaceMuted"
+          className="flex flex-1 items-center justify-center gap-2 rounded-btn border border-border px-4 py-2 text-xs font-medium text-textPri hover:bg-surfaceMuted"
         >
           <Upload size={16} /> Upload Photos
         </button>
@@ -117,7 +117,7 @@ export function PhotoUploader({ sku, itemId, photos }: PhotoUploaderProps) {
             </div>
           </>
         ) : (
-          <div className="flex h-32 items-center justify-center text-sm text-textMuted">No photos yet</div>
+          <div className="flex h-32 items-center justify-center text-xs text-textMuted">No photos yet</div>
         )}
 
         {failed.map((f) => (

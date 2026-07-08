@@ -1,4 +1,6 @@
-export type ConditionEnum = 'New' | 'LikeNew' | 'Good' | 'Fair' | 'Poor' | 'ForParts';
+export type ConditionEnum = 'New' | 'Like New' | 'Good' | 'Fair' | 'Poor' | 'For Parts';
+
+export type BoxConditionEnum = 'Excellent' | 'Very Good' | 'Good' | 'Poor' | 'No Box';
 
 export type WorkflowStatus = 'NotStarted' | 'Processing' | 'Completed';
 
@@ -18,11 +20,14 @@ export interface InventoryPart {
   qoh: number;
   confirmedQoh: number | null;
   notes?: string;
-  boxCondition?: ConditionEnum | string;
+  itemCondition?: ConditionEnum | string;
+  boxCondition?: BoxConditionEnum | string;
   photographed: boolean;
   itemListed: boolean;
   itemListedDate?: string | null;
+  ebayListingId?: string | null;
   transferredToMarketRecovery: boolean;
+  transferId?: string | null;
   catalogingStartDate?: string | null;
   legacyPartId?: string;
   importSequenceNumber?: number | null;
@@ -36,11 +41,14 @@ export type InventoryPartPatch = Partial<
     InventoryPart,
     | 'confirmedQoh'
     | 'notes'
+    | 'itemCondition'
     | 'boxCondition'
     | 'photographed'
     | 'itemListed'
     | 'itemListedDate'
+    | 'ebayListingId'
     | 'transferredToMarketRecovery'
+    | 'transferId'
     | 'catalogingStartDate'
   >
 >;

@@ -16,11 +16,14 @@ const KNOWN_FIELDS = [
   'qoh',
   'confirmedQoh',
   'notes',
+  'itemCondition',
   'boxCondition',
   'photographed',
   'itemListed',
   'itemListedDate',
+  'ebayListingId',
   'transferredToMarketRecovery',
+  'transferId',
   'catalogingStartDate',
   'legacyPartId',
   'importSequenceNumber',
@@ -36,11 +39,14 @@ export interface CreatePartFields {
   binLocation?: string;
   qoh?: number;
   confirmedQoh?: number | null;
+  itemCondition?: string;
   boxCondition?: string;
   notes?: string;
   itemListed?: boolean;
   itemListedDate?: string | null;
+  ebayListingId?: string | null;
   transferredToMarketRecovery?: boolean;
+  transferId?: string | null;
   catalogingStartDate?: string | null;
   legacyPartId?: string;
   importSequenceNumber?: number | null;
@@ -79,11 +85,14 @@ export function mapRowToPart(headers: string[], row: unknown[], photos: Photo[])
     qoh: parseNumberOrNull(get('qoh')) ?? 0,
     confirmedQoh: parseNumberOrNull(get('confirmedQoh')),
     notes: get('notes'),
+    itemCondition: get('itemCondition'),
     boxCondition: get('boxCondition'),
     photographed: parseBoolean(get('photographed')) || photos.length > 0,
     itemListed: parseBoolean(get('itemListed')),
     itemListedDate: parseDateOrNull(get('itemListedDate')),
+    ebayListingId: get('ebayListingId') ?? null,
     transferredToMarketRecovery: parseBoolean(get('transferredToMarketRecovery')),
+    transferId: get('transferId') ?? null,
     catalogingStartDate: parseDateOrNull(get('catalogingStartDate')),
     legacyPartId: get('legacyPartId'),
     importSequenceNumber: parseNumberOrNull(get('importSequenceNumber')),
@@ -135,12 +144,15 @@ function buildCreateRecord(data: CreatePartFields, updatedAt: string): Partial<R
     binLocation: data.binLocation,
     qoh: data.qoh,
     confirmedQoh: data.confirmedQoh,
+    itemCondition: data.itemCondition,
     boxCondition: data.boxCondition,
     notes: data.notes,
     photographed: false,
     itemListed: data.itemListed ?? false,
     itemListedDate: data.itemListedDate,
+    ebayListingId: data.ebayListingId,
     transferredToMarketRecovery: data.transferredToMarketRecovery ?? false,
+    transferId: data.transferId,
     catalogingStartDate: data.catalogingStartDate,
     legacyPartId: data.legacyPartId,
     importSequenceNumber: data.importSequenceNumber,
@@ -188,11 +200,14 @@ export async function updatePart(sku: string, patch: InventoryPartPatch): Promis
 
   if (patch.confirmedQoh !== undefined) record.confirmedQoh = patch.confirmedQoh;
   if (patch.notes !== undefined) record.notes = patch.notes;
+  if (patch.itemCondition !== undefined) record.itemCondition = patch.itemCondition;
   if (patch.boxCondition !== undefined) record.boxCondition = patch.boxCondition;
   if (patch.photographed !== undefined) record.photographed = patch.photographed;
   if (patch.itemListed !== undefined) record.itemListed = patch.itemListed;
   if (patch.itemListedDate !== undefined) record.itemListedDate = patch.itemListedDate;
+  if (patch.ebayListingId !== undefined) record.ebayListingId = patch.ebayListingId;
   if (patch.transferredToMarketRecovery !== undefined) record.transferredToMarketRecovery = patch.transferredToMarketRecovery;
+  if (patch.transferId !== undefined) record.transferId = patch.transferId;
   if (patch.catalogingStartDate !== undefined) record.catalogingStartDate = patch.catalogingStartDate;
   record.updatedAt = new Date().toISOString();
 
