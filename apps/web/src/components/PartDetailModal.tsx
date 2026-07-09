@@ -149,6 +149,28 @@ export function PartDetailModal() {
           </div>
 
           <div>
+            <label className="mb-1 block text-xs font-semibold text-textMuted">Disposition Reason</label>
+            <Controller
+              control={control}
+              name="disposition"
+              render={({ field }) => (
+                <Dropdown
+                  groups={DISPOSITION_GROUPS}
+                  placeholder={DISPOSITION_PLACEHOLDER}
+                  value={field.value}
+                  onChange={field.onChange}
+                />
+              )}
+            />
+          </div>
+          {disposition === 'Other' && (
+            <div>
+              <label className="mb-1 block text-xs font-semibold text-textMuted">Disposition Notes</label>
+              <Input placeholder="Describe the reason" {...register('dispositionNote')} />
+            </div>
+          )}
+
+          <div>
             <label className="mb-1 block text-xs font-semibold text-textMuted">Notes</label>
             <Textarea rows={3} {...register('notes')} />
           </div>
@@ -184,28 +206,6 @@ export function PartDetailModal() {
                 )}
               />
             </div>
-
-            <div>
-              <label className="mb-1 block text-xs font-semibold text-textMuted">Disposition</label>
-              <Controller
-                control={control}
-                name="disposition"
-                render={({ field }) => (
-                  <Dropdown
-                    groups={DISPOSITION_GROUPS}
-                    placeholder={DISPOSITION_PLACEHOLDER}
-                    value={field.value}
-                    onChange={field.onChange}
-                  />
-                )}
-              />
-            </div>
-            {disposition === 'Other' && (
-              <div>
-                <label className="mb-1 block text-xs font-semibold text-textMuted">Disposition Notes</label>
-                <Input placeholder="Describe the reason" {...register('dispositionNote')} />
-              </div>
-            )}
 
             <div>
               <label className="mb-1 block text-xs font-semibold text-textMuted">Transferred To Market Recovery</label>

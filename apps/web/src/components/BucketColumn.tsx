@@ -12,7 +12,7 @@ const BUCKET_META: Record<WorkflowStatus, { label: string; icon: ReactElement; b
 export function BucketColumn({ status, parts }: { status: WorkflowStatus; parts: InventoryPart[] }) {
   const meta = BUCKET_META[status];
   return (
-    <div className="flex flex-col rounded-card border border-border bg-surface lg:h-full lg:min-h-0">
+    <div className="flex flex-col rounded-card border border-border bg-columnBg lg:h-full lg:min-h-0">
       <div className="flex items-center gap-3 border-b border-border p-4">
         <div className={`flex h-10 w-10 items-center justify-center rounded-full ${meta.badgeBg} ${meta.iconColor}`}>
           {meta.icon}
@@ -22,7 +22,7 @@ export function BucketColumn({ status, parts }: { status: WorkflowStatus; parts:
           {parts.length}
         </span>
       </div>
-      <div className="flex flex-1 flex-col gap-3 p-4 lg:min-h-0 lg:overflow-y-auto">
+      <div className="flex max-h-[1900px] flex-1 flex-col gap-3 overflow-y-auto p-4 lg:max-h-none lg:min-h-0">
         {parts.length === 0 ? (
           <div className="flex flex-1 items-center justify-center rounded-card border border-dashed border-border p-8 text-center text-xs text-textMuted">
             No parts match the selected filters in this bucket.
