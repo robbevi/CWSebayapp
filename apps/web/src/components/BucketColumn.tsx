@@ -12,7 +12,7 @@ const BUCKET_META: Record<WorkflowStatus, { label: string; icon: ReactElement; b
 export function BucketColumn({ status, parts }: { status: WorkflowStatus; parts: InventoryPart[] }) {
   const meta = BUCKET_META[status];
   return (
-    <div className="flex flex-col rounded-card border border-border bg-columnBg lg:h-full lg:min-h-0">
+    <div className="flex flex-col rounded-card border border-border bg-surfaceMuted lg:h-full lg:min-h-0">
       <div className="flex items-center gap-3 rounded-t-card border-b border-border bg-columnHeaderBg p-4">
         <div className={`flex h-10 w-10 items-center justify-center rounded-full ${meta.badgeBg} ${meta.iconColor}`}>
           {meta.icon}
