@@ -18,6 +18,8 @@ const KNOWN_FIELDS = [
   'notes',
   'itemCondition',
   'boxCondition',
+  'disposition',
+  'dispositionNote',
   'photographed',
   'itemListed',
   'itemListedDate',
@@ -41,6 +43,8 @@ export interface CreatePartFields {
   confirmedQoh?: number | null;
   itemCondition?: string;
   boxCondition?: string;
+  disposition?: string;
+  dispositionNote?: string;
   notes?: string;
   itemListed?: boolean;
   itemListedDate?: string | null;
@@ -87,6 +91,8 @@ export function mapRowToPart(headers: string[], row: unknown[], photos: Photo[])
     notes: get('notes'),
     itemCondition: get('itemCondition'),
     boxCondition: get('boxCondition'),
+    disposition: get('disposition'),
+    dispositionNote: get('dispositionNote'),
     photographed: parseBoolean(get('photographed')) || photos.length > 0,
     itemListed: parseBoolean(get('itemListed')),
     itemListedDate: parseDateOrNull(get('itemListedDate')),
@@ -146,6 +152,8 @@ function buildCreateRecord(data: CreatePartFields, updatedAt: string): Partial<R
     confirmedQoh: data.confirmedQoh,
     itemCondition: data.itemCondition,
     boxCondition: data.boxCondition,
+    disposition: data.disposition,
+    dispositionNote: data.dispositionNote,
     notes: data.notes,
     photographed: false,
     itemListed: data.itemListed ?? false,
@@ -202,6 +210,8 @@ export async function updatePart(sku: string, patch: InventoryPartPatch): Promis
   if (patch.notes !== undefined) record.notes = patch.notes;
   if (patch.itemCondition !== undefined) record.itemCondition = patch.itemCondition;
   if (patch.boxCondition !== undefined) record.boxCondition = patch.boxCondition;
+  if (patch.disposition !== undefined) record.disposition = patch.disposition;
+  if (patch.dispositionNote !== undefined) record.dispositionNote = patch.dispositionNote;
   if (patch.photographed !== undefined) record.photographed = patch.photographed;
   if (patch.itemListed !== undefined) record.itemListed = patch.itemListed;
   if (patch.itemListedDate !== undefined) record.itemListedDate = patch.itemListedDate;

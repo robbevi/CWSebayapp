@@ -12,6 +12,8 @@ export const DISPLAY = {
   confirmedQoh: 'Confirmed Quantity On Hand',
   itemCondition: 'Item Condition',
   boxCondition: 'Box Condition',
+  disposition: 'Disposition',
+  dispositionNote: 'Disposition Notes',
   notes: 'Notes',
   photographed: 'Item Photographed',
   itemListed: 'Item Listed',

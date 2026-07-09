@@ -35,6 +35,8 @@ function mapItemToPart(
     notes: (get('notes') as string) ?? undefined,
     itemCondition: (get('itemCondition') as string) ?? undefined,
     boxCondition: (get('boxCondition') as string) ?? undefined,
+    disposition: (get('disposition') as string) ?? undefined,
+    dispositionNote: (get('dispositionNote') as string) ?? undefined,
     photographed: Boolean(get('photographed')) || photos.length > 0,
     itemListed: Boolean(get('itemListed')),
     itemListedDate: (get('itemListedDate') as string) ?? null,
@@ -91,6 +93,8 @@ export async function updatePart(itemId: string, patch: InventoryPartPatch): Pro
   setIfPresent('notes', patch.notes);
   setIfPresent('itemCondition', patch.itemCondition);
   setIfPresent('boxCondition', patch.boxCondition);
+  setIfPresent('disposition', patch.disposition);
+  setIfPresent('dispositionNote', patch.dispositionNote);
   setIfPresent('photographed', patch.photographed);
   setIfPresent('itemListed', patch.itemListed);
   setIfPresent('itemListedDate', patch.itemListedDate);
@@ -124,6 +128,8 @@ export interface CreatePartFields {
   confirmedQoh?: number | null;
   itemCondition?: string;
   boxCondition?: string;
+  disposition?: string;
+  dispositionNote?: string;
   notes?: string;
   photographed?: boolean;
   itemListed?: boolean;
@@ -154,6 +160,8 @@ export async function createPart(data: CreatePartFields): Promise<string> {
   set('confirmedQoh', data.confirmedQoh);
   set('itemCondition', data.itemCondition);
   set('boxCondition', data.boxCondition);
+  set('disposition', data.disposition);
+  set('dispositionNote', data.dispositionNote);
   set('notes', data.notes);
   set('photographed', data.photographed ?? false);
   set('itemListed', data.itemListed ?? false);
@@ -186,6 +194,8 @@ export async function updatePartFields(itemId: string, data: Partial<CreatePartF
   set('confirmedQoh', data.confirmedQoh);
   set('itemCondition', data.itemCondition);
   set('boxCondition', data.boxCondition);
+  set('disposition', data.disposition);
+  set('dispositionNote', data.dispositionNote);
   set('notes', data.notes);
   set('itemListed', data.itemListed);
   set('itemListedDate', data.itemListedDate);

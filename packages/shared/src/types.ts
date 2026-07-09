@@ -2,6 +2,22 @@ export type ConditionEnum = 'New' | 'Like New' | 'Good' | 'Fair' | 'Poor' | 'For
 
 export type BoxConditionEnum = 'Excellent' | 'Very Good' | 'Good' | 'Poor' | 'No Box';
 
+export type DispositionEnum =
+  | 'Unable to Locate'
+  | 'Location Discrepancy'
+  | 'Currently Active Unit'
+  | 'Reserved for Operations'
+  | 'Committed to Work Order'
+  | 'Damaged'
+  | 'Excessive Wear'
+  | 'Non-Functional'
+  | 'Missing Components'
+  | 'Low Resale Value'
+  | 'No Market Demand'
+  | 'Scrap'
+  | 'Recycle'
+  | 'Other';
+
 export type WorkflowStatus = 'NotStarted' | 'Processing' | 'Completed';
 
 export interface Photo {
@@ -23,6 +39,8 @@ export interface InventoryPart {
   notes?: string;
   itemCondition?: ConditionEnum | string;
   boxCondition?: BoxConditionEnum | string;
+  disposition?: DispositionEnum | string;
+  dispositionNote?: string;
   photographed: boolean;
   itemListed: boolean;
   itemListedDate?: string | null;
@@ -44,6 +62,8 @@ export type InventoryPartPatch = Partial<
     | 'notes'
     | 'itemCondition'
     | 'boxCondition'
+    | 'disposition'
+    | 'dispositionNote'
     | 'photographed'
     | 'itemListed'
     | 'itemListedDate'

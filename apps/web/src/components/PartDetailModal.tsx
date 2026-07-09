@@ -17,11 +17,22 @@ const ITEM_CONDITIONS = ['New', 'Like New', 'Good', 'Fair', 'Poor', 'For Parts']
 const BOX_CONDITIONS = ['Excellent', 'Very Good', 'Good', 'Poor', 'No Box'];
 const CONDITION_PLACEHOLDER = 'Select Condition';
 
+const DISPOSITION_GROUPS = [
+  { label: 'Not Found', options: ['Unable to Locate', 'Location Discrepancy'] },
+  { label: 'Operational Use', options: ['Currently Active Unit', 'Reserved for Operations', 'Committed to Work Order'] },
+  { label: 'Condition Issues', options: ['Damaged', 'Excessive Wear', 'Non-Functional', 'Missing Components'] },
+  { label: 'Business Decision', options: ['Low Resale Value', 'No Market Demand', 'Scrap', 'Recycle'] },
+  { label: 'Other', options: ['Other'] },
+];
+const DISPOSITION_PLACEHOLDER = 'No Disposition';
+
 const schema = z.object({
   confirmedQoh: z.number().min(0),
   notes: z.string().optional(),
   itemCondition: z.string().optional(),
   boxCondition: z.string().optional(),
+  disposition: z.string().optional(),
+  dispositionNote: z.string().optional(),
   transferredToMarketRecovery: z.boolean(),
   transferId: z.string().optional(),
   itemListed: z.boolean(),
@@ -44,6 +55,8 @@ export function PartDetailModal() {
       notes: '',
       itemCondition: '',
       boxCondition: '',
+      disposition: '',
+      dispositionNote: '',
       transferredToMarketRecovery: false,
       transferId: '',
       itemListed: false,
@@ -59,6 +72,8 @@ export function PartDetailModal() {
         notes: part.notes ?? '',
         itemCondition: part.itemCondition ?? '',
         boxCondition: part.boxCondition ?? '',
+        disposition: part.disposition ?? '',
+        dispositionNote: part.dispositionNote ?? '',
         transferredToMarketRecovery: part.transferredToMarketRecovery,
         transferId: part.transferId ?? '',
         itemListed: part.itemListed,
@@ -72,6 +87,7 @@ export function PartDetailModal() {
 
   const itemListed = watch('itemListed');
   const transferred = watch('transferredToMarketRecovery');
+  const disposition = watch('disposition');
 
   const close = () => {
     if (formState.isDirty && !window.confirm('Discard unsaved changes?')) return;
@@ -86,6 +102,8 @@ export function PartDetailModal() {
         notes: values.notes,
         itemCondition: values.itemCondition || undefined,
         boxCondition: values.boxCondition || undefined,
+        disposition: values.disposition || undefined,
+        dispositionNote: values.disposition === 'Other' ? values.dispositionNote || undefined : undefined,
         transferredToMarketRecovery: values.transferredToMarketRecovery,
         transferId: values.transferredToMarketRecovery ? values.transferId || undefined : null,
         itemListed: values.itemListed,
@@ -166,6 +184,28 @@ export function PartDetailModal() {
                 )}
               />
             </div>
+
+            <div>
+              <label className="mb-1 block text-xs font-semibold text-textMuted">Disposition</label>
+              <Controller
+                control={control}
+                name="disposition"
+                render={({ field }) => (
+                  <Dropdown
+                    groups={DISPOSITION_GROUPS}
+                    placeholder={DISPOSITION_PLACEHOLDER}
+                    value={field.value}
+                    onChange={field.onChange}
+                  />
+                )}
+              />
+            </div>
+            {disposition === 'Other' && (
+              <div>
+                <label className="mb-1 block text-xs font-semibold text-textMuted">Disposition Notes</label>
+                <Input placeholder="Describe the reason" {...register('dispositionNote')} />
+              </div>
+            )}
 
             <div>
               <label className="mb-1 block text-xs font-semibold text-textMuted">Transferred To Market Recovery</label>
