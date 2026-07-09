@@ -108,7 +108,11 @@ export function PhotoUploader({ sku, itemId, photos }: PhotoUploaderProps) {
 
         {photos.length > 0 && activePhoto ? (
           <>
-            <img src={activePhoto.url} alt={`${sku} preview`} className="mb-2 h-56 w-full rounded-btn object-cover" />
+            <img
+              src={activePhoto.url}
+              alt={`${sku} preview`}
+              className="mb-2 h-56 w-full rounded-btn bg-surfaceMuted object-contain"
+            />
             <div className="flex gap-2 overflow-x-auto">
               {photos.map((p, i) => (
                 <div key={p.fileId} className="relative shrink-0">
@@ -122,7 +126,7 @@ export function PhotoUploader({ sku, itemId, photos }: PhotoUploaderProps) {
                       handleDelete(p);
                     }}
                     aria-label={`Remove photo ${i + 1}`}
-                    className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full border border-border bg-surface text-textMuted shadow-sm hover:bg-red-50 hover:text-red-600"
+                    className="absolute -right-1.5 -top-1.5 flex h-5 w-5 min-h-0 shrink-0 items-center justify-center rounded-full border border-border bg-surface p-0 leading-none text-textMuted shadow-sm hover:bg-red-50 hover:text-red-600"
                   >
                     <X size={12} />
                   </button>

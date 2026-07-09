@@ -28,7 +28,9 @@ body {
   @apply bg-surfaceMuted text-textPri font-sans antialiased;
 }
 
-button,
-[role='button'] {
-  min-height: 44px;
+@layer base {
+  button,
+  [role='button'] {
+    min-height: 44px;
+  }
 }
