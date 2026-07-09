@@ -8,6 +8,7 @@ import { useSavePart } from '../hooks/useSavePart';
 import { useUIStore } from '../state/useUIStore';
 import { Button } from './ui/Button';
 import { Dropdown } from './ui/Dropdown';
+import { GroupedDropdown } from './ui/GroupedDropdown';
 import { Input } from './ui/Input';
 import { Textarea } from './ui/Textarea';
 import { PhotoUploader } from './PhotoUploader';
@@ -116,8 +117,8 @@ export function PartDetailModal() {
 
   return (
     <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 sm:p-6">
-      <div className="flex h-full w-full flex-col overflow-y-auto bg-surface sm:h-auto sm:max-h-[90vh] sm:w-[720px] sm:rounded-card">
-        <div className="flex items-center justify-between border-b border-border p-4">
+      <div className="flex h-full w-full flex-col bg-surface sm:h-auto sm:max-h-[90vh] sm:w-[720px] sm:rounded-card">
+        <div className="flex shrink-0 items-center justify-between border-b border-border p-4">
           <div>
             <div className="text-base font-semibold text-textPri">{part.sku}</div>
             <div className="text-xs text-textMuted">
@@ -129,14 +130,16 @@ export function PartDetailModal() {
           </button>
         </div>
 
-        <form onSubmit={onSubmit} className="flex-1 space-y-5 p-4">
+        <div className="shrink-0 border-b border-border p-4">
           <div className="grid grid-cols-2 gap-3 rounded-card bg-surfaceMuted p-3 text-xs sm:grid-cols-4">
             <Field label="SKU" value={part.sku} />
             <Field label="Bin" value={part.binLocation || '—'} />
             <Field label="System QOH" value={String(part.qoh)} />
             <Field label="Site" value={part.inventorySite || '—'} />
           </div>
+        </div>
 
+        <form onSubmit={onSubmit} className="min-h-0 flex-1 space-y-5 overflow-y-auto p-4">
           <PhotoUploader sku={part.sku} itemId={part.id} photos={part.photos} />
 
           <div>
@@ -154,10 +157,10 @@ export function PartDetailModal() {
               control={control}
               name="disposition"
               render={({ field }) => (
-                <Dropdown
+                <GroupedDropdown
                   groups={DISPOSITION_GROUPS}
                   placeholder={DISPOSITION_PLACEHOLDER}
-                  value={field.value}
+                  value={field.value ?? ''}
                   onChange={field.onChange}
                 />
               )}
@@ -262,7 +265,7 @@ export function PartDetailModal() {
           </div>
         </form>
 
-        <div className="flex justify-end gap-2 border-t border-border p-4">
+        <div className="flex shrink-0 justify-end gap-2 border-t border-border p-4">
           <Button variant="outline" onClick={close} type="button">
             Cancel
           </Button>
