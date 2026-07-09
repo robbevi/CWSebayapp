@@ -58,8 +58,8 @@ export function FilterPanel() {
         />
       </div>
 
-      <div className="flex flex-wrap items-center gap-3">
-        <div className="w-56">
+      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+        <div className="w-full sm:w-56">
           <MultiSelectDropdown
             icon={<Factory size={14} />}
             label="Inventory Site"
@@ -69,7 +69,7 @@ export function FilterPanel() {
             onChange={(next) => set({ sites: next })}
           />
         </div>
-        <div className="w-56">
+        <div className="w-full sm:w-56">
           <MultiSelectDropdown
             icon={<MapPin size={14} />}
             label="Bin Location"
@@ -79,7 +79,7 @@ export function FilterPanel() {
             onChange={(next) => set({ bins: next })}
           />
         </div>
-        <div className="w-56">
+        <div className="w-full sm:w-56">
           <MultiSelectDropdown
             icon={<Wrench size={14} />}
             label="Manufacturer"
@@ -89,7 +89,7 @@ export function FilterPanel() {
             onChange={(next) => set({ manufacturers: next })}
           />
         </div>
-        <div className="flex w-56 items-center gap-2 rounded-btn border border-border bg-surface px-3 py-2">
+        <div className="flex w-full items-center gap-2 rounded-btn border border-border bg-surface px-3 py-2 sm:w-56">
           <ArrowUpDown size={14} className="shrink-0 text-textMuted" />
           <Dropdown
             variant="bare"
@@ -99,24 +99,26 @@ export function FilterPanel() {
           />
         </div>
 
-        <button
-          type="button"
-          onClick={handleClearAll}
-          className="flex items-center gap-1.5 rounded-btn border border-border bg-surface px-3 py-2 text-xs text-textMuted hover:bg-white hover:text-primary"
-        >
-          <X size={14} />
-          Clear All
-        </button>
+        <div className="grid grid-cols-2 gap-3 sm:contents">
+          <button
+            type="button"
+            onClick={handleClearAll}
+            className="flex items-center justify-center gap-1.5 rounded-btn border border-border bg-surface px-3 py-2 text-xs text-textMuted hover:bg-white hover:text-primary sm:justify-start"
+          >
+            <X size={14} />
+            Clear All
+          </button>
 
-        <button
-          onClick={() => qc.invalidateQueries({ queryKey: PARTS_QUERY_KEY })}
-          className="ml-auto flex items-center gap-1.5 rounded-btn border border-border bg-surface px-3 py-2 text-xs text-textMuted hover:bg-white hover:text-primary"
-          aria-label="Refresh"
-          title="Refresh"
-        >
-          <RefreshCw size={14} />
-          Refresh
-        </button>
+          <button
+            onClick={() => qc.invalidateQueries({ queryKey: PARTS_QUERY_KEY })}
+            className="flex items-center justify-center gap-1.5 rounded-btn border border-border bg-surface px-3 py-2 text-xs text-textMuted hover:bg-white hover:text-primary sm:ml-auto sm:justify-start"
+            aria-label="Refresh"
+            title="Refresh"
+          >
+            <RefreshCw size={14} />
+            Refresh
+          </button>
+        </div>
       </div>
     </div>
   );

@@ -22,7 +22,7 @@ export function BucketColumn({ status, parts }: { status: WorkflowStatus; parts:
           {parts.length}
         </span>
       </div>
-      <div className="flex max-h-[1900px] flex-1 flex-col gap-3 overflow-y-auto p-4 lg:max-h-none lg:min-h-0">
+      <div className="flex min-h-0 max-h-[1900px] flex-1 flex-col gap-3 overflow-y-auto p-4 lg:max-h-none">
         {parts.length === 0 ? (
           <div className="flex flex-1 items-center justify-center rounded-card border border-dashed border-border p-8 text-center text-xs text-textMuted">
             No parts match the selected filters in this bucket.
