@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
-import { ArrowUpDown, Factory, MapPin, RefreshCw, Search, Wrench, X } from 'lucide-react';
-import { PARTS_QUERY_KEY, useInventoryParts } from '../hooks/useInventoryParts';
+import { ArrowUpDown, Factory, MapPin, Search, Wrench, X } from 'lucide-react';
+import { useInventoryParts } from '../hooks/useInventoryParts';
 import { useUIStore, type SortKey } from '../state/useUIStore';
 import { Dropdown } from './ui/Dropdown';
 import { Input } from './ui/Input';
@@ -25,7 +24,6 @@ function countBy(values: (string | undefined)[]): Record<string, number> {
 export function FilterPanel() {
   const { data: parts } = useInventoryParts();
   const { search, sites, bins, manufacturers, sort, set, clearAll } = useUIStore();
-  const qc = useQueryClient();
   const [searchInput, setSearchInput] = useState(search);
 
   useEffect(() => {
@@ -89,7 +87,7 @@ export function FilterPanel() {
             onChange={(next) => set({ manufacturers: next })}
           />
         </div>
-        <div className="flex w-full items-center gap-2 rounded-btn border border-border bg-surface px-3 py-2 sm:w-56">
+        <div className="flex min-h-[44px] w-full items-center gap-2 rounded-btn border border-border bg-surface px-3 py-2 sm:w-56">
           <ArrowUpDown size={14} className="shrink-0 text-textMuted" />
           <Dropdown
             variant="bare"
@@ -99,26 +97,14 @@ export function FilterPanel() {
           />
         </div>
 
-        <div className="grid grid-cols-2 gap-3 sm:contents">
-          <button
-            type="button"
-            onClick={handleClearAll}
-            className="flex items-center justify-center gap-1.5 rounded-btn border border-border bg-surface px-3 py-2 text-xs text-textMuted hover:bg-white hover:text-primary sm:justify-start"
-          >
-            <X size={14} />
-            Clear All
-          </button>
-
-          <button
-            onClick={() => qc.invalidateQueries({ queryKey: PARTS_QUERY_KEY })}
-            className="flex items-center justify-center gap-1.5 rounded-btn border border-border bg-surface px-3 py-2 text-xs text-textMuted hover:bg-white hover:text-primary sm:ml-auto sm:justify-start"
-            aria-label="Refresh"
-            title="Refresh"
-          >
-            <RefreshCw size={14} />
-            Refresh
-          </button>
-        </div>
+        <button
+          type="button"
+          onClick={handleClearAll}
+          className="flex w-full items-center justify-center gap-1.5 rounded-btn border border-border bg-surface px-3 py-2 text-xs text-textMuted hover:bg-white hover:text-primary sm:w-auto sm:justify-start"
+        >
+          <X size={14} />
+          Clear All
+        </button>
       </div>
     </div>
   );
