@@ -106,12 +106,12 @@ export async function updatePart(itemId: string, patch: InventoryPartPatch): Pro
   return getPartById(itemId);
 }
 
-export async function markPhotographed(itemId: string): Promise<void> {
+export async function setPhotographed(itemId: string, value: boolean): Promise<void> {
   const client = getGraphClient();
   const { siteId, listId, columnMap } = await getResolvedContext();
   await client
     .api(`/sites/${siteId}/lists/${listId}/items/${itemId}/fields`)
-    .update({ [internalName(columnMap, DISPLAY.photographed)]: true });
+    .update({ [internalName(columnMap, DISPLAY.photographed)]: value });
 }
 
 export interface CreatePartFields {

@@ -36,6 +36,15 @@ export async function uploadPhoto(sku: string, itemId: string, file: File): Prom
   return parseJson(res);
 }
 
+export async function deletePhoto(fileId: string, sku: string, itemId: string): Promise<void> {
+  const params = new URLSearchParams({ sku, itemId });
+  const res = await fetch(`/api/photos/${encodeURIComponent(fileId)}?${params.toString()}`, { method: 'DELETE' });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}) as { error?: string });
+    throw new Error(body.error || `Request failed with status ${res.status}`);
+  }
+}
+
 export interface ImportResult {
   totalRows: number;
   created: number;

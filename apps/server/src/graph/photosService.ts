@@ -17,7 +17,7 @@ export async function listPhotosGroupedBySku(): Promise<Map<string, Photo[]>> {
   const path = encodeFolderPath(photosFolderPath);
 
   const grouped = new Map<string, Photo[]>();
-  let url: string | undefined = `/drives/${driveId}/root:/${path}:/children?$top=200&$select=name,webUrl,createdDateTime,file`;
+  let url: string | undefined = `/drives/${driveId}/root:/${path}:/children?$top=200&$select=id,name,webUrl,createdDateTime,file`;
 
   while (url) {
     const res: any = await client.api(url).get();
@@ -27,7 +27,7 @@ export async function listPhotosGroupedBySku(): Promise<Map<string, Photo[]>> {
       const sku = extractSkuFromFileName(name);
       if (!sku) continue;
       const list = grouped.get(sku) ?? [];
-      list.push({ fileName: name, url: item.webUrl, uploadedAt: item.createdDateTime });
+      list.push({ fileId: item.id, fileName: name, url: item.webUrl, uploadedAt: item.createdDateTime });
       grouped.set(sku, list);
     }
     url = res['@odata.nextLink'];
@@ -44,8 +44,19 @@ export async function uploadPhoto(sku: string, buffer: Buffer): Promise<Photo> {
   const uploaded = await client.api(`/drives/${driveId}/root:/${path}:/content`).put(buffer);
 
   return {
+    fileId: uploaded.id,
     fileName,
     url: uploaded.webUrl,
     uploadedAt: uploaded.createdDateTime ?? new Date().toISOString(),
   };
+}
+
+// Mirrors google/driveService.ts's deletePhoto for structural parity — untested against
+// a real SharePoint list since this backend is currently dormant. Graph moves items to
+// the drive's recycle bin by default on delete (recoverable), matching the Google path's
+// trash-not-permanent-delete behavior.
+export async function deletePhoto(fileId: string): Promise<void> {
+  const client = getGraphClient();
+  const { driveId } = await getResolvedContext();
+  await client.api(`/drives/${driveId}/items/${fileId}`).delete();
 }

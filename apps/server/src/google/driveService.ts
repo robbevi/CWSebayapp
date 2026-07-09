@@ -39,6 +39,7 @@ export async function listPhotosGroupedBySku(): Promise<Map<string, Photo[]>> {
       if (!sku) continue;
       const list = grouped.get(sku) ?? [];
       list.push({
+        fileId: file.id,
         fileName: file.name,
         url: buildImageUrl(file.id),
         uploadedAt: file.createdTime ?? new Date().toISOString(),
@@ -79,8 +80,18 @@ export async function uploadPhoto(sku: string, buffer: Buffer): Promise<Photo> {
   await drive.permissions.create({ fileId, requestBody: { role: 'reader', type: 'anyone' } });
 
   return {
+    fileId,
     fileName,
     url: buildImageUrl(fileId),
     uploadedAt: created.data.createdTime ?? new Date().toISOString(),
   };
+}
+
+// Trashes rather than permanently deletes — recoverable from Drive's trash if someone
+// removes a photo by mistake. Must use the OAuth client, not the service account: photos
+// are owned by the OAuth-authenticated account (see uploadPhoto), and the service account
+// only has reader access via the shared folder, not edit rights over files it doesn't own.
+export async function deletePhoto(fileId: string): Promise<void> {
+  const drive = getDriveUploadClient();
+  await drive.files.update({ fileId, requestBody: { trashed: true } });
 }

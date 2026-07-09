@@ -1,10 +1,19 @@
 import { Router } from 'express';
 import multer from 'multer';
 import { isGoogleConfigured, isGraphConfigured } from '../config/env.js';
-import { markPhotographed as markPhotographedGraph } from '../graph/partsService.js';
-import { uploadPhoto as uploadPhotoGraph } from '../graph/photosService.js';
-import { markPhotographed as markPhotographedGoogle } from '../google/sheetsService.js';
-import { getPhotoContent, uploadPhoto as uploadPhotoGoogle } from '../google/driveService.js';
+import { setPhotographed as setPhotographedGraph } from '../graph/partsService.js';
+import {
+  deletePhoto as deletePhotoGraph,
+  listPhotosGroupedBySku as listPhotosGroupedBySkuGraph,
+  uploadPhoto as uploadPhotoGraph,
+} from '../graph/photosService.js';
+import { setPhotographed as setPhotographedGoogle } from '../google/sheetsService.js';
+import {
+  deletePhoto as deletePhotoGoogle,
+  getPhotoContent,
+  listPhotosGroupedBySku,
+  uploadPhoto as uploadPhotoGoogle,
+} from '../google/driveService.js';
 
 // Uploads are no longer downscaled client-side (original quality is preserved), so this
 // needs headroom for full-resolution phone camera photos.
@@ -30,7 +39,7 @@ photosRouter.post('/photos', upload.single('file'), async (req, res, next) => {
     if (isGoogleConfigured()) {
       const photo = await uploadPhotoGoogle(sku, req.file.buffer);
       if (itemId) {
-        await markPhotographedGoogle(itemId).catch((err) => console.error('Failed to flag photographed:', err));
+        await setPhotographedGoogle(itemId, true).catch((err) => console.error('Failed to flag photographed:', err));
       }
       res.json(photo);
       return;
@@ -38,7 +47,7 @@ photosRouter.post('/photos', upload.single('file'), async (req, res, next) => {
 
     const photo = await uploadPhotoGraph(sku, req.file.buffer);
     if (itemId) {
-      await markPhotographedGraph(itemId).catch((err) => console.error('Failed to flag Item Photographed:', err));
+      await setPhotographedGraph(itemId, true).catch((err) => console.error('Failed to flag Item Photographed:', err));
     }
     res.json(photo);
   } catch (err) {
@@ -58,6 +67,42 @@ photosRouter.get('/photos/:fileId/content', async (req, res, next) => {
     res.set('Content-Type', 'image/jpeg');
     res.set('Cache-Control', 'public, max-age=31536000, immutable');
     stream.on('error', next).pipe(res);
+  } catch (err) {
+    next(err);
+  }
+});
+
+photosRouter.delete('/photos/:fileId', async (req, res, next) => {
+  try {
+    if (!isGoogleConfigured() && !isGraphConfigured()) {
+      res.status(503).json({ error: 'Photo delete is not configured for this environment.' });
+      return;
+    }
+    const sku = (req.query.sku as string | undefined)?.trim();
+    const itemId = (req.query.itemId as string | undefined)?.trim();
+
+    if (isGoogleConfigured()) {
+      await deletePhotoGoogle(req.params.fileId);
+      if (sku) {
+        const remaining = await listPhotosGroupedBySku();
+        const stillHasPhotos = (remaining.get(sku.toUpperCase()) ?? []).length > 0;
+        await setPhotographedGoogle(itemId ?? sku, stillHasPhotos).catch((err) =>
+          console.error('Failed to sync photographed flag after delete:', err)
+        );
+      }
+      res.status(204).end();
+      return;
+    }
+
+    await deletePhotoGraph(req.params.fileId);
+    if (sku) {
+      const remaining = await listPhotosGroupedBySkuGraph();
+      const stillHasPhotos = (remaining.get(sku.toUpperCase()) ?? []).length > 0;
+      await setPhotographedGraph(itemId ?? sku, stillHasPhotos).catch((err) =>
+        console.error('Failed to sync Item Photographed after delete:', err)
+      );
+    }
+    res.status(204).end();
   } catch (err) {
     next(err);
   }

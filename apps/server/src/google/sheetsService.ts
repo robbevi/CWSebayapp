@@ -222,7 +222,7 @@ export async function updatePart(sku: string, patch: InventoryPartPatch): Promis
   return getPartBySku(sku);
 }
 
-export async function markPhotographed(sku: string): Promise<void> {
+export async function setPhotographed(sku: string, value: boolean): Promise<void> {
   const sheets = getSheetsClient();
   const { headers, rows } = await readSheet();
   const found = findRow(headers, rows, sku);
@@ -234,7 +234,7 @@ export async function markPhotographed(sku: string): Promise<void> {
     spreadsheetId: env.googleSheetId,
     range: `${SHEET_NAME}!${colLetter(col)}${found.rowNumber}`,
     valueInputOption: 'USER_ENTERED',
-    requestBody: { values: [['TRUE']] },
+    requestBody: { values: [[value ? 'TRUE' : 'FALSE']] },
   });
 }
 

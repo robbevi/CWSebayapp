@@ -2,6 +2,7 @@ import { useRef, useState } from 'react';
 import { Camera, Upload, X } from 'lucide-react';
 import type { Photo } from '@warehouse/shared';
 import { prepareUpload } from '../lib/image';
+import { useDeletePhoto } from '../hooks/useDeletePhoto';
 import { useUploadPhoto } from '../hooks/useUploadPhoto';
 import { Pill } from './ui/Pill';
 
@@ -29,6 +30,7 @@ export function PhotoUploader({ sku, itemId, photos }: PhotoUploaderProps) {
   const [activePreview, setActivePreview] = useState(0);
   const [failed, setFailed] = useState<FailedUpload[]>([]);
   const uploadPhoto = useUploadPhoto();
+  const deletePhoto = useDeletePhoto();
 
   const handleFiles = async (files: FileList | null) => {
     if (!files) return;
@@ -51,6 +53,11 @@ export function PhotoUploader({ sku, itemId, photos }: PhotoUploaderProps) {
   };
 
   const activePhoto = photos[Math.min(activePreview, photos.length - 1)];
+
+  const handleDelete = (photo: Photo) => {
+    if (!window.confirm('Remove this photo?')) return;
+    deletePhoto.mutate({ fileId: photo.fileId, sku, itemId });
+  };
 
   return (
     <div>
@@ -104,15 +111,22 @@ export function PhotoUploader({ sku, itemId, photos }: PhotoUploaderProps) {
             <img src={activePhoto.url} alt={`${sku} preview`} className="mb-2 h-56 w-full rounded-btn object-cover" />
             <div className="flex gap-2 overflow-x-auto">
               {photos.map((p, i) => (
-                <button
-                  key={p.fileName}
-                  type="button"
-                  onClick={() => setActivePreview(i)}
-                  className="shrink-0"
-                  title={`Photo ${i + 1}`}
-                >
-                  <img src={p.url} alt={`Photo ${i + 1}`} className="h-16 w-16 rounded-btn object-cover" />
-                </button>
+                <div key={p.fileId} className="relative shrink-0">
+                  <button type="button" onClick={() => setActivePreview(i)} title={`Photo ${i + 1}`}>
+                    <img src={p.url} alt={`Photo ${i + 1}`} className="h-16 w-16 rounded-btn object-cover" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDelete(p);
+                    }}
+                    aria-label={`Remove photo ${i + 1}`}
+                    className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full border border-border bg-surface text-textMuted shadow-sm hover:bg-red-50 hover:text-red-600"
+                  >
+                    <X size={12} />
+                  </button>
+                </div>
               ))}
             </div>
           </>

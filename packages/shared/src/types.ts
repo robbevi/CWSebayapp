@@ -5,6 +5,7 @@ export type BoxConditionEnum = 'Excellent' | 'Very Good' | 'Good' | 'Poor' | 'No
 export type WorkflowStatus = 'NotStarted' | 'Processing' | 'Completed';
 
 export interface Photo {
+  fileId: string;
   fileName: string;
   url: string;
   uploadedAt: string;
