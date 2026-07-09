@@ -4,7 +4,7 @@ import type { InventoryPart, WorkflowStatus } from '@warehouse/shared';
 import { PartCard } from './PartCard';
 
 const BUCKET_META: Record<WorkflowStatus, { label: string; icon: ReactElement; badgeBg: string; iconColor: string }> = {
-  NotStarted: { label: 'Not Started', icon: <ClipboardList size={18} />, badgeBg: 'bg-gray-200', iconColor: 'text-gray-600' },
+  NotStarted: { label: 'Not Started', icon: <ClipboardList size={18} />, badgeBg: 'bg-blue-500', iconColor: 'text-white' },
   Processing: { label: 'Processing', icon: <Wrench size={18} />, badgeBg: 'bg-amber-500', iconColor: 'text-white' },
   Completed: { label: 'Completed', icon: <CheckCircle2 size={18} />, badgeBg: 'bg-primary', iconColor: 'text-white' },
 };
@@ -22,7 +22,7 @@ export function BucketColumn({ status, parts }: { status: WorkflowStatus; parts:
           {parts.length}
         </span>
       </div>
-      <div className="flex min-h-0 max-h-[1900px] flex-1 flex-col gap-3 overflow-y-auto p-4 lg:max-h-none">
+      <div className="column-scroll flex min-h-0 max-h-[640px] flex-1 flex-col gap-3 overflow-y-auto p-4 lg:max-h-none">
         {parts.length === 0 ? (
           <div className="flex flex-1 items-center justify-center rounded-card border border-dashed border-border p-8 text-center text-xs text-textMuted">
             No parts match the selected filters in this bucket.

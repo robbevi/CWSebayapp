@@ -35,3 +35,22 @@ body {
     min-height: 44px;
   }
 }
+
+/* Persistent, visible scrollbar for the bucket column card list (rather than the
+   thin overlay indicator browsers show by default) — a visual cue that there's
+   more to scroll to. Safari on iOS/iPadOS ignores these and always shows its own
+   transient overlay indicator instead; there's no CSS override for that. */
+.column-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: #9caaa6 transparent;
+}
+.column-scroll::-webkit-scrollbar {
+  width: 8px;
+}
+.column-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+.column-scroll::-webkit-scrollbar-thumb {
+  background-color: #9caaa6;
+  border-radius: 9999px;
+}
