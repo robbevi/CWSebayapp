@@ -69,14 +69,14 @@ export function MultiSelectDropdown({ icon, label, options, selected, counts, on
           <div className="mb-2 flex items-center justify-between border-b border-border pb-2 text-xs font-medium">
             <button
               type="button"
-              className="rounded-pill bg-surfaceMuted px-2.5 py-1 text-textMuted hover:bg-border"
+              className="min-h-0 rounded-pill bg-surfaceMuted px-2.5 py-0.5 leading-normal text-textMuted hover:bg-border"
               onClick={() => onChange(filteredOptions)}
             >
               Select All
             </button>
             <button
               type="button"
-              className="rounded-pill bg-surfaceMuted px-2.5 py-1 text-textMuted hover:bg-border"
+              className="min-h-0 rounded-pill bg-surfaceMuted px-2.5 py-0.5 leading-normal text-textMuted hover:bg-border"
               onClick={() => onChange([])}
             >
               Clear All
