@@ -59,7 +59,6 @@ export function MultiSelectDropdown({ icon, label, options, selected, counts, on
           <div className="relative mb-2">
             <Search size={14} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-textMuted" />
             <input
-              autoFocus
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder={`Search ${label.toLowerCase()}s…`}
@@ -67,12 +66,19 @@ export function MultiSelectDropdown({ icon, label, options, selected, counts, on
             />
           </div>
 
-          <div className="mb-2 flex items-center gap-2 border-b border-border pb-2 text-xs font-medium">
-            <button type="button" className="text-primary hover:underline" onClick={() => onChange(filteredOptions)}>
+          <div className="mb-2 flex items-center justify-between border-b border-border pb-2 text-xs font-medium">
+            <button
+              type="button"
+              className="rounded-pill bg-surfaceMuted px-2.5 py-1 text-textMuted hover:bg-border"
+              onClick={() => onChange(filteredOptions)}
+            >
               Select All
             </button>
-            <span className="text-textMuted">·</span>
-            <button type="button" className="text-primary hover:underline" onClick={() => onChange([])}>
+            <button
+              type="button"
+              className="rounded-pill bg-surfaceMuted px-2.5 py-1 text-textMuted hover:bg-border"
+              onClick={() => onChange([])}
+            >
               Clear All
             </button>
           </div>
