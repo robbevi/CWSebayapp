@@ -69,8 +69,11 @@ export function MultiSelectDropdown({
       </button>
 
       {open && (
-        <div style={popoverStyle} className="z-50 rounded-card border border-border bg-surface p-2 shadow-lg">
-          <div className="relative mb-2">
+        <div
+          style={popoverStyle}
+          className="z-50 flex flex-col overflow-hidden rounded-card border border-border bg-surface p-2 shadow-lg"
+        >
+          <div className="relative mb-2 shrink-0">
             <Search size={14} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-textMuted" />
             <input
               value={query}
@@ -80,7 +83,7 @@ export function MultiSelectDropdown({
             />
           </div>
 
-          <div className="mb-2 flex items-center justify-between border-b border-border pb-2 text-xs font-medium">
+          <div className="mb-2 flex shrink-0 items-center justify-between border-b border-border pb-2 text-xs font-medium">
             <button
               type="button"
               className="min-h-0 rounded-pill bg-surfaceMuted px-2.5 py-0.5 leading-normal text-textMuted hover:bg-border"
@@ -97,7 +100,7 @@ export function MultiSelectDropdown({
             </button>
           </div>
 
-          <div className="max-h-56 overflow-y-auto">
+          <div className="min-h-0 flex-1 overflow-y-auto">
             {filteredOptions.length === 0 ? (
               <div className="px-2 py-3 text-center text-xs text-textMuted">No matches</div>
             ) : (

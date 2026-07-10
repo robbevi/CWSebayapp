@@ -1,11 +1,7 @@
-import { Factory, MapPin, Wrench, ArrowUpDown, X } from 'lucide-react';
+import { Factory, MapPin, Wrench, X } from 'lucide-react';
 import type { WorkflowStatus } from '@warehouse/shared';
-import type { SortKey } from '../state/useUIStore';
 import { Button } from './ui/Button';
 import { MultiSelectDropdown } from './ui/MultiSelectDropdown';
-import { SelectDropdown } from './ui/SelectDropdown';
-
-const SORT_OPTIONS: SortKey[] = ['SKU', 'Bin Location', 'Manufacturer', 'Inventory Site', 'Quantity On Hand'];
 
 export const STATUS_OPTIONS: { key: WorkflowStatus; label: string }[] = [
   { key: 'NotStarted', label: 'Not Started' },
@@ -30,8 +26,6 @@ interface FilterDrawerProps {
   onManufacturersChange: (next: string[]) => void;
   statuses: WorkflowStatus[];
   onToggleStatus: (key: WorkflowStatus) => void;
-  sort: SortKey;
-  onSortChange: (v: SortKey) => void;
 }
 
 export function FilterDrawer({
@@ -51,8 +45,6 @@ export function FilterDrawer({
   onManufacturersChange,
   statuses,
   onToggleStatus,
-  sort,
-  onSortChange,
 }: FilterDrawerProps) {
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center">
@@ -127,16 +119,6 @@ export function FilterDrawer({
                 </label>
               ))}
             </div>
-          </div>
-
-          <div>
-            <label className="mb-1 block text-xs font-semibold text-textMuted">Sort</label>
-            <SelectDropdown
-              icon={<ArrowUpDown size={14} />}
-              options={SORT_OPTIONS}
-              value={sort}
-              onChange={(v) => onSortChange(v as SortKey)}
-            />
           </div>
         </div>
 

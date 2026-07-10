@@ -1,9 +1,11 @@
 import { useState } from 'react';
-import { Info, X } from 'lucide-react';
+import { Info, Moon, Sun, X } from 'lucide-react';
 import calfracLogo from '../assets/calfrac-logo.png';
+import { useDarkMode } from '../hooks/useDarkMode';
 
 export function Header() {
   const [infoOpen, setInfoOpen] = useState(false);
+  const [dark, setDark] = useDarkMode();
 
   return (
     <header className="flex shrink-0 items-center gap-3 bg-primaryDeep px-6 py-4">
@@ -14,8 +16,17 @@ export function Header() {
       </div>
       <button
         type="button"
-        onClick={() => setInfoOpen(true)}
+        onClick={() => setDark((d) => !d)}
         className="ml-auto flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-white hover:bg-white/10"
+        aria-label={dark ? 'Switch to light mode' : 'Switch to dark mode'}
+        title={dark ? 'Switch to light mode' : 'Switch to dark mode'}
+      >
+        {dark ? <Sun size={20} /> : <Moon size={20} />}
+      </button>
+      <button
+        type="button"
+        onClick={() => setInfoOpen(true)}
+        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-white hover:bg-white/10"
         aria-label="Info"
       >
         <Info size={20} />

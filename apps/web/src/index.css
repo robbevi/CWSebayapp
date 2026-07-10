@@ -29,6 +29,25 @@ body {
   @apply bg-surfaceMuted text-textPri font-sans antialiased;
 }
 
+:root {
+  color-scheme: light;
+}
+
+/* Manual (class-based) dark mode: since every color in the app is already a CSS custom
+   property referenced via @theme (bg-surface, text-textPri, etc.), overriding the
+   variable values here is enough to re-theme the whole app — no component changes or
+   `dark:` utility variants needed. Toggled by adding/removing `.dark` on <html>. */
+.dark {
+  color-scheme: dark;
+  --color-surface: #1c2622;
+  --color-surfaceMuted: #121815;
+  --color-columnHeaderBg: #26332d;
+  --color-border: #33413a;
+  --color-textPri: #edf2ef;
+  --color-textMuted: #93a49c;
+  --color-tileBg: #17251f;
+}
+
 @layer base {
   button,
   [role='button'] {

@@ -1,9 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Filter, Search, X } from 'lucide-react';
+import { ArrowUpDown, Filter, Search, X } from 'lucide-react';
 import { useInventoryParts } from '../hooks/useInventoryParts';
-import { useUIStore } from '../state/useUIStore';
+import { useUIStore, type SortKey } from '../state/useUIStore';
 import { FilterDrawer, STATUS_OPTIONS } from './FilterDrawer';
 import { Input } from './ui/Input';
+import { SelectDropdown } from './ui/SelectDropdown';
+
+const SORT_OPTIONS: SortKey[] = ['SKU', 'Bin Location', 'Manufacturer', 'Inventory Site', 'Quantity On Hand'];
 
 function uniqueSorted(values: (string | undefined)[]): string[] {
   return Array.from(new Set(values.filter((v): v is string => !!v))).sort();
@@ -74,10 +77,19 @@ export function FilterPanel() {
           />
         </div>
 
+        <div className="w-full sm:w-48">
+          <SelectDropdown
+            icon={<ArrowUpDown size={14} />}
+            options={SORT_OPTIONS}
+            value={sort}
+            onChange={(v) => set({ sort: v as SortKey })}
+          />
+        </div>
+
         <button
           type="button"
           onClick={() => setDrawerOpen(true)}
-          className="flex h-11 items-center justify-center gap-2 rounded-btn border border-border bg-surface px-4 text-xs font-medium text-textPri hover:bg-white sm:w-auto"
+          className="flex h-11 shrink-0 items-center justify-center gap-2 rounded-btn border border-border bg-surface px-4 text-xs font-medium text-textPri hover:bg-surfaceMuted sm:w-auto"
         >
           <Filter size={14} />
           Filters
@@ -131,8 +143,6 @@ export function FilterPanel() {
           onManufacturersChange={(next) => set({ manufacturers: next })}
           statuses={statuses}
           onToggleStatus={toggleStatus}
-          sort={sort}
-          onSortChange={(v) => set({ sort: v })}
         />
       )}
     </div>

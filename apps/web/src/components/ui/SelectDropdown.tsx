@@ -66,7 +66,7 @@ export function SelectDropdown({ icon, options, groups, value, placeholder, onCh
       </button>
 
       {open && (
-        <div style={popoverStyle} className="z-50 max-h-72 overflow-y-auto rounded-card border border-border bg-surface p-2 shadow-lg">
+        <div style={popoverStyle} className="z-50 overflow-y-auto rounded-card border border-border bg-surface p-2 shadow-lg">
           {placeholder && (
             <button type="button" onClick={() => select('')} className={optionButtonClass('')}>
               {placeholder}
