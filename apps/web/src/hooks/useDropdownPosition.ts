@@ -58,10 +58,23 @@ export function useDropdownPosition(open: boolean, triggerRef: RefObject<HTMLEle
     window.addEventListener('resize', reposition);
     window.addEventListener('scroll', reposition, true);
     window.visualViewport?.addEventListener('resize', reposition);
+
+    // Belt-and-suspenders: on a real device we saw this drift out of sync with the
+    // trigger's actual position on some opens even after the above listeners were added
+    // (couldn't pin down the exact trigger — likely a mobile keyboard/toolbar resize that
+    // doesn't fire a plain 'resize' event, or fires it before the visual viewport has
+    // settled). Re-measuring every frame while open is cheap for a short-lived popover and
+    // guarantees it tracks the trigger regardless of what caused the shift.
+    let rafId = requestAnimationFrame(function loop() {
+      reposition();
+      rafId = requestAnimationFrame(loop);
+    });
+
     return () => {
       window.removeEventListener('resize', reposition);
       window.removeEventListener('scroll', reposition, true);
       window.visualViewport?.removeEventListener('resize', reposition);
+      cancelAnimationFrame(rafId);
     };
   }, [open, reposition]);
 
