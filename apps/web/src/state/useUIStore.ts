@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import type { WorkflowStatus } from '@warehouse/shared';
 
 export type SortKey = 'SKU' | 'Bin Location' | 'Manufacturer' | 'Inventory Site' | 'Quantity On Hand';
 
@@ -7,6 +8,7 @@ interface UIState {
   sites: string[];
   bins: string[];
   manufacturers: string[];
+  statuses: WorkflowStatus[];
   sort: SortKey;
   selectedId: string | null;
   modalOpen: boolean;
@@ -19,6 +21,7 @@ const DEFAULTS = {
   sites: [] as string[],
   bins: [] as string[],
   manufacturers: [] as string[],
+  statuses: [] as WorkflowStatus[],
   sort: 'Bin Location' as SortKey,
 };
 

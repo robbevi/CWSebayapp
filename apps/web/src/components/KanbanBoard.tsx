@@ -32,9 +32,19 @@ function sortParts(parts: InventoryPart[], sort: SortKey): InventoryPart[] {
   return [...parts].sort((a, b) => String(a[field] ?? '').localeCompare(String(b[field] ?? '')));
 }
 
+const ALL_STATUSES: WorkflowStatus[] = ['NotStarted', 'Processing', 'Completed'];
+
+// Tailwind needs static class names, so a computed `lg:grid-cols-${n}` string won't
+// generate — this maps the visible column count to a real class.
+const GRID_COLS: Record<number, string> = {
+  1: 'lg:grid-cols-1',
+  2: 'lg:grid-cols-2',
+  3: 'lg:grid-cols-3',
+};
+
 export function KanbanBoard() {
   const { data, isLoading } = useInventoryParts();
-  const { search, sites, bins, manufacturers, sort } = useUIStore();
+  const { search, sites, bins, manufacturers, statuses, sort } = useUIStore();
 
   const filtered = useMemo(() => {
     const parts = data ?? [];
@@ -58,11 +68,13 @@ export function KanbanBoard() {
     Completed: filtered.filter((p) => p.workflowStatus === 'Completed'),
   };
 
+  const visibleStatuses = statuses.length === 0 ? ALL_STATUSES : ALL_STATUSES.filter((s) => statuses.includes(s));
+
   return (
-    <div className="grid grid-cols-1 gap-4 lg:h-full lg:grid-cols-3">
-      <BucketColumn status="NotStarted" parts={buckets.NotStarted} />
-      <BucketColumn status="Processing" parts={buckets.Processing} />
-      <BucketColumn status="Completed" parts={buckets.Completed} />
+    <div className={`grid grid-cols-1 gap-4 lg:h-full ${GRID_COLS[visibleStatuses.length]}`}>
+      {visibleStatuses.map((status) => (
+        <BucketColumn key={status} status={status} parts={buckets[status]} />
+      ))}
     </div>
   );
 }
