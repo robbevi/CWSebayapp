@@ -5,13 +5,23 @@ import { cn } from '../../lib/cn';
 interface MultiSelectDropdownProps {
   icon: ReactNode;
   label: string;
+  /** Shorter trigger text for narrow screens (e.g. "Mfg." for "Manufacturer") — falls back to `label`. */
+  mobileLabel?: string;
   options: string[];
   selected: string[];
   counts?: Record<string, number>;
   onChange: (next: string[]) => void;
 }
 
-export function MultiSelectDropdown({ icon, label, options, selected, counts, onChange }: MultiSelectDropdownProps) {
+export function MultiSelectDropdown({
+  icon,
+  label,
+  mobileLabel,
+  options,
+  selected,
+  counts,
+  onChange,
+}: MultiSelectDropdownProps) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const containerRef = useRef<HTMLDivElement>(null);
@@ -33,8 +43,9 @@ export function MultiSelectDropdown({ icon, label, options, selected, counts, on
     return needle ? options.filter((o) => o.toLowerCase().includes(needle)) : options;
   }, [options, query]);
 
-  const triggerText =
-    selected.length === 0 ? `All ${label}s` : selected.length === 1 ? selected[0] : `${selected.length} selected`;
+  const selectionText = selected.length === 1 ? selected[0] : selected.length > 1 ? `${selected.length} selected` : null;
+  const desktopTriggerText = selectionText ?? `All ${label}s`;
+  const mobileTriggerText = selectionText ?? mobileLabel ?? `All ${label}s`;
 
   const toggle = (option: string) => {
     onChange(selected.includes(option) ? selected.filter((o) => o !== option) : [...selected, option]);
@@ -51,7 +62,8 @@ export function MultiSelectDropdown({ icon, label, options, selected, counts, on
         )}
       >
         <span className="text-textMuted">{icon}</span>
-        <span className="flex-1 truncate">{triggerText}</span>
+        <span className="flex-1 truncate sm:hidden">{mobileTriggerText}</span>
+        <span className="hidden flex-1 truncate sm:inline">{desktopTriggerText}</span>
       </button>
 
       {open && (

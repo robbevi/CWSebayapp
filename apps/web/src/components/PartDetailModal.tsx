@@ -7,8 +7,7 @@ import { useInventoryParts } from '../hooks/useInventoryParts';
 import { useSavePart } from '../hooks/useSavePart';
 import { useUIStore } from '../state/useUIStore';
 import { Button } from './ui/Button';
-import { Dropdown } from './ui/Dropdown';
-import { GroupedDropdown } from './ui/GroupedDropdown';
+import { SelectDropdown } from './ui/SelectDropdown';
 import { Input } from './ui/Input';
 import { Textarea } from './ui/Textarea';
 import { PhotoUploader } from './PhotoUploader';
@@ -18,14 +17,15 @@ const ITEM_CONDITIONS = ['New', 'Like New', 'Good', 'Fair', 'Poor', 'For Parts']
 const BOX_CONDITIONS = ['Excellent', 'Very Good', 'Good', 'Poor', 'No Box'];
 const CONDITION_PLACEHOLDER = 'Select Condition';
 
-const DISPOSITION_GROUPS = [
+const EXCEPTION_GROUPS = [
   { label: 'Not Found', options: ['Unable to Locate', 'Location Discrepancy'] },
   { label: 'Operational Use', options: ['Currently Active Unit', 'Reserved for Operations', 'Committed to Work Order'] },
   { label: 'Condition Issues', options: ['Damaged', 'Excessive Wear', 'Non-Functional', 'Missing Components'] },
   { label: 'Business Decision', options: ['Low Resale Value', 'No Market Demand', 'Scrap', 'Recycle'] },
   { label: 'Other', options: ['Other'] },
 ];
-const DISPOSITION_PLACEHOLDER = 'No Disposition';
+const EXCEPTION_PLACEHOLDER = 'No Exception';
+const YES_NO = ['No', 'Yes'];
 
 const schema = z.object({
   confirmedQoh: z.number().min(0),
@@ -116,8 +116,8 @@ export function PartDetailModal() {
   });
 
   return (
-    <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 sm:p-6">
-      <div className="flex h-full w-full flex-col bg-surface sm:h-auto sm:max-h-[90vh] sm:w-[720px] sm:rounded-card">
+    <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 p-4 sm:p-6">
+      <div className="flex max-h-[85vh] w-full flex-col rounded-card bg-surface sm:w-[720px]">
         <div className="flex shrink-0 items-center justify-between border-b border-border p-4">
           <div>
             <div className="text-base font-semibold text-textPri">{part.sku}</div>
@@ -152,14 +152,14 @@ export function PartDetailModal() {
           </div>
 
           <div>
-            <label className="mb-1 block text-xs font-semibold text-textMuted">Disposition Reason</label>
+            <label className="mb-1 block text-xs font-semibold text-textMuted">Exception Reason</label>
             <Controller
               control={control}
               name="disposition"
               render={({ field }) => (
-                <GroupedDropdown
-                  groups={DISPOSITION_GROUPS}
-                  placeholder={DISPOSITION_PLACEHOLDER}
+                <SelectDropdown
+                  groups={EXCEPTION_GROUPS}
+                  placeholder={EXCEPTION_PLACEHOLDER}
                   value={field.value ?? ''}
                   onChange={field.onChange}
                 />
@@ -168,7 +168,7 @@ export function PartDetailModal() {
           </div>
           {disposition === 'Other' && (
             <div>
-              <label className="mb-1 block text-xs font-semibold text-textMuted">Disposition Notes</label>
+              <label className="mb-1 block text-xs font-semibold text-textMuted">Exception Notes</label>
               <Input placeholder="Describe the reason" {...register('dispositionNote')} />
             </div>
           )}
@@ -185,10 +185,10 @@ export function PartDetailModal() {
                 control={control}
                 name="itemCondition"
                 render={({ field }) => (
-                  <Dropdown
+                  <SelectDropdown
                     options={ITEM_CONDITIONS}
                     placeholder={CONDITION_PLACEHOLDER}
-                    value={field.value}
+                    value={field.value ?? ''}
                     onChange={field.onChange}
                   />
                 )}
@@ -200,10 +200,10 @@ export function PartDetailModal() {
                 control={control}
                 name="boxCondition"
                 render={({ field }) => (
-                  <Dropdown
+                  <SelectDropdown
                     options={BOX_CONDITIONS}
                     placeholder={CONDITION_PLACEHOLDER}
-                    value={field.value}
+                    value={field.value ?? ''}
                     onChange={field.onChange}
                   />
                 )}
@@ -216,10 +216,10 @@ export function PartDetailModal() {
                 control={control}
                 name="transferredToMarketRecovery"
                 render={({ field }) => (
-                  <Dropdown
-                    options={['No', 'Yes']}
+                  <SelectDropdown
+                    options={YES_NO}
                     value={field.value ? 'Yes' : 'No'}
-                    onChange={(e) => field.onChange(e.target.value === 'Yes')}
+                    onChange={(v) => field.onChange(v === 'Yes')}
                   />
                 )}
               />
@@ -237,10 +237,10 @@ export function PartDetailModal() {
                 control={control}
                 name="itemListed"
                 render={({ field }) => (
-                  <Dropdown
-                    options={['No', 'Yes']}
+                  <SelectDropdown
+                    options={YES_NO}
                     value={field.value ? 'Yes' : 'No'}
-                    onChange={(e) => field.onChange(e.target.value === 'Yes')}
+                    onChange={(v) => field.onChange(v === 'Yes')}
                   />
                 )}
               />

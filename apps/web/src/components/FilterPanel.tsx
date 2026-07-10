@@ -2,9 +2,9 @@ import { useEffect, useMemo, useState } from 'react';
 import { ArrowUpDown, Factory, MapPin, Search, Wrench, X } from 'lucide-react';
 import { useInventoryParts } from '../hooks/useInventoryParts';
 import { useUIStore, type SortKey } from '../state/useUIStore';
-import { Dropdown } from './ui/Dropdown';
 import { Input } from './ui/Input';
 import { MultiSelectDropdown } from './ui/MultiSelectDropdown';
+import { SelectDropdown } from './ui/SelectDropdown';
 
 const SORT_OPTIONS: SortKey[] = ['SKU', 'Bin Location', 'Manufacturer', 'Inventory Site', 'Quantity On Hand'];
 
@@ -61,6 +61,7 @@ export function FilterPanel() {
           <MultiSelectDropdown
             icon={<Factory size={14} />}
             label="Inventory Site"
+            mobileLabel="Inv. Site"
             options={siteOptions}
             selected={sites}
             counts={siteCounts}
@@ -71,6 +72,7 @@ export function FilterPanel() {
           <MultiSelectDropdown
             icon={<MapPin size={14} />}
             label="Bin Location"
+            mobileLabel="Bin"
             options={binOptions}
             selected={bins}
             counts={binCounts}
@@ -81,19 +83,19 @@ export function FilterPanel() {
           <MultiSelectDropdown
             icon={<Wrench size={14} />}
             label="Manufacturer"
+            mobileLabel="Mfg."
             options={mfrOptions}
             selected={manufacturers}
             counts={mfrCounts}
             onChange={(next) => set({ manufacturers: next })}
           />
         </div>
-        <div className="flex min-h-[44px] w-full items-center gap-2 rounded-btn border border-border bg-surface px-3 py-2 sm:w-56">
-          <ArrowUpDown size={14} className="shrink-0 text-textMuted" />
-          <Dropdown
-            variant="bare"
+        <div className="w-full sm:w-56">
+          <SelectDropdown
+            icon={<ArrowUpDown size={14} />}
             options={SORT_OPTIONS}
             value={sort}
-            onChange={(e) => set({ sort: e.target.value as SortKey })}
+            onChange={(v) => set({ sort: v as SortKey })}
           />
         </div>
 
