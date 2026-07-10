@@ -19,13 +19,15 @@ interface SelectDropdownProps {
   /** A value treated as the "neutral"/default state — rendered in muted gray like a placeholder
    *  (e.g. "No" on a Yes/No toggle), so it matches the look of the unselected condition dropdowns. */
   mutedValue?: string;
+  /** Extra classes for the closed trigger button (e.g. font-medium to match a sibling button). */
+  triggerClassName?: string;
   onChange: (value: string) => void;
 }
 
 // Fully custom single-select popover instead of a native <select> — the browser's own
 // picker/option-group styling can't be restyled (especially on mobile), so this renders
 // everything ourselves to match the rest of the UI (rounded corners, light gray border).
-export function SelectDropdown({ icon, options, groups, value, placeholder, mutedValue, onChange }: SelectDropdownProps) {
+export function SelectDropdown({ icon, options, groups, value, placeholder, mutedValue, triggerClassName, onChange }: SelectDropdownProps) {
   const isMuted = !value || value === mutedValue;
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -64,7 +66,8 @@ export function SelectDropdown({ icon, options, groups, value, placeholder, mute
         className={cn(
           'flex w-full items-center gap-2 rounded-btn border border-border bg-surface px-3 py-2 text-left text-xs',
           isMuted ? 'text-textMuted' : 'text-textPri',
-          open && 'ring-2 ring-primary/40'
+          open && 'ring-2 ring-primary/40',
+          triggerClassName
         )}
       >
         {icon && <span className="shrink-0 text-textMuted">{icon}</span>}

@@ -82,6 +82,7 @@ export function FilterPanel() {
             icon={<ArrowUpDown size={14} />}
             options={SORT_OPTIONS}
             value={sort}
+            triggerClassName="font-medium text-textPri"
             onChange={(v) => set({ sort: v as SortKey })}
           />
         </div>
