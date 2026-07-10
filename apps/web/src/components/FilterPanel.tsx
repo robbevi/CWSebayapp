@@ -56,19 +56,19 @@ export function FilterPanel() {
         />
       </div>
 
-      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
-        <div className="w-full sm:w-56">
+      <div className="flex flex-row items-center gap-1.5 sm:flex-wrap sm:gap-3">
+        <div className="min-w-0 flex-1 sm:w-56 sm:flex-none">
           <MultiSelectDropdown
             icon={<Factory size={14} />}
             label="Inventory Site"
-            mobileLabel="Inv. Site"
+            mobileLabel="Inv."
             options={siteOptions}
             selected={sites}
             counts={siteCounts}
             onChange={(next) => set({ sites: next })}
           />
         </div>
-        <div className="w-full sm:w-56">
+        <div className="min-w-0 flex-1 sm:w-56 sm:flex-none">
           <MultiSelectDropdown
             icon={<MapPin size={14} />}
             label="Bin Location"
@@ -79,7 +79,7 @@ export function FilterPanel() {
             onChange={(next) => set({ bins: next })}
           />
         </div>
-        <div className="w-full sm:w-56">
+        <div className="min-w-0 flex-1 sm:w-56 sm:flex-none">
           <MultiSelectDropdown
             icon={<Wrench size={14} />}
             label="Manufacturer"
@@ -90,7 +90,7 @@ export function FilterPanel() {
             onChange={(next) => set({ manufacturers: next })}
           />
         </div>
-        <div className="w-full sm:w-56">
+        <div className="min-w-0 flex-1 sm:w-56 sm:flex-none">
           <SelectDropdown
             icon={<ArrowUpDown size={14} />}
             options={SORT_OPTIONS}
@@ -102,10 +102,12 @@ export function FilterPanel() {
         <button
           type="button"
           onClick={handleClearAll}
-          className="flex w-full items-center justify-center gap-1.5 rounded-btn border border-border bg-surface px-3 py-2 text-xs text-textMuted hover:bg-white hover:text-primary sm:w-auto sm:justify-start"
+          aria-label="Clear All"
+          title="Clear All"
+          className="flex h-11 w-11 shrink-0 items-center justify-center gap-1.5 rounded-btn border border-border bg-surface text-textMuted hover:bg-white hover:text-primary sm:h-auto sm:w-auto sm:px-3 sm:py-2"
         >
           <X size={14} />
-          Clear All
+          <span className="hidden sm:inline">Clear All</span>
         </button>
       </div>
     </div>
