@@ -218,6 +218,7 @@ export function PartDetailModal() {
                 render={({ field }) => (
                   <SelectDropdown
                     options={YES_NO}
+                    mutedValue="No"
                     value={field.value ? 'Yes' : 'No'}
                     onChange={(v) => field.onChange(v === 'Yes')}
                   />
@@ -239,6 +240,7 @@ export function PartDetailModal() {
                 render={({ field }) => (
                   <SelectDropdown
                     options={YES_NO}
+                    mutedValue="No"
                     value={field.value ? 'Yes' : 'No'}
                     onChange={(v) => field.onChange(v === 'Yes')}
                   />

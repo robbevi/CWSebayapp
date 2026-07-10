@@ -16,16 +16,22 @@ interface SelectDropdownProps {
   value: string;
   /** Omit for a value that's never "unset" (e.g. a Yes/No toggle) — this also hides the clear-to-blank row. */
   placeholder?: string;
+  /** A value treated as the "neutral"/default state — rendered in muted gray like a placeholder
+   *  (e.g. "No" on a Yes/No toggle), so it matches the look of the unselected condition dropdowns. */
+  mutedValue?: string;
   onChange: (value: string) => void;
 }
 
 // Fully custom single-select popover instead of a native <select> — the browser's own
 // picker/option-group styling can't be restyled (especially on mobile), so this renders
 // everything ourselves to match the rest of the UI (rounded corners, light gray border).
-export function SelectDropdown({ icon, options, groups, value, placeholder, onChange }: SelectDropdownProps) {
+export function SelectDropdown({ icon, options, groups, value, placeholder, mutedValue, onChange }: SelectDropdownProps) {
+  const isMuted = !value || value === mutedValue;
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
-  const popoverStyle = useDropdownPosition(open, containerRef, 256);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  // Measure the trigger button (fixed height), not the container — see MultiSelectDropdown.
+  const popoverStyle = useDropdownPosition(open, triggerRef, 256);
 
   useEffect(() => {
     if (!open) return;
@@ -52,11 +58,12 @@ export function SelectDropdown({ icon, options, groups, value, placeholder, onCh
   return (
     <div ref={containerRef} className="relative">
       <button
+        ref={triggerRef}
         type="button"
         onClick={() => setOpen((o) => !o)}
         className={cn(
           'flex w-full items-center gap-2 rounded-btn border border-border bg-surface px-3 py-2 text-left text-xs',
-          value ? 'text-textPri' : 'text-textMuted',
+          isMuted ? 'text-textMuted' : 'text-textPri',
           open && 'ring-2 ring-primary/40'
         )}
       >

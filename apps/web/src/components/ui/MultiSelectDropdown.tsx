@@ -26,7 +26,11 @@ export function MultiSelectDropdown({
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const containerRef = useRef<HTMLDivElement>(null);
-  const popoverStyle = useDropdownPosition(open, containerRef, 288);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  // Measure the trigger button (fixed height), not the container — the container also
+  // holds the popover, which briefly renders in-flow on first open and would corrupt the
+  // measurement, throwing the popover to the wrong place until reopened.
+  const popoverStyle = useDropdownPosition(open, triggerRef, 288);
 
   useEffect(() => {
     if (!open) return;
@@ -56,6 +60,7 @@ export function MultiSelectDropdown({
   return (
     <div ref={containerRef} className="relative">
       <button
+        ref={triggerRef}
         type="button"
         onClick={() => setOpen((o) => !o)}
         className={cn(

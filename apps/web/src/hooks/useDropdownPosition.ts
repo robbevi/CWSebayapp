@@ -11,8 +11,15 @@ import { useCallback, useLayoutEffect, useState, type CSSProperties, type RefObj
 // never spills past either edge, and vertically flipped to open *above* the trigger when
 // there isn't enough room below. Measured synchronously in useLayoutEffect (before paint,
 // with the trigger ref guaranteed attached) and re-measured on scroll/resize while open.
+// Start out-of-flow and invisible: the popover must NEVER render `position: static` (its
+// default) even for a single frame, or its full-height option list flows into the layout,
+// shoves the trigger, and the very first measurement reads a wrong trigger position (the
+// "first open lands in the wrong place, reopen is fine" bug). useLayoutEffect fills in the
+// real coordinates + visibility before paint, so the hidden state is never actually seen.
+const HIDDEN_STYLE: CSSProperties = { position: 'fixed', top: 0, left: 0, visibility: 'hidden' };
+
 export function useDropdownPosition(open: boolean, triggerRef: RefObject<HTMLElement | null>, width: number) {
-  const [style, setStyle] = useState<CSSProperties>({});
+  const [style, setStyle] = useState<CSSProperties>(HIDDEN_STYLE);
 
   const reposition = useCallback(() => {
     const el = triggerRef.current;
