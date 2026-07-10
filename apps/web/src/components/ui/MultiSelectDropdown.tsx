@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Search } from 'lucide-react';
+import { useDropdownPosition } from '../../hooks/useDropdownPosition';
 import { cn } from '../../lib/cn';
 
 interface MultiSelectDropdownProps {
@@ -25,6 +26,7 @@ export function MultiSelectDropdown({
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const containerRef = useRef<HTMLDivElement>(null);
+  const popoverStyle = useDropdownPosition(open, containerRef, 288);
 
   useEffect(() => {
     if (!open) return;
@@ -67,7 +69,7 @@ export function MultiSelectDropdown({
       </button>
 
       {open && (
-        <div className="absolute left-0 top-[calc(100%+4px)] z-50 w-72 rounded-card border border-border bg-surface p-2 shadow-lg">
+        <div style={popoverStyle} className="z-50 rounded-card border border-border bg-surface p-2 shadow-lg">
           <div className="relative mb-2">
             <Search size={14} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-textMuted" />
             <input

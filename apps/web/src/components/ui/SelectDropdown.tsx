@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { ChevronDown } from 'lucide-react';
+import { useDropdownPosition } from '../../hooks/useDropdownPosition';
 import { cn } from '../../lib/cn';
 
 interface OptionGroup {
@@ -24,6 +25,7 @@ interface SelectDropdownProps {
 export function SelectDropdown({ icon, options, groups, value, placeholder, onChange }: SelectDropdownProps) {
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const popoverStyle = useDropdownPosition(open, containerRef, 256);
 
   useEffect(() => {
     if (!open) return;
@@ -60,11 +62,11 @@ export function SelectDropdown({ icon, options, groups, value, placeholder, onCh
       >
         {icon && <span className="shrink-0 text-textMuted">{icon}</span>}
         <span className="flex-1 truncate">{value || placeholder}</span>
-        <ChevronDown size={14} className="shrink-0 text-textMuted" />
+        <ChevronDown size={14} className="hidden shrink-0 text-textMuted sm:block" />
       </button>
 
       {open && (
-        <div className="absolute left-0 top-[calc(100%+4px)] z-50 max-h-72 w-full min-w-[16rem] overflow-y-auto rounded-card border border-border bg-surface p-2 shadow-lg">
+        <div style={popoverStyle} className="z-50 max-h-72 overflow-y-auto rounded-card border border-border bg-surface p-2 shadow-lg">
           {placeholder && (
             <button type="button" onClick={() => select('')} className={optionButtonClass('')}>
               {placeholder}
