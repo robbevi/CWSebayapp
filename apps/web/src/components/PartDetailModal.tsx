@@ -131,8 +131,9 @@ export function PartDetailModal() {
         </div>
 
         <div className="shrink-0 border-b border-border p-4">
-          <div className="grid grid-cols-2 gap-3 rounded-card bg-surfaceMuted p-3 text-xs sm:grid-cols-4">
+          <div className="grid grid-cols-2 gap-3 rounded-card bg-surfaceMuted p-3 text-xs sm:grid-cols-5">
             <Field label="SKU" value={part.sku} />
+            <Field label="Manufacturer" value={part.manufacturer || '—'} />
             <Field label="Bin" value={part.binLocation || '—'} />
             <Field label="System QOH" value={String(part.qoh)} />
             <Field label="Site" value={part.inventorySite || '—'} />

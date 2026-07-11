@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ArrowUpDown, Filter, Search, X } from 'lucide-react';
+import { ArrowUpDown, Filter, Plus, Search, X } from 'lucide-react';
 import { useInventoryParts } from '../hooks/useInventoryParts';
 import { useUIStore, type SortKey } from '../state/useUIStore';
+import { AddPartModal } from './AddPartModal';
 import { FilterDrawer, STATUS_OPTIONS } from './FilterDrawer';
 import { Input } from './ui/Input';
 import { SelectDropdown } from './ui/SelectDropdown';
@@ -26,6 +27,7 @@ export function FilterPanel() {
   const { search, sites, bins, manufacturers, statuses, sort, set, clearAll } = useUIStore();
   const [searchInput, setSearchInput] = useState(search);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [addPartOpen, setAddPartOpen] = useState(false);
 
   useEffect(() => {
     const timer = setTimeout(() => set({ search: searchInput }), 250);
@@ -102,6 +104,15 @@ export function FilterPanel() {
             </span>
           )}
         </button>
+
+        <button
+          type="button"
+          onClick={() => setAddPartOpen(true)}
+          className="flex h-11 shrink-0 items-center justify-center gap-2 rounded-btn bg-primary px-4 text-xs font-medium text-white hover:bg-primaryHover sm:w-auto"
+        >
+          <Plus size={14} />
+          Add Part
+        </button>
       </div>
 
       {chips.length > 0 && (
@@ -146,6 +157,14 @@ export function FilterPanel() {
           onManufacturersChange={(next) => set({ manufacturers: next })}
           statuses={statuses}
           onToggleStatus={toggleStatus}
+        />
+      )}
+
+      {addPartOpen && (
+        <AddPartModal
+          onClose={() => setAddPartOpen(false)}
+          manufacturerOptions={mfrOptions}
+          siteOptions={siteOptions}
         />
       )}
     </div>

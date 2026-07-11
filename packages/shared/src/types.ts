@@ -55,6 +55,14 @@ export interface InventoryPart {
   workflowStatus: WorkflowStatus;
 }
 
+export interface CreatePartInput {
+  sku: string;
+  binLocation?: string;
+  qoh?: number;
+  manufacturer?: string;
+  inventorySite?: string;
+}
+
 export type InventoryPartPatch = Partial<
   Pick<
     InventoryPart,

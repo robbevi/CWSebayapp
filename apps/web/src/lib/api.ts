@@ -1,4 +1,4 @@
-import type { HealthStatus, InventoryPart, InventoryPartPatch, Photo } from '@warehouse/shared';
+import type { CreatePartInput, HealthStatus, InventoryPart, InventoryPartPatch, Photo } from '@warehouse/shared';
 
 async function parseJson<T>(res: Response): Promise<T> {
   if (!res.ok) {
@@ -15,6 +15,15 @@ export async function fetchHealth(): Promise<HealthStatus> {
 
 export async function fetchParts(): Promise<InventoryPart[]> {
   const res = await fetch('/api/parts');
+  return parseJson(res);
+}
+
+export async function createPart(input: CreatePartInput): Promise<InventoryPart> {
+  const res = await fetch('/api/parts', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+  });
   return parseJson(res);
 }
 
