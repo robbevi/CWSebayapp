@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react';
 import { Search } from 'lucide-react';
 import { useDropdownPosition } from '../../hooks/useDropdownPosition';
 import { cn } from '../../lib/cn';
@@ -30,7 +30,7 @@ export function MultiSelectDropdown({
   // Measure the trigger button (fixed height), not the container — the container also
   // holds the popover, which briefly renders in-flow on first open and would corrupt the
   // measurement, throwing the popover to the wrong place until reopened.
-  const popoverStyle = useDropdownPosition(open, triggerRef, 288);
+  const { style: popoverStyle, popoverRef } = useDropdownPosition(open, triggerRef, 288);
 
   useEffect(() => {
     if (!open) return;
@@ -75,6 +75,7 @@ export function MultiSelectDropdown({
 
       {open && (
         <div
+          ref={popoverRef as RefObject<HTMLDivElement>}
           style={popoverStyle}
           className="z-50 flex flex-col overflow-hidden rounded-card border border-border bg-surface p-2 shadow-lg"
         >

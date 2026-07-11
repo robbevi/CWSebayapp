@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
 import { ChevronDown } from 'lucide-react';
 import { useDropdownPosition } from '../../hooks/useDropdownPosition';
 import { cn } from '../../lib/cn';
@@ -21,19 +21,35 @@ interface SelectDropdownProps {
   mutedValue?: string;
   /** Extra classes for the closed trigger button (e.g. font-medium to match a sibling button). */
   triggerClassName?: string;
+  /** Prepended to the displayed value only (e.g. "Sort: " before "Bin Location") — doesn't
+   *  affect matching against `options`/`groups`, so selection highlighting still works. */
+  valuePrefix?: string;
+  /** Extra classes for the value text span (e.g. text-center). */
+  valueClassName?: string;
   onChange: (value: string) => void;
 }
 
 // Fully custom single-select popover instead of a native <select> — the browser's own
 // picker/option-group styling can't be restyled (especially on mobile), so this renders
 // everything ourselves to match the rest of the UI (rounded corners, light gray border).
-export function SelectDropdown({ icon, options, groups, value, placeholder, mutedValue, triggerClassName, onChange }: SelectDropdownProps) {
+export function SelectDropdown({
+  icon,
+  options,
+  groups,
+  value,
+  placeholder,
+  mutedValue,
+  triggerClassName,
+  valuePrefix,
+  valueClassName,
+  onChange,
+}: SelectDropdownProps) {
   const isMuted = !value || value === mutedValue;
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   // Measure the trigger button (fixed height), not the container — see MultiSelectDropdown.
-  const popoverStyle = useDropdownPosition(open, triggerRef, 256);
+  const { style: popoverStyle, popoverRef } = useDropdownPosition(open, triggerRef, 256);
 
   useEffect(() => {
     if (!open) return;
@@ -71,12 +87,18 @@ export function SelectDropdown({ icon, options, groups, value, placeholder, mute
         )}
       >
         {icon && <span className="shrink-0 text-textMuted">{icon}</span>}
-        <span className="flex-1 truncate">{value || placeholder}</span>
+        <span className={cn('flex-1 truncate', valueClassName)}>
+          {value ? `${valuePrefix ?? ''}${value}` : placeholder}
+        </span>
         <ChevronDown size={14} className="hidden shrink-0 text-textMuted sm:block" />
       </button>
 
       {open && (
-        <div style={popoverStyle} className="z-50 overflow-y-auto rounded-card border border-border bg-surface p-2 shadow-lg">
+        <div
+          ref={popoverRef as RefObject<HTMLDivElement>}
+          style={popoverStyle}
+          className="z-50 overflow-y-auto rounded-card border border-border bg-surface p-2 shadow-lg"
+        >
           {placeholder && (
             <button type="button" onClick={() => select('')} className={optionButtonClass('')}>
               {placeholder}
