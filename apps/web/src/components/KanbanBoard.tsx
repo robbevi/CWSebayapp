@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import type { InventoryPart, WorkflowStatus } from '@warehouse/shared';
+import { checkpointCount, getCheckpoints, type InventoryPart, type TaskKey, type WorkflowStatus } from '@warehouse/shared';
 import { useInventoryParts } from '../hooks/useInventoryParts';
 import { useUIStore, type SortKey } from '../state/useUIStore';
 import { BucketColumn } from './BucketColumn';
@@ -16,19 +16,31 @@ function matchesSet(value: string, selected: string[]): boolean {
   return selected.length === 0 || selected.includes(value);
 }
 
-const SORT_FIELD: Record<SortKey, keyof InventoryPart> = {
+// A part matches if it's still missing at least one of the checked tasks — mirrors the
+// Status filter's OR-across-checked-boxes pattern, so checking several boxes broadens
+// the results (anything left to do on any of them) rather than narrowing to parts
+// missing ALL of them at once.
+function matchesMissingTasks(p: InventoryPart, missingTasks: TaskKey[]): boolean {
+  if (missingTasks.length === 0) return true;
+  const checkpoints = getCheckpoints(p);
+  return missingTasks.some((key) => !checkpoints[key]);
+}
+
+const SORT_FIELD: Partial<Record<SortKey, keyof InventoryPart>> = {
   SKU: 'sku',
   'Bin Location': 'binLocation',
   Manufacturer: 'manufacturer',
   'Inventory Site': 'inventorySite',
-  'Quantity On Hand': 'qoh',
 };
 
 function sortParts(parts: InventoryPart[], sort: SortKey): InventoryPart[] {
-  const field = SORT_FIELD[sort];
   if (sort === 'Quantity On Hand') {
     return [...parts].sort((a, b) => a.qoh - b.qoh);
   }
+  if (sort === 'Progress') {
+    return [...parts].sort((a, b) => checkpointCount(a) - checkpointCount(b));
+  }
+  const field = SORT_FIELD[sort]!;
   return [...parts].sort((a, b) => String(a[field] ?? '').localeCompare(String(b[field] ?? '')));
 }
 
@@ -44,7 +56,7 @@ const GRID_COLS: Record<number, string> = {
 
 export function KanbanBoard() {
   const { data, isLoading } = useInventoryParts();
-  const { search, sites, bins, manufacturers, statuses, sort } = useUIStore();
+  const { search, sites, bins, manufacturers, statuses, missingTasks, sort } = useUIStore();
 
   const filtered = useMemo(() => {
     const parts = data ?? [];
@@ -53,10 +65,11 @@ export function KanbanBoard() {
         matchesSet(p.inventorySite, sites) &&
         matchesSet(p.binLocation, bins) &&
         matchesSet(p.manufacturer, manufacturers) &&
+        matchesMissingTasks(p, missingTasks) &&
         matchesSearch(p, search)
     );
     return sortParts(result, sort);
-  }, [data, search, sites, bins, manufacturers, sort]);
+  }, [data, search, sites, bins, manufacturers, missingTasks, sort]);
 
   if (isLoading) {
     return <div className="py-16 text-center text-textMuted">Loading inventory…</div>;

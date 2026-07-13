@@ -1,7 +1,7 @@
 import { create } from 'zustand';
-import type { WorkflowStatus } from '@warehouse/shared';
+import type { TaskKey, WorkflowStatus } from '@warehouse/shared';
 
-export type SortKey = 'SKU' | 'Bin Location' | 'Manufacturer' | 'Inventory Site' | 'Quantity On Hand';
+export type SortKey = 'SKU' | 'Bin Location' | 'Manufacturer' | 'Inventory Site' | 'Quantity On Hand' | 'Progress';
 
 interface UIState {
   search: string;
@@ -9,6 +9,7 @@ interface UIState {
   bins: string[];
   manufacturers: string[];
   statuses: WorkflowStatus[];
+  missingTasks: TaskKey[];
   sort: SortKey;
   selectedId: string | null;
   modalOpen: boolean;
@@ -22,6 +23,7 @@ const DEFAULTS = {
   bins: [] as string[],
   manufacturers: [] as string[],
   statuses: [] as WorkflowStatus[],
+  missingTasks: [] as TaskKey[],
   sort: 'Bin Location' as SortKey,
 };
 

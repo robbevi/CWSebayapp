@@ -1,5 +1,5 @@
-import { Factory, MapPin, Wrench, X } from 'lucide-react';
-import type { WorkflowStatus } from '@warehouse/shared';
+import { Camera, ClipboardCheck, Factory, ListChecks, MapPin, Tag, TruckIcon, Wrench, X } from 'lucide-react';
+import type { TaskKey, WorkflowStatus } from '@warehouse/shared';
 import { Button } from './ui/Button';
 import { MultiSelectDropdown } from './ui/MultiSelectDropdown';
 
@@ -7,6 +7,14 @@ export const STATUS_OPTIONS: { key: WorkflowStatus; label: string }[] = [
   { key: 'NotStarted', label: 'Not Started' },
   { key: 'Processing', label: 'Processing' },
   { key: 'Completed', label: 'Completed' },
+];
+
+export const TASK_OPTIONS: { key: TaskKey; label: string; icon: React.ReactNode }[] = [
+  { key: 'photographed', label: 'Photos taken', icon: <Camera size={14} /> },
+  { key: 'qtyConfirmed', label: 'Quantity confirmed', icon: <ListChecks size={14} /> },
+  { key: 'conditionSet', label: 'Condition set', icon: <ClipboardCheck size={14} /> },
+  { key: 'transferred', label: 'Transferred', icon: <TruckIcon size={14} /> },
+  { key: 'listed', label: 'eBay listed', icon: <Tag size={14} /> },
 ];
 
 interface FilterDrawerProps {
@@ -26,6 +34,8 @@ interface FilterDrawerProps {
   onManufacturersChange: (next: string[]) => void;
   statuses: WorkflowStatus[];
   onToggleStatus: (key: WorkflowStatus) => void;
+  missingTasks: TaskKey[];
+  onToggleTask: (key: TaskKey) => void;
 }
 
 export function FilterDrawer({
@@ -45,6 +55,8 @@ export function FilterDrawer({
   onManufacturersChange,
   statuses,
   onToggleStatus,
+  missingTasks,
+  onToggleTask,
 }: FilterDrawerProps) {
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center">
@@ -119,6 +131,25 @@ export function FilterDrawer({
                 </label>
               ))}
             </div>
+          </div>
+
+          <div>
+            <span className="mb-1 block text-xs font-semibold text-textMuted">Tasks Completed</span>
+            <div className="space-y-2 rounded-btn border border-border p-3">
+              {TASK_OPTIONS.map((opt) => (
+                <label key={opt.key} className="flex cursor-pointer items-center gap-2 text-xs text-textPri">
+                  <input
+                    type="checkbox"
+                    checked={missingTasks.includes(opt.key)}
+                    onChange={() => onToggleTask(opt.key)}
+                    className="h-4 w-4 shrink-0 accent-primary"
+                  />
+                  <span className="text-textMuted">{opt.icon}</span>
+                  {opt.label}
+                </label>
+              ))}
+            </div>
+            <p className="mt-1.5 text-[11px] text-textMuted">Check a box to show only parts missing that step.</p>
           </div>
         </div>
 

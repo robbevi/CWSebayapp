@@ -3,11 +3,18 @@ import { ArrowUpDown, Filter, Plus, Search, X } from 'lucide-react';
 import { useInventoryParts } from '../hooks/useInventoryParts';
 import { useUIStore, type SortKey } from '../state/useUIStore';
 import { AddPartModal } from './AddPartModal';
-import { FilterDrawer, STATUS_OPTIONS } from './FilterDrawer';
+import { FilterDrawer, STATUS_OPTIONS, TASK_OPTIONS } from './FilterDrawer';
 import { Input } from './ui/Input';
 import { SelectDropdown } from './ui/SelectDropdown';
 
-const SORT_OPTIONS: SortKey[] = ['SKU', 'Bin Location', 'Manufacturer', 'Inventory Site', 'Quantity On Hand'];
+const SORT_OPTIONS: SortKey[] = [
+  'SKU',
+  'Bin Location',
+  'Manufacturer',
+  'Inventory Site',
+  'Quantity On Hand',
+  'Progress',
+];
 
 function uniqueSorted(values: (string | undefined)[]): string[] {
   return Array.from(new Set(values.filter((v): v is string => !!v))).sort();
@@ -24,7 +31,7 @@ function countBy(values: (string | undefined)[]): Record<string, number> {
 
 export function FilterPanel() {
   const { data: parts } = useInventoryParts();
-  const { search, sites, bins, manufacturers, statuses, sort, set, clearAll } = useUIStore();
+  const { search, sites, bins, manufacturers, statuses, missingTasks, sort, set, clearAll } = useUIStore();
   const [searchInput, setSearchInput] = useState(search);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [addPartOpen, setAddPartOpen] = useState(false);
@@ -51,6 +58,10 @@ export function FilterPanel() {
     set({ statuses: statuses.includes(key) ? statuses.filter((s) => s !== key) : [...statuses, key] });
   };
 
+  const toggleTask = (key: (typeof missingTasks)[number]) => {
+    set({ missingTasks: missingTasks.includes(key) ? missingTasks.filter((t) => t !== key) : [...missingTasks, key] });
+  };
+
   const chips = [
     sites.length > 0 && { key: 'sites', label: `Inventory Site: ${sites.join(', ')}`, onRemove: () => set({ sites: [] }) },
     bins.length > 0 && { key: 'bins', label: `Bin Location: ${bins.join(', ')}`, onRemove: () => set({ bins: [] }) },
@@ -63,6 +74,11 @@ export function FilterPanel() {
       key: 'statuses',
       label: `Status: ${statuses.map((s) => STATUS_OPTIONS.find((o) => o.key === s)?.label ?? s).join(', ')}`,
       onRemove: () => set({ statuses: [] }),
+    },
+    missingTasks.length > 0 && {
+      key: 'missingTasks',
+      label: `Missing: ${missingTasks.map((t) => TASK_OPTIONS.find((o) => o.key === t)?.label ?? t).join(', ')}`,
+      onRemove: () => set({ missingTasks: [] }),
     },
   ].filter((c): c is { key: string; label: string; onRemove: () => void } => !!c);
 
@@ -157,6 +173,8 @@ export function FilterPanel() {
           onManufacturersChange={(next) => set({ manufacturers: next })}
           statuses={statuses}
           onToggleStatus={toggleStatus}
+          missingTasks={missingTasks}
+          onToggleTask={toggleTask}
         />
       )}
 
