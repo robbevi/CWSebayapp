@@ -2,7 +2,8 @@ import { useEffect } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { X } from 'lucide-react';
+import { Trash2, X } from 'lucide-react';
+import { useDeletePart } from '../hooks/useDeletePart';
 import { useInventoryParts } from '../hooks/useInventoryParts';
 import { useSavePart } from '../hooks/useSavePart';
 import { useUIStore } from '../state/useUIStore';
@@ -46,6 +47,7 @@ export function PartDetailModal() {
   const { selectedId, modalOpen, set } = useUIStore();
   const { data: parts } = useInventoryParts();
   const savePart = useSavePart();
+  const deletePart = useDeletePart();
 
   const part = parts?.find((p) => p.id === selectedId);
 
@@ -114,6 +116,12 @@ export function PartDetailModal() {
     });
     set({ modalOpen: false, selectedId: null });
   });
+
+  const handleDelete = async () => {
+    if (!window.confirm(`Delete ${part.sku}? This cannot be undone.`)) return;
+    await deletePart.mutateAsync({ id: part.id, sku: part.sku });
+    set({ modalOpen: false, selectedId: null });
+  };
 
   return (
     <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 p-4 sm:p-6">
@@ -268,13 +276,25 @@ export function PartDetailModal() {
           </div>
         </form>
 
-        <div className="flex shrink-0 justify-end gap-2 border-t border-border p-4">
-          <Button variant="outline" onClick={close} type="button">
-            Cancel
+        <div className="flex shrink-0 items-center justify-between border-t border-border p-4">
+          <Button
+            variant="outline"
+            onClick={handleDelete}
+            disabled={deletePart.isPending}
+            type="button"
+            className="border-red-200 text-red-600 hover:bg-red-50"
+          >
+            <Trash2 size={14} />
+            Delete Record
           </Button>
-          <Button onClick={onSubmit} disabled={savePart.isPending} type="button">
-            Save
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={close} type="button">
+              Cancel
+            </Button>
+            <Button onClick={onSubmit} disabled={savePart.isPending} type="button">
+              Save
+            </Button>
+          </div>
         </div>
       </div>
     </div>

@@ -118,6 +118,12 @@ export async function setPhotographed(itemId: string, value: boolean): Promise<v
     .update({ [internalName(columnMap, DISPLAY.photographed)]: value });
 }
 
+export async function deletePart(itemId: string): Promise<void> {
+  const client = getGraphClient();
+  const { siteId, listId } = await getResolvedContext();
+  await client.api(`/sites/${siteId}/lists/${listId}/items/${itemId}`).delete();
+}
+
 export interface CreatePartFields {
   sku: string;
   description?: string;

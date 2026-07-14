@@ -3,12 +3,14 @@ import type { CreatePartInput, InventoryPartPatch } from '@warehouse/shared';
 import { isGoogleConfigured, isGraphConfigured } from '../config/env.js';
 import {
   createPart as createPartGraph,
+  deletePart as deletePartGraph,
   getAllParts as getAllPartsGraph,
   getPartById as getPartByIdGraph,
   updatePart as updatePartGraph,
 } from '../graph/partsService.js';
 import {
   createPart as createPartGoogle,
+  deletePart as deletePartGoogle,
   getAllParts as getAllPartsGoogle,
   getPartBySku as getPartBySkuGoogle,
   updatePart as updatePartGoogle,
@@ -85,6 +87,24 @@ partsRouter.patch('/parts/:id', async (req, res, next) => {
     }
     if (isGraphConfigured()) {
       res.json(await updatePartGraph(req.params.id, patch));
+      return;
+    }
+    res.status(503).json({ error: 'No data backend is configured for this environment.' });
+  } catch (err) {
+    next(err);
+  }
+});
+
+partsRouter.delete('/parts/:id', async (req, res, next) => {
+  try {
+    if (isGoogleConfigured()) {
+      await deletePartGoogle(req.params.id);
+      res.status(204).end();
+      return;
+    }
+    if (isGraphConfigured()) {
+      await deletePartGraph(req.params.id);
+      res.status(204).end();
       return;
     }
     res.status(503).json({ error: 'No data backend is configured for this environment.' });

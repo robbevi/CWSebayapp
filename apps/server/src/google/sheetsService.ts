@@ -124,6 +124,18 @@ export async function checkAccess(): Promise<void> {
   await sheets.spreadsheets.get({ spreadsheetId: env.googleSheetId });
 }
 
+let cachedSheetId: number | undefined;
+
+async function getSheetId(): Promise<number> {
+  if (cachedSheetId !== undefined) return cachedSheetId;
+  const sheets = getSheetsClient();
+  const res = await sheets.spreadsheets.get({ spreadsheetId: env.googleSheetId, fields: 'sheets.properties' });
+  const sheet = res.data.sheets?.find((s) => s.properties?.title === SHEET_NAME);
+  if (sheet?.properties?.sheetId == null) throw new Error(`Sheet "${SHEET_NAME}" was not found in the spreadsheet.`);
+  cachedSheetId = sheet.properties.sheetId;
+  return cachedSheetId;
+}
+
 async function readSheet(): Promise<{ headers: string[]; rows: unknown[][] }> {
   const sheets = getSheetsClient();
   const res = await sheets.spreadsheets.values.get({ spreadsheetId: env.googleSheetId, range: SHEET_NAME });
@@ -230,6 +242,27 @@ export async function updatePart(sku: string, patch: InventoryPartPatch): Promis
   });
 
   return getPartBySku(sku);
+}
+
+export async function deletePart(sku: string): Promise<void> {
+  const sheets = getSheetsClient();
+  const { headers, rows } = await readSheet();
+  const found = findRow(headers, rows, sku);
+  if (!found) throw new Error(`Part with SKU "${sku}" was not found in the Google Sheet.`);
+  const sheetId = await getSheetId();
+
+  await sheets.spreadsheets.batchUpdate({
+    spreadsheetId: env.googleSheetId,
+    requestBody: {
+      requests: [
+        {
+          deleteDimension: {
+            range: { sheetId, dimension: 'ROWS', startIndex: found.rowNumber - 1, endIndex: found.rowNumber },
+          },
+        },
+      ],
+    },
+  });
 }
 
 export async function setPhotographed(sku: string, value: boolean): Promise<void> {

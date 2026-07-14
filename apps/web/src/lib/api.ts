@@ -36,6 +36,14 @@ export async function savePart(id: string, patch: InventoryPartPatch): Promise<I
   return parseJson(res);
 }
 
+export async function deletePart(id: string): Promise<void> {
+  const res = await fetch(`/api/parts/${encodeURIComponent(id)}`, { method: 'DELETE' });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}) as { error?: string });
+    throw new Error(body.error || `Request failed with status ${res.status}`);
+  }
+}
+
 export async function uploadPhoto(sku: string, itemId: string, file: File): Promise<Photo> {
   const form = new FormData();
   form.append('sku', sku);
