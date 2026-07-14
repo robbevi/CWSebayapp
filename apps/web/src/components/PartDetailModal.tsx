@@ -7,6 +7,7 @@ import { useDeletePart } from '../hooks/useDeletePart';
 import { useInventoryParts } from '../hooks/useInventoryParts';
 import { useSavePart } from '../hooks/useSavePart';
 import { useUIStore } from '../state/useUIStore';
+import { useUserStore } from '../state/useUserStore';
 import { Button } from './ui/Button';
 import { SelectDropdown } from './ui/SelectDropdown';
 import { Input } from './ui/Input';
@@ -48,6 +49,7 @@ export function PartDetailModal() {
   const { data: parts } = useInventoryParts();
   const savePart = useSavePart();
   const deletePart = useDeletePart();
+  const currentUser = useUserStore((s) => s.currentUser);
 
   const part = parts?.find((p) => p.id === selectedId);
 
@@ -113,6 +115,7 @@ export function PartDetailModal() {
         itemListedDate: values.itemListed ? values.itemListedDate || new Date().toISOString() : null,
         ebayListingId: values.itemListed ? values.ebayListingId || undefined : null,
       },
+      submittedBy: currentUser ?? undefined,
     });
     set({ modalOpen: false, selectedId: null });
   });

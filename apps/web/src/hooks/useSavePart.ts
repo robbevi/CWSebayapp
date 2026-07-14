@@ -9,7 +9,8 @@ export const useSavePart = () => {
   const toast = useToastStore((s) => s.show);
 
   return useMutation({
-    mutationFn: ({ id, patch }: { id: string; patch: InventoryPartPatch }) => savePart(id, patch),
+    mutationFn: ({ id, patch, submittedBy }: { id: string; patch: InventoryPartPatch; submittedBy?: string }) =>
+      savePart(id, patch, submittedBy),
     onMutate: async ({ id, patch }) => {
       await qc.cancelQueries({ queryKey: PARTS_QUERY_KEY });
       const previous = qc.getQueryData<InventoryPart[]>(PARTS_QUERY_KEY);

@@ -80,9 +80,9 @@ partsRouter.post('/parts', async (req, res, next) => {
 
 partsRouter.patch('/parts/:id', async (req, res, next) => {
   try {
-    const patch = req.body as InventoryPartPatch;
+    const { submittedBy, ...patch } = req.body as InventoryPartPatch & { submittedBy?: string };
     if (isGoogleConfigured()) {
-      res.json(await updatePartGoogle(req.params.id, patch));
+      res.json(await updatePartGoogle(req.params.id, patch, submittedBy));
       return;
     }
     if (isGraphConfigured()) {

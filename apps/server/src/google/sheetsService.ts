@@ -1,11 +1,13 @@
-import { deriveStatus } from '@warehouse/shared';
-import type { InventoryPart, InventoryPartPatch, Photo } from '@warehouse/shared';
+import { deriveStatus, isWinForRole, roleForUser } from '@warehouse/shared';
+import type { InventoryPart, InventoryPartPatch, Photo, Submission } from '@warehouse/shared';
 import { env } from '../config/env.js';
 import { parseBoolean, parseDateOrNull, parseNumberOrNull } from '../lib/csv.js';
 import { getSheetsClient } from './client.js';
 import { listPhotosGroupedBySku } from './driveService.js';
 
 const SHEET_NAME = 'Parts';
+const SUBMISSIONS_SHEET = 'Submissions';
+const SUBMISSIONS_HEADERS = ['sku', 'user', 'role', 'completedAt'];
 
 const KNOWN_FIELDS = [
   'sku',
@@ -207,11 +209,63 @@ export async function getPartBySku(sku: string): Promise<InventoryPart> {
   return mapRowToPart(headers, found.row, photosBySku.get(sku.toUpperCase()) ?? []);
 }
 
-export async function updatePart(sku: string, patch: InventoryPartPatch): Promise<InventoryPart> {
+let submissionsSheetReady = false;
+
+// Creates the "Submissions" tab (with a header row) the first time it's needed, so
+// tracking works without anyone having to manually prep the spreadsheet first.
+async function ensureSubmissionsSheet(): Promise<void> {
+  if (submissionsSheetReady) return;
+  const sheets = getSheetsClient();
+  const res = await sheets.spreadsheets.get({ spreadsheetId: env.googleSheetId, fields: 'sheets.properties' });
+  const exists = res.data.sheets?.some((s) => s.properties?.title === SUBMISSIONS_SHEET);
+  if (!exists) {
+    await sheets.spreadsheets.batchUpdate({
+      spreadsheetId: env.googleSheetId,
+      requestBody: { requests: [{ addSheet: { properties: { title: SUBMISSIONS_SHEET } } }] },
+    });
+    await sheets.spreadsheets.values.update({
+      spreadsheetId: env.googleSheetId,
+      range: `${SUBMISSIONS_SHEET}!A1:D1`,
+      valueInputOption: 'USER_ENTERED',
+      requestBody: { values: [SUBMISSIONS_HEADERS] },
+    });
+  }
+  submissionsSheetReady = true;
+}
+
+async function appendSubmission(submission: Submission): Promise<void> {
+  await ensureSubmissionsSheet();
+  const sheets = getSheetsClient();
+  await sheets.spreadsheets.values.append({
+    spreadsheetId: env.googleSheetId,
+    range: SUBMISSIONS_SHEET,
+    valueInputOption: 'USER_ENTERED',
+    insertDataOption: 'INSERT_ROWS',
+    requestBody: { values: [[submission.sku, submission.user, submission.role, submission.completedAt]] },
+  });
+}
+
+export async function getSubmissions(): Promise<Submission[]> {
+  await ensureSubmissionsSheet();
+  const sheets = getSheetsClient();
+  const res = await sheets.spreadsheets.values.get({ spreadsheetId: env.googleSheetId, range: SUBMISSIONS_SHEET });
+  const [, ...rows] = res.data.values ?? [];
+  return rows
+    .filter((row) => row.length > 0 && row[0])
+    .map((row) => ({
+      sku: String(row[0] ?? ''),
+      user: String(row[1] ?? ''),
+      role: String(row[2] ?? '') as Submission['role'],
+      completedAt: String(row[3] ?? ''),
+    }));
+}
+
+export async function updatePart(sku: string, patch: InventoryPartPatch, submittedBy?: string): Promise<InventoryPart> {
   const sheets = getSheetsClient();
   const { headers, rows } = await readSheet();
   const found = findRow(headers, rows, sku);
   if (!found) throw new Error(`Part with SKU "${sku}" was not found in the Google Sheet.`);
+  const before = mapRowToPart(headers, found.row, []);
 
   const record: Partial<Record<FieldName, unknown>> = {};
   headers.forEach((h, i) => {
@@ -240,6 +294,14 @@ export async function updatePart(sku: string, patch: InventoryPartPatch): Promis
     valueInputOption: 'USER_ENTERED',
     requestBody: { values: [recordToRow(headers, record)] },
   });
+
+  const role = submittedBy ? roleForUser(env.appUsers, submittedBy) : undefined;
+  if (role) {
+    const after = mapRowToPart(headers, recordToRow(headers, record), []);
+    if (!isWinForRole(role, before) && isWinForRole(role, after)) {
+      await appendSubmission({ sku, user: submittedBy!, role, completedAt: new Date().toISOString() });
+    }
+  }
 
   return getPartBySku(sku);
 }

@@ -2,6 +2,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import dotenv from 'dotenv';
 import { z } from 'zod';
+import type { AppUser } from '@warehouse/shared';
 
 // npm workspace scripts ("-w @warehouse/server") run with cwd set to apps/server, not
 // the repo root — dotenv's default `path.resolve(process.cwd(), '.env')` would silently
@@ -27,10 +28,23 @@ const rawSchema = z.object({
   GOOGLE_OAUTH_CLIENT_ID: z.string().optional(),
   GOOGLE_OAUTH_CLIENT_SECRET: z.string().optional(),
   GOOGLE_OAUTH_REFRESH_TOKEN: z.string().optional(),
+  APP_USERS_JSON: z.string().optional(),
   PORT: z.string().optional(),
 });
 
 const raw = rawSchema.parse(process.env);
+
+// The real employee roster (names + roles) is kept out of source entirely — this repo
+// is public — and injected at runtime instead, as a JSON array in .env/Render's env vars.
+function parseAppUsers(json: string | undefined): AppUser[] {
+  if (!json) return [];
+  try {
+    return JSON.parse(json) as AppUser[];
+  } catch {
+    console.error('APP_USERS_JSON is not valid JSON; no users will be available.');
+    return [];
+  }
+}
 
 export const env = {
   tenantId: raw.AZURE_TENANT_ID,
@@ -50,6 +64,7 @@ export const env = {
   googleOAuthClientId: raw.GOOGLE_OAUTH_CLIENT_ID,
   googleOAuthClientSecret: raw.GOOGLE_OAUTH_CLIENT_SECRET,
   googleOAuthRefreshToken: raw.GOOGLE_OAUTH_REFRESH_TOKEN,
+  appUsers: parseAppUsers(raw.APP_USERS_JSON),
   port: Number(raw.PORT ?? 4000),
 };
 

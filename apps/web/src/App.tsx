@@ -2,9 +2,11 @@ import { useEffect } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ConfigBanner } from './components/ConfigBanner';
 import { FilterPanel } from './components/FilterPanel';
+import { GoalsPopup } from './components/GoalsPopup';
 import { Header } from './components/Header';
 import { KanbanBoard } from './components/KanbanBoard';
 import { PartDetailModal } from './components/PartDetailModal';
+import { UserPicker } from './components/UserPicker';
 import { Toast } from './components/ui/Toast';
 import { useInventoryParts } from './hooks/useInventoryParts';
 import { useUIStore } from './state/useUIStore';
@@ -40,6 +42,8 @@ function Dashboard() {
         </div>
       </div>
       <PartDetailModal />
+      <UserPicker />
+      <GoalsPopup />
       <Toast />
       <DeepLinkHandler />
     </>

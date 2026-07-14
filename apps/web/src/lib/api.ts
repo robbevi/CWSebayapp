@@ -1,4 +1,12 @@
-import type { CreatePartInput, HealthStatus, InventoryPart, InventoryPartPatch, Photo } from '@warehouse/shared';
+import type {
+  AppUser,
+  CreatePartInput,
+  HealthStatus,
+  InventoryPart,
+  InventoryPartPatch,
+  Photo,
+  SubmissionSummary,
+} from '@warehouse/shared';
 
 async function parseJson<T>(res: Response): Promise<T> {
   if (!res.ok) {
@@ -27,11 +35,11 @@ export async function createPart(input: CreatePartInput): Promise<InventoryPart>
   return parseJson(res);
 }
 
-export async function savePart(id: string, patch: InventoryPartPatch): Promise<InventoryPart> {
+export async function savePart(id: string, patch: InventoryPartPatch, submittedBy?: string): Promise<InventoryPart> {
   const res = await fetch(`/api/parts/${encodeURIComponent(id)}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(patch),
+    body: JSON.stringify({ ...patch, submittedBy }),
   });
   return parseJson(res);
 }
@@ -60,6 +68,16 @@ export async function deletePhoto(fileId: string, sku: string, itemId: string): 
     const body = await res.json().catch(() => ({}) as { error?: string });
     throw new Error(body.error || `Request failed with status ${res.status}`);
   }
+}
+
+export async function fetchSubmissionSummary(): Promise<SubmissionSummary[]> {
+  const res = await fetch('/api/submissions/summary');
+  return parseJson(res);
+}
+
+export async function fetchAppUsers(): Promise<AppUser[]> {
+  const res = await fetch('/api/users');
+  return parseJson(res);
 }
 
 export interface ImportResult {

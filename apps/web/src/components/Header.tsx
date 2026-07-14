@@ -1,11 +1,17 @@
 import { useState } from 'react';
-import { Info, Moon, Sun, X } from 'lucide-react';
+import { Info, Moon, Sun, Target, Trophy, X } from 'lucide-react';
 import calfracLogo from '../assets/calfrac-logo.png';
 import { useDarkMode } from '../hooks/useDarkMode';
+import { useGoalsPopupStore } from '../state/useGoalsPopupStore';
+import { useUserStore } from '../state/useUserStore';
+import { Scoreboard } from './Scoreboard';
 
 export function Header() {
   const [infoOpen, setInfoOpen] = useState(false);
+  const [scoreboardOpen, setScoreboardOpen] = useState(false);
   const [dark, setDark] = useDarkMode();
+  const currentUser = useUserStore((s) => s.currentUser);
+  const setGoalsOpen = useGoalsPopupStore((s) => s.setOpen);
 
   return (
     <header className="flex shrink-0 items-center gap-3 bg-primaryDeep px-6 py-4">
@@ -14,10 +20,30 @@ export function Header() {
         <h1 className="text-xl font-bold text-white">Calfrac eBay Inventory App</h1>
         <p className="text-xs text-white/80">Inventory search, status tracking, and photo capture for warehouse parts</p>
       </div>
+      {currentUser && (
+        <button
+          type="button"
+          onClick={() => setGoalsOpen(true)}
+          className="ml-auto flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-white hover:bg-white/10"
+          aria-label="Goals"
+          title="Goals"
+        >
+          <Target size={20} />
+        </button>
+      )}
+      <button
+        type="button"
+        onClick={() => setScoreboardOpen(true)}
+        className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-white hover:bg-white/10 ${currentUser ? '' : 'ml-auto'}`}
+        aria-label="Scoreboard"
+        title="Scoreboard"
+      >
+        <Trophy size={20} />
+      </button>
       <button
         type="button"
         onClick={() => setDark((d) => !d)}
-        className="ml-auto flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-white hover:bg-white/10"
+        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-white hover:bg-white/10"
         aria-label={dark ? 'Switch to light mode' : 'Switch to dark mode'}
         title={dark ? 'Switch to light mode' : 'Switch to dark mode'}
       >
@@ -31,6 +57,8 @@ export function Header() {
       >
         <Info size={20} />
       </button>
+
+      {scoreboardOpen && <Scoreboard onClose={() => setScoreboardOpen(false)} />}
 
       {infoOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
