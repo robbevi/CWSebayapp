@@ -5,6 +5,7 @@ import type {
   InventoryPart,
   InventoryPartPatch,
   Photo,
+  Submission,
   SubmissionSummary,
 } from '@warehouse/shared';
 
@@ -72,6 +73,11 @@ export async function deletePhoto(fileId: string, sku: string, itemId: string): 
 
 export async function fetchSubmissionSummary(): Promise<SubmissionSummary[]> {
   const res = await fetch('/api/submissions/summary');
+  return parseJson(res);
+}
+
+export async function fetchAllSubmissions(): Promise<Submission[]> {
+  const res = await fetch('/api/submissions');
   return parseJson(res);
 }
 

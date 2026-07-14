@@ -280,13 +280,7 @@ export function PartDetailModal() {
         </form>
 
         <div className="flex shrink-0 items-center justify-between border-t border-border p-4">
-          <Button
-            variant="outline"
-            onClick={handleDelete}
-            disabled={deletePart.isPending}
-            type="button"
-            className="border-red-200 text-red-600 hover:bg-red-50"
-          >
+          <Button variant="danger" onClick={handleDelete} disabled={deletePart.isPending} type="button">
             <Trash2 size={14} />
             Delete Record
           </Button>

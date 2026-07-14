@@ -1,23 +1,21 @@
 import { Router } from 'express';
-import type { SubmissionSummary } from '@warehouse/shared';
+import { chicagoDateString, mondayOf, type SubmissionSummary } from '@warehouse/shared';
 import { env, isGoogleConfigured } from '../config/env.js';
 import { getSubmissions } from '../google/sheetsService.js';
 
 export const submissionsRouter = Router();
 
-// en-CA formats as YYYY-MM-DD, which sorts/compares correctly as a plain string —
-// convenient for the day/week/month bucketing below without a date library.
-function chicagoDateString(iso: string): string {
-  return new Date(iso).toLocaleDateString('en-CA', { timeZone: 'America/Chicago' });
-}
-
-function mondayOf(dateStr: string): string {
-  const d = new Date(`${dateStr}T00:00:00Z`);
-  const dow = d.getUTCDay();
-  const diffToMonday = (dow + 6) % 7;
-  d.setUTCDate(d.getUTCDate() - diffToMonday);
-  return d.toISOString().slice(0, 10);
-}
+submissionsRouter.get('/submissions', async (_req, res, next) => {
+  try {
+    if (!isGoogleConfigured()) {
+      res.status(503).json({ error: 'No data backend is configured for this environment.' });
+      return;
+    }
+    res.json(await getSubmissions());
+  } catch (err) {
+    next(err);
+  }
+});
 
 submissionsRouter.get('/submissions/summary', async (_req, res, next) => {
   try {

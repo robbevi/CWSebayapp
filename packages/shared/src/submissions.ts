@@ -48,3 +48,19 @@ export interface SubmissionSummary {
   week: number;
   month: number;
 }
+
+// en-CA formats as YYYY-MM-DD, which sorts/compares correctly as a plain string —
+// convenient for day/week/month bucketing without a date library. Chicago covers the
+// Williston, ND site, so "today" means the same thing to the server and every user
+// regardless of their own device's timezone.
+export function chicagoDateString(iso: string): string {
+  return new Date(iso).toLocaleDateString('en-CA', { timeZone: 'America/Chicago' });
+}
+
+export function mondayOf(dateStr: string): string {
+  const d = new Date(`${dateStr}T00:00:00Z`);
+  const dow = d.getUTCDay();
+  const diffToMonday = (dow + 6) % 7;
+  d.setUTCDate(d.getUTCDate() - diffToMonday);
+  return d.toISOString().slice(0, 10);
+}
