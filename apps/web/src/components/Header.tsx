@@ -16,10 +16,7 @@ export function Header() {
   return (
     <header className="flex shrink-0 items-center gap-3 bg-primaryDeep px-6 py-4">
       <img src={calfracLogo} alt="Calfrac" className="h-12 w-12 shrink-0 object-contain" />
-      <div>
-        <h1 className="text-xl font-bold text-white">Calfrac eBay Inventory App</h1>
-        <p className="text-xs text-white/80">Inventory search, status tracking, and photo capture for warehouse parts</p>
-      </div>
+      <h1 className="text-xl font-bold text-white">Calfrac eBay Inventory App</h1>
       {currentUser && (
         <button
           type="button"

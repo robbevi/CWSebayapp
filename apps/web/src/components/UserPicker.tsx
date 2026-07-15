@@ -10,7 +10,7 @@ export function UserPicker() {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
       <div className="w-full max-w-sm rounded-card bg-surface p-6">
-        <h2 className="mb-1 text-base font-semibold text-textPri">Who's using this?</h2>
+        <h2 className="mb-1 text-base font-semibold text-textPri">Please Select User</h2>
         <p className="mb-4 text-xs text-textMuted">Pick your name so completed parts get credited to you.</p>
         <div className="space-y-2">
           {users.map((u) => (
