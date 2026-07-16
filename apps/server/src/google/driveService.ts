@@ -28,14 +28,20 @@ export async function listPhotosGroupedBySku(): Promise<Map<string, Photo[]>> {
   do {
     const res = await drive.files.list({
       q: `'${env.googleDriveFolderId}' in parents and trashed = false`,
-      fields: 'nextPageToken, files(id, name, createdTime)',
+      fields: 'nextPageToken, files(id, name, createdTime, properties)',
       pageSize: 200,
       pageToken,
     });
 
     for (const file of res.data.files ?? []) {
       if (!file.name || !file.id) continue;
-      const sku = extractSkuFromFileName(file.name);
+      // The real SKU is stored in Drive's custom `properties` metadata (see uploadPhoto)
+      // rather than parsed back out of the filename — the filename is sanitized to
+      // [A-Za-z0-9-] for display, which is lossy for SKUs containing '.', '/', '\', etc.
+      // (e.g. "AB.123" and "AB/123" both sanitize to "AB-123"), so two different SKUs'
+      // photos would otherwise collide or fail to match at all. Fall back to the old
+      // filename-parsing for photos uploaded before this property existed.
+      const sku = file.properties?.sku ?? extractSkuFromFileName(file.name);
       if (!sku) continue;
       const list = grouped.get(sku) ?? [];
       list.push({
@@ -67,7 +73,13 @@ export async function uploadPhoto(sku: string, buffer: Buffer): Promise<Photo> {
   const fileName = buildPhotoFileName(sku);
 
   const created = await drive.files.create({
-    requestBody: { name: fileName, parents: [env.googleDriveFolderId!] },
+    // `sku.trim().toUpperCase()` matches the key format getAllParts() builds from the
+    // Parts sheet, so the lookup in listPhotosGroupedBySku's caller lines up exactly.
+    requestBody: {
+      name: fileName,
+      parents: [env.googleDriveFolderId!],
+      properties: { sku: sku.trim().toUpperCase() },
+    },
     media: { mimeType: 'image/jpeg', body: Readable.from(buffer) },
     fields: 'id, name, createdTime',
   });
