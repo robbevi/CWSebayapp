@@ -82,7 +82,11 @@ export function PartDetailModal() {
         transferredToMarketRecovery: part.transferredToMarketRecovery,
         transferId: part.transferId ?? '',
         itemListed: part.itemListed,
-        itemListedDate: part.itemListedDate ?? '',
+        // itemListedDate is stored as a full ISO datetime ("2026-07-16T00:00:00.000Z"),
+        // but a native <input type="date"> only accepts exactly "YYYY-MM-DD" as its
+        // value — anything else is silently treated as invalid and rendered blank, even
+        // though the data was saved correctly. Slicing to the date portion fixes display.
+        itemListedDate: part.itemListedDate ? part.itemListedDate.slice(0, 10) : '',
         ebayListingId: part.ebayListingId ?? '',
       });
     }
