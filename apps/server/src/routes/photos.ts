@@ -11,7 +11,7 @@ import { setPhotographed as setPhotographedGoogle } from '../google/sheetsServic
 import {
   deletePhoto as deletePhotoGoogle,
   getPhotoContent,
-  listPhotosGroupedBySku,
+  listPhotosGrouped,
   uploadPhoto as uploadPhotoGoogle,
 } from '../google/driveService.js';
 
@@ -32,13 +32,14 @@ photosRouter.post('/photos', upload.single('file'), async (req, res, next) => {
     const sku = (req.body?.sku as string | undefined)?.trim();
     const itemId = (req.body?.itemId as string | undefined)?.trim();
     const submittedBy = (req.body?.submittedBy as string | undefined)?.trim() || undefined;
+    const site = (req.body?.site as string | undefined)?.trim() || undefined;
     if (!sku || !req.file) {
       res.status(400).json({ error: 'sku and file are required.' });
       return;
     }
 
     if (isGoogleConfigured()) {
-      const photo = await uploadPhotoGoogle(sku, req.file.buffer);
+      const photo = await uploadPhotoGoogle(sku, req.file.buffer, itemId, site);
       if (itemId) {
         // Passing submittedBy matters for more than bookkeeping: uploading a photo can be
         // the action that completes a part, and that win is only credited if we know who did it.
@@ -89,8 +90,13 @@ photosRouter.delete('/photos/:fileId', async (req, res, next) => {
     if (isGoogleConfigured()) {
       await deletePhotoGoogle(req.params.fileId);
       if (sku) {
-        const remaining = await listPhotosGroupedBySku();
-        const stillHasPhotos = (remaining.get(sku.toUpperCase()) ?? []).length > 0;
+        const remaining = await listPhotosGrouped();
+        // Count both buckets: a part can hold a mix of partId-tagged photos and older
+        // SKU-only ones, and it stays "photographed" while any of them survive.
+        const stillHasPhotos =
+          (itemId ? (remaining.byPartId.get(itemId) ?? []).length : 0) +
+            (remaining.legacyBySku.get(sku.toUpperCase()) ?? []).length >
+          0;
         await setPhotographedGoogle(itemId ?? sku, stillHasPhotos).catch((err) =>
           console.error('Failed to sync photographed flag after delete:', err)
         );

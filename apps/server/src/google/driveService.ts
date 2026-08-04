@@ -20,9 +20,17 @@ export async function checkAccess(): Promise<void> {
   await drive.files.get({ fileId: env.googleDriveFolderId!, fields: 'id' });
 }
 
-export async function listPhotosGroupedBySku(): Promise<Map<string, Photo[]>> {
+export interface GroupedPhotos {
+  /** Keyed by the owning row's stable partId. */
+  byPartId: Map<string, Photo[]>;
+  /** Photos predating partId, keyed by SKU — attached to that SKU's oldest row as a fallback. */
+  legacyBySku: Map<string, Photo[]>;
+}
+
+export async function listPhotosGrouped(): Promise<GroupedPhotos> {
   const drive = getDriveClient();
-  const grouped = new Map<string, Photo[]>();
+  const byPartId = new Map<string, Photo[]>();
+  const legacyBySku = new Map<string, Photo[]>();
 
   let pageToken: string | undefined;
   do {
@@ -35,27 +43,34 @@ export async function listPhotosGroupedBySku(): Promise<Map<string, Photo[]>> {
 
     for (const file of res.data.files ?? []) {
       if (!file.name || !file.id) continue;
-      // The real SKU is stored in Drive's custom `properties` metadata (see uploadPhoto)
-      // rather than parsed back out of the filename — the filename is sanitized to
-      // [A-Za-z0-9-] for display, which is lossy for SKUs containing '.', '/', '\', etc.
-      // (e.g. "AB.123" and "AB/123" both sanitize to "AB-123"), so two different SKUs'
-      // photos would otherwise collide or fail to match at all. Fall back to the old
-      // filename-parsing for photos uploaded before this property existed.
-      const sku = file.properties?.sku ?? extractSkuFromFileName(file.name);
-      if (!sku) continue;
-      const list = grouped.get(sku) ?? [];
-      list.push({
+      const photo: Photo = {
         fileId: file.id,
         fileName: file.name,
         url: buildImageUrl(file.id),
         uploadedAt: file.createdTime ?? new Date().toISOString(),
-      });
-      grouped.set(sku, list);
+      };
+
+      // partId is authoritative: the same SKU can now be stocked at several sites, so SKU
+      // alone no longer identifies which row a photo belongs to. It also survives a site
+      // being renamed, which plain SKU+site would not.
+      const partId = file.properties?.partId;
+      if (partId) {
+        byPartId.set(partId, [...(byPartId.get(partId) ?? []), photo]);
+        continue;
+      }
+
+      // Pre-partId photos. The SKU property is still lossless (the filename is not — it is
+      // sanitized to [A-Za-z0-9-], so "AB.123" and "AB/123" collide); fall back to parsing
+      // the name only for photos older than that property too.
+      const sku = file.properties?.sku ?? extractSkuFromFileName(file.name);
+      if (!sku) continue;
+      const key = sku.toUpperCase();
+      legacyBySku.set(key, [...(legacyBySku.get(key) ?? []), photo]);
     }
     pageToken = res.data.nextPageToken ?? undefined;
   } while (pageToken);
 
-  return grouped;
+  return { byPartId, legacyBySku };
 }
 
 // Streams the raw file bytes for the photo content proxy route. Uses the service
@@ -67,19 +82,17 @@ export async function getPhotoContent(fileId: string): Promise<Readable> {
   return res.data as unknown as Readable;
 }
 
-export async function uploadPhoto(sku: string, buffer: Buffer): Promise<Photo> {
+export async function uploadPhoto(sku: string, buffer: Buffer, partId?: string, site?: string): Promise<Photo> {
   // Uses the OAuth-authenticated client, not the service account — see client.ts for why.
   const drive = getDriveUploadClient();
-  const fileName = buildPhotoFileName(sku);
+  const fileName = buildPhotoFileName(sku, site);
+
+  const properties: Record<string, string> = { sku: sku.trim().toUpperCase() };
+  if (partId) properties.partId = partId;
+  if (site) properties.site = site.trim().toUpperCase();
 
   const created = await drive.files.create({
-    // `sku.trim().toUpperCase()` matches the key format getAllParts() builds from the
-    // Parts sheet, so the lookup in listPhotosGroupedBySku's caller lines up exactly.
-    requestBody: {
-      name: fileName,
-      parents: [env.googleDriveFolderId!],
-      properties: { sku: sku.trim().toUpperCase() },
-    },
+    requestBody: { name: fileName, parents: [env.googleDriveFolderId!], properties },
     media: { mimeType: 'image/jpeg', body: Readable.from(buffer) },
     fields: 'id, name, createdTime',
   });

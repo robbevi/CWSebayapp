@@ -12,12 +12,14 @@ export const useUploadPhoto = () => {
       itemId,
       file,
       submittedBy,
+      site,
     }: {
       sku: string;
       itemId: string;
       file: File;
       submittedBy?: string;
-    }) => uploadPhoto(sku, itemId, file, submittedBy),
+      site?: string;
+    }) => uploadPhoto(sku, itemId, file, submittedBy, site),
     onSuccess: (photo, { itemId }) => {
       qc.setQueryData<InventoryPart[]>(PARTS_QUERY_KEY, (old) =>
         (old ?? []).map((p) => (p.id === itemId ? { ...p, photos: [...p.photos, photo], photographed: true } : p))

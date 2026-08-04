@@ -11,6 +11,8 @@ interface PhotoUploaderProps {
   sku: string;
   itemId: string;
   photos: Photo[];
+  /** Stamped onto the uploaded file so a multi-site SKU's photos stay distinguishable. */
+  site?: string;
 }
 
 interface FailedUpload {
@@ -25,7 +27,7 @@ function makeFileList(file: File): FileList {
   return dt.files;
 }
 
-export function PhotoUploader({ sku, itemId, photos }: PhotoUploaderProps) {
+export function PhotoUploader({ sku, itemId, photos, site }: PhotoUploaderProps) {
   const takeInputRef = useRef<HTMLInputElement>(null);
   const uploadInputRef = useRef<HTMLInputElement>(null);
   const [activePreview, setActivePreview] = useState(0);
@@ -39,7 +41,13 @@ export function PhotoUploader({ sku, itemId, photos }: PhotoUploaderProps) {
     for (const file of Array.from(files)) {
       try {
         const prepared = await prepareUpload(file);
-        await uploadPhoto.mutateAsync({ sku, itemId, file: prepared, submittedBy: currentUser ?? undefined });
+        await uploadPhoto.mutateAsync({
+          sku,
+          itemId,
+          file: prepared,
+          submittedBy: currentUser ?? undefined,
+          site,
+        });
       } catch (err) {
         setFailed((f) => [
           ...f,

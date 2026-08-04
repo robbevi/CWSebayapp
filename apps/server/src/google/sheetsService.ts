@@ -1,15 +1,17 @@
+import { randomUUID } from 'node:crypto';
 import { deriveStatus, isWinForRole, roleForUser } from '@warehouse/shared';
 import type { InventoryPart, InventoryPartPatch, Photo, Submission } from '@warehouse/shared';
 import { env } from '../config/env.js';
 import { parseBoolean, parseDateOrNull, parseNumberOrNull } from '../lib/csv.js';
 import { getSheetsClient } from './client.js';
-import { listPhotosGroupedBySku } from './driveService.js';
+import { listPhotosGrouped, type GroupedPhotos } from './driveService.js';
 
 const SHEET_NAME = 'Parts';
 const SUBMISSIONS_SHEET = 'Submissions';
 const SUBMISSIONS_HEADERS = ['sku', 'user', 'role', 'completedAt'];
 
 const KNOWN_FIELDS = [
+  'partId',
   'sku',
   'description',
   'manufacturer',
@@ -41,6 +43,7 @@ const KNOWN_FIELDS = [
 type FieldName = (typeof KNOWN_FIELDS)[number];
 
 export interface CreatePartFields {
+  partId?: string;
   sku: string;
   description?: string;
   manufacturer?: string;
@@ -92,7 +95,10 @@ export function mapRowToPart(headers: string[], row: unknown[], photos: Photo[])
   const sku = (get('sku') ?? '').trim();
 
   const base = {
-    id: sku,
+    // partId is the stable record key: the same SKU can be stocked at several sites, and a
+    // site can be renamed, so neither SKU nor SKU+site is a safe identity. Rows written
+    // before this column existed fall back to the SKU so nothing 404s mid-migration.
+    id: get('partId') ?? sku,
     sku,
     description: get('description') ?? '',
     manufacturer: get('manufacturer') ?? '',
@@ -172,6 +178,7 @@ async function getHeaders(): Promise<string[]> {
 
 function buildCreateRecord(data: CreatePartFields, updatedAt: string): Partial<Record<FieldName, unknown>> {
   return {
+    partId: data.partId ?? randomUUID(),
     sku: data.sku,
     description: data.description,
     manufacturer: data.manufacturer,
@@ -202,31 +209,56 @@ function buildCreateRecord(data: CreatePartFields, updatedAt: string): Partial<R
   };
 }
 
-function findRow(headers: string[], rows: unknown[][], sku: string): { rowNumber: number; row: unknown[] } | undefined {
+// `id` is a partId for rows written since the multi-site migration, and a bare SKU for
+// anything older (or for callers that only know the SKU, like the photo routes). Match on
+// partId first so the right row wins when a SKU is stocked at more than one site.
+function findRow(headers: string[], rows: unknown[][], id: string): { rowNumber: number; row: unknown[] } | undefined {
+  const needle = id.trim().toUpperCase();
+  const partIdCol = headers.indexOf('partId');
+  if (partIdCol !== -1) {
+    const index = rows.findIndex((r) => cellToString(r[partIdCol])?.trim().toUpperCase() === needle);
+    if (index !== -1) return { rowNumber: index + 2, row: rows[index] };
+  }
   const skuCol = headers.indexOf('sku');
   if (skuCol === -1) return undefined;
-  const index = rows.findIndex((r) => cellToString(r[skuCol])?.trim().toUpperCase() === sku.toUpperCase());
+  const index = rows.findIndex((r) => cellToString(r[skuCol])?.trim().toUpperCase() === needle);
   if (index === -1) return undefined;
   return { rowNumber: index + 2, row: rows[index] };
 }
 
+// Legacy (pre-partId) photos only carry a SKU, so they cannot say *which* row of a
+// multi-site SKU they belong to. Attach them to the first row for that SKU — for the
+// existing data that is always the original Williston row the photo was taken against.
+function photosFor(part: InventoryPart, grouped: GroupedPhotos, claimedLegacySkus: Set<string>): Photo[] {
+  const own = grouped.byPartId.get(part.id) ?? [];
+  const skuKey = part.sku.toUpperCase();
+  const legacy = grouped.legacyBySku.get(skuKey);
+  if (!legacy || claimedLegacySkus.has(skuKey)) return own;
+  claimedLegacySkus.add(skuKey);
+  return [...own, ...legacy];
+}
+
 export async function getAllParts(): Promise<InventoryPart[]> {
   const { headers, rows } = await readSheet();
-  const photosBySku = await listPhotosGroupedBySku();
+  const grouped = await listPhotosGrouped();
+  const claimed = new Set<string>();
   return rows
     .filter((row) => row.some((cell) => cellToString(cell) !== undefined))
     .map((row) => {
-      const sku = cellToString(row[headers.indexOf('sku')])?.trim().toUpperCase() ?? '';
-      return mapRowToPart(headers, row, photosBySku.get(sku) ?? []);
-    });
+      const bare = mapRowToPart(headers, row, []);
+      return { ...bare, photos: photosFor(bare, grouped, claimed) };
+    })
+    .map((p) => ({ ...p, photographed: p.photographed || p.photos.length > 0 }));
 }
 
-export async function getPartBySku(sku: string): Promise<InventoryPart> {
+export async function getPartById(id: string): Promise<InventoryPart> {
   const { headers, rows } = await readSheet();
-  const found = findRow(headers, rows, sku);
-  if (!found) throw new Error(`Part with SKU "${sku}" was not found in the Google Sheet.`);
-  const photosBySku = await listPhotosGroupedBySku();
-  return mapRowToPart(headers, found.row, photosBySku.get(sku.toUpperCase()) ?? []);
+  const found = findRow(headers, rows, id);
+  if (!found) throw new Error(`Part "${id}" was not found in the Google Sheet.`);
+  const grouped = await listPhotosGrouped();
+  const bare = mapRowToPart(headers, found.row, []);
+  const photos = [...(grouped.byPartId.get(bare.id) ?? []), ...(grouped.legacyBySku.get(bare.sku.toUpperCase()) ?? [])];
+  return { ...bare, photos, photographed: bare.photographed || photos.length > 0 };
 }
 
 let submissionsSheetReady = false;
@@ -297,11 +329,11 @@ async function logWinIfCompleted(
   await appendSubmission({ sku, user: submittedBy, role, completedAt: new Date().toISOString() });
 }
 
-export async function updatePart(sku: string, patch: InventoryPartPatch, submittedBy?: string): Promise<InventoryPart> {
+export async function updatePart(id: string, patch: InventoryPartPatch, submittedBy?: string): Promise<InventoryPart> {
   const sheets = getSheetsClient();
   const { headers, rows } = await readSheet();
-  const found = findRow(headers, rows, sku);
-  if (!found) throw new Error(`Part with SKU "${sku}" was not found in the Google Sheet.`);
+  const found = findRow(headers, rows, id);
+  if (!found) throw new Error(`Part "${id}" was not found in the Google Sheet.`);
   const before = mapRowToPart(headers, found.row, []);
 
   const record: Partial<Record<FieldName, unknown>> = {};
@@ -332,16 +364,16 @@ export async function updatePart(sku: string, patch: InventoryPartPatch, submitt
     requestBody: { values: [recordToRow(headers, record)] },
   });
 
-  await logWinIfCompleted(sku, before, mapRowToPart(headers, recordToRow(headers, record), []), submittedBy);
+  await logWinIfCompleted(before.sku, before, mapRowToPart(headers, recordToRow(headers, record), []), submittedBy);
 
-  return getPartBySku(sku);
+  return getPartById(id);
 }
 
-export async function deletePart(sku: string): Promise<void> {
+export async function deletePart(id: string): Promise<void> {
   const sheets = getSheetsClient();
   const { headers, rows } = await readSheet();
-  const found = findRow(headers, rows, sku);
-  if (!found) throw new Error(`Part with SKU "${sku}" was not found in the Google Sheet.`);
+  const found = findRow(headers, rows, id);
+  if (!found) throw new Error(`Part "${id}" was not found in the Google Sheet.`);
   const sheetId = await getSheetId();
 
   await sheets.spreadsheets.batchUpdate({
@@ -358,10 +390,10 @@ export async function deletePart(sku: string): Promise<void> {
   });
 }
 
-export async function setPhotographed(sku: string, value: boolean, submittedBy?: string): Promise<void> {
+export async function setPhotographed(id: string, value: boolean, submittedBy?: string): Promise<void> {
   const sheets = getSheetsClient();
   const { headers, rows } = await readSheet();
-  const found = findRow(headers, rows, sku);
+  const found = findRow(headers, rows, id);
   if (!found) return;
   const col = headers.indexOf('photographed');
   if (col === -1) return;
@@ -376,7 +408,7 @@ export async function setPhotographed(sku: string, value: boolean, submittedBy?:
   const before = mapRowToPart(headers, found.row, []);
   const afterRow = [...found.row];
   afterRow[col] = value ? 'TRUE' : 'FALSE';
-  await logWinIfCompleted(sku, before, mapRowToPart(headers, afterRow, []), submittedBy);
+  await logWinIfCompleted(before.sku, before, mapRowToPart(headers, afterRow, []), submittedBy);
 }
 
 export async function createPart(data: CreatePartFields): Promise<string> {
@@ -392,7 +424,7 @@ export async function createPart(data: CreatePartFields): Promise<string> {
     requestBody: { values: [recordToRow(headers, record)] },
   });
 
-  return data.sku;
+  return String(record.partId);
 }
 
 // Appends many new rows in a small, fixed number of API calls instead of one call per

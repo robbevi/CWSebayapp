@@ -193,7 +193,7 @@ export function PartDetailModal() {
         </div>
 
         <form onSubmit={onSubmit} className="min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain p-4">
-          <PhotoUploader sku={part.sku} itemId={part.id} photos={part.photos} />
+          <PhotoUploader sku={part.sku} itemId={part.id} photos={part.photos} site={part.inventorySite} />
 
           <div>
             <label className="mb-1 block text-xs font-semibold text-textMuted">Confirmed Quantity On Hand</label>

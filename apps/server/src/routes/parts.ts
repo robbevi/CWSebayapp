@@ -12,7 +12,7 @@ import {
   createPart as createPartGoogle,
   deletePart as deletePartGoogle,
   getAllParts as getAllPartsGoogle,
-  getPartBySku as getPartBySkuGoogle,
+  getPartById as getPartByIdGoogle,
   updatePart as updatePartGoogle,
 } from '../google/sheetsService.js';
 import { MOCK_PARTS } from '../lib/mockData.js';
@@ -52,20 +52,27 @@ partsRouter.post('/parts', async (req, res, next) => {
       inventorySite: body.inventorySite?.trim() || undefined,
     };
 
+    // A SKU may legitimately exist at several inventory sites, so uniqueness is per
+    // SKU+site rather than per SKU.
+    const site = (fields.inventorySite ?? '').toUpperCase();
+    const duplicate = (p: { sku: string; inventorySite: string }) =>
+      p.sku.toUpperCase() === sku.toUpperCase() && (p.inventorySite ?? '').toUpperCase() === site;
+    const duplicateMessage = `A part with SKU "${sku}" already exists at ${fields.inventorySite || 'this site'}.`;
+
     if (isGoogleConfigured()) {
       const existing = await getAllPartsGoogle();
-      if (existing.some((p) => p.sku.toUpperCase() === sku.toUpperCase())) {
-        res.status(409).json({ error: `A part with SKU "${sku}" already exists.` });
+      if (existing.some(duplicate)) {
+        res.status(409).json({ error: duplicateMessage });
         return;
       }
-      await createPartGoogle(fields);
-      res.status(201).json(await getPartBySkuGoogle(sku));
+      const id = await createPartGoogle(fields);
+      res.status(201).json(await getPartByIdGoogle(id));
       return;
     }
     if (isGraphConfigured()) {
       const existing = await getAllPartsGraph();
-      if (existing.some((p) => p.sku.toUpperCase() === sku.toUpperCase())) {
-        res.status(409).json({ error: `A part with SKU "${sku}" already exists.` });
+      if (existing.some(duplicate)) {
+        res.status(409).json({ error: duplicateMessage });
         return;
       }
       const id = await createPartGraph(fields);
