@@ -31,6 +31,11 @@ const KNOWN_FIELDS = [
   'catalogingStartDate',
   'legacyPartId',
   'importSequenceNumber',
+  'revenuePriorityRank',
+  'fieldReviewPriority',
+  'activeRecoveryPriceBasis',
+  'expectedGrossRecoveryMargin',
+  'grossMarginStatus',
   'updatedAt',
 ] as const;
 type FieldName = (typeof KNOWN_FIELDS)[number];
@@ -56,6 +61,11 @@ export interface CreatePartFields {
   catalogingStartDate?: string | null;
   legacyPartId?: string;
   importSequenceNumber?: number | null;
+  revenuePriorityRank?: number | null;
+  fieldReviewPriority?: string;
+  activeRecoveryPriceBasis?: number | null;
+  expectedGrossRecoveryMargin?: number | null;
+  grossMarginStatus?: string;
 }
 
 function cellToString(value: unknown): string | undefined {
@@ -104,6 +114,11 @@ export function mapRowToPart(headers: string[], row: unknown[], photos: Photo[])
     catalogingStartDate: parseDateOrNull(get('catalogingStartDate')),
     legacyPartId: get('legacyPartId'),
     importSequenceNumber: parseNumberOrNull(get('importSequenceNumber')),
+    revenuePriorityRank: parseNumberOrNull(get('revenuePriorityRank')),
+    fieldReviewPriority: get('fieldReviewPriority'),
+    activeRecoveryPriceBasis: parseNumberOrNull(get('activeRecoveryPriceBasis')),
+    expectedGrossRecoveryMargin: parseNumberOrNull(get('expectedGrossRecoveryMargin')),
+    grossMarginStatus: get('grossMarginStatus'),
     photos,
     updatedAt: get('updatedAt'),
   };
@@ -178,6 +193,11 @@ function buildCreateRecord(data: CreatePartFields, updatedAt: string): Partial<R
     catalogingStartDate: data.catalogingStartDate,
     legacyPartId: data.legacyPartId,
     importSequenceNumber: data.importSequenceNumber,
+    revenuePriorityRank: data.revenuePriorityRank,
+    fieldReviewPriority: data.fieldReviewPriority,
+    activeRecoveryPriceBasis: data.activeRecoveryPriceBasis,
+    expectedGrossRecoveryMargin: data.expectedGrossRecoveryMargin,
+    grossMarginStatus: data.grossMarginStatus,
     updatedAt,
   };
 }
@@ -260,6 +280,23 @@ export async function getSubmissions(): Promise<Submission[]> {
     }));
 }
 
+// A "win" can be completed by either of two independent code paths — saving the detail
+// form (updatePart) or uploading the photo that satisfies the last missing checkpoint
+// (setPhotographed) — so both call this rather than only the save path. Logging only on
+// save silently lost every completion where the photo was taken last.
+async function logWinIfCompleted(
+  sku: string,
+  before: InventoryPart,
+  after: InventoryPart,
+  submittedBy: string | undefined
+): Promise<void> {
+  if (!submittedBy) return;
+  const role = roleForUser(env.appUsers, submittedBy);
+  if (!role) return;
+  if (isWinForRole(role, before) || !isWinForRole(role, after)) return;
+  await appendSubmission({ sku, user: submittedBy, role, completedAt: new Date().toISOString() });
+}
+
 export async function updatePart(sku: string, patch: InventoryPartPatch, submittedBy?: string): Promise<InventoryPart> {
   const sheets = getSheetsClient();
   const { headers, rows } = await readSheet();
@@ -295,13 +332,7 @@ export async function updatePart(sku: string, patch: InventoryPartPatch, submitt
     requestBody: { values: [recordToRow(headers, record)] },
   });
 
-  const role = submittedBy ? roleForUser(env.appUsers, submittedBy) : undefined;
-  if (role) {
-    const after = mapRowToPart(headers, recordToRow(headers, record), []);
-    if (!isWinForRole(role, before) && isWinForRole(role, after)) {
-      await appendSubmission({ sku, user: submittedBy!, role, completedAt: new Date().toISOString() });
-    }
-  }
+  await logWinIfCompleted(sku, before, mapRowToPart(headers, recordToRow(headers, record), []), submittedBy);
 
   return getPartBySku(sku);
 }
@@ -327,7 +358,7 @@ export async function deletePart(sku: string): Promise<void> {
   });
 }
 
-export async function setPhotographed(sku: string, value: boolean): Promise<void> {
+export async function setPhotographed(sku: string, value: boolean, submittedBy?: string): Promise<void> {
   const sheets = getSheetsClient();
   const { headers, rows } = await readSheet();
   const found = findRow(headers, rows, sku);
@@ -341,6 +372,11 @@ export async function setPhotographed(sku: string, value: boolean): Promise<void
     valueInputOption: 'USER_ENTERED',
     requestBody: { values: [[value ? 'TRUE' : 'FALSE']] },
   });
+
+  const before = mapRowToPart(headers, found.row, []);
+  const afterRow = [...found.row];
+  afterRow[col] = value ? 'TRUE' : 'FALSE';
+  await logWinIfCompleted(sku, before, mapRowToPart(headers, afterRow, []), submittedBy);
 }
 
 export async function createPart(data: CreatePartFields): Promise<string> {

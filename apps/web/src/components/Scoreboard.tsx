@@ -3,6 +3,7 @@ import { X } from 'lucide-react';
 import { GOALS } from '@warehouse/shared';
 import { useAllSubmissions } from '../hooks/useAllSubmissions';
 import { useAppUsers } from '../hooks/useAppUsers';
+import { useBodyScrollLock } from '../hooks/useBodyScrollLock';
 import { computeUserMetrics, countsForPeriod, type Period } from '../lib/submissionStats';
 
 const PERIOD_OPTIONS: { key: Period; label: string }[] = [
@@ -44,6 +45,7 @@ export function Scoreboard({ onClose }: { onClose: () => void }) {
   const { data: submissions } = useAllSubmissions();
   const [period, setPeriod] = useState<Period>('day');
   const [selectedUser, setSelectedUser] = useState<string | null>(null);
+  useBodyScrollLock();
 
   const counts = useMemo(() => countsForPeriod(submissions ?? [], period), [submissions, period]);
   const goal = GOALS[period];
@@ -61,7 +63,7 @@ export function Scoreboard({ onClose }: { onClose: () => void }) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-card bg-surface p-6">
+      <div className="max-h-[85vh] w-full max-w-lg overflow-y-auto overscroll-contain rounded-card bg-surface p-6">
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-base font-semibold text-textPri">Scoreboard</h2>
           <button onClick={onClose} className="rounded-btn p-1 hover:bg-surfaceMuted" aria-label="Close" type="button">

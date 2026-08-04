@@ -2,12 +2,14 @@ import { useEffect } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Trash2, X } from 'lucide-react';
+import { Check, Trash2, X } from 'lucide-react';
+import { useBodyScrollLock } from '../hooks/useBodyScrollLock';
 import { useDeletePart } from '../hooks/useDeletePart';
 import { useInventoryParts } from '../hooks/useInventoryParts';
 import { useSavePart } from '../hooks/useSavePart';
 import { useUIStore } from '../state/useUIStore';
 import { useUserStore } from '../state/useUserStore';
+import { cn } from '../lib/cn';
 import { Button } from './ui/Button';
 import { SelectDropdown } from './ui/SelectDropdown';
 import { Input } from './ui/Input';
@@ -16,7 +18,7 @@ import { PhotoUploader } from './PhotoUploader';
 import { QtyStepper } from './QtyStepper';
 
 const ITEM_CONDITIONS = ['New', 'Like New', 'Good', 'Fair', 'Poor', 'For Parts'];
-const BOX_CONDITIONS = ['Excellent', 'Very Good', 'Good', 'Poor', 'No Box'];
+const BOX_CONDITIONS = ['Excellent', 'Very Good', 'Good', 'Poor', 'No Box', 'Part in Bag'];
 const CONDITION_PLACEHOLDER = 'Select Condition';
 
 const EXCEPTION_GROUPS = [
@@ -31,6 +33,10 @@ const YES_NO = ['No', 'Yes'];
 
 const schema = z.object({
   confirmedQoh: z.number().min(0),
+  // Tracked separately from the number itself: the stepper is pre-filled with the system
+  // quantity, so without an explicit confirm the "Qty Confirmed" checkpoint would be
+  // satisfied by simply opening and saving a part nobody actually counted.
+  qohConfirmed: z.boolean(),
   notes: z.string().optional(),
   itemCondition: z.string().optional(),
   boxCondition: z.string().optional(),
@@ -52,11 +58,13 @@ export function PartDetailModal() {
   const currentUser = useUserStore((s) => s.currentUser);
 
   const part = parts?.find((p) => p.id === selectedId);
+  useBodyScrollLock(modalOpen && !!part);
 
-  const { register, control, handleSubmit, reset, watch, formState } = useForm<FormValues>({
+  const { register, control, handleSubmit, reset, watch, setValue, formState } = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: {
       confirmedQoh: 0,
+      qohConfirmed: false,
       notes: '',
       itemCondition: '',
       boxCondition: '',
@@ -74,6 +82,7 @@ export function PartDetailModal() {
     if (part) {
       reset({
         confirmedQoh: part.confirmedQoh ?? part.qoh,
+        qohConfirmed: part.confirmedQoh !== null && part.confirmedQoh !== undefined,
         notes: part.notes ?? '',
         itemCondition: part.itemCondition ?? '',
         boxCondition: part.boxCondition ?? '',
@@ -98,6 +107,14 @@ export function PartDetailModal() {
   const transferred = watch('transferredToMarketRecovery');
   const disposition = watch('disposition');
 
+  // Parts loaded before the recovery columns existed have none of these — hide the whole
+  // row rather than show four em-dashes.
+  const hasRecoveryData =
+    part.revenuePriorityRank != null ||
+    !!part.fieldReviewPriority ||
+    part.activeRecoveryPriceBasis != null ||
+    part.expectedGrossRecoveryMargin != null;
+
   const close = () => {
     if (formState.isDirty && !window.confirm('Discard unsaved changes?')) return;
     set({ modalOpen: false, selectedId: null });
@@ -107,7 +124,7 @@ export function PartDetailModal() {
     await savePart.mutateAsync({
       id: part.id,
       patch: {
-        confirmedQoh: values.confirmedQoh,
+        confirmedQoh: values.qohConfirmed ? values.confirmedQoh : null,
         notes: values.notes,
         itemCondition: values.itemCondition || undefined,
         boxCondition: values.boxCondition || undefined,
@@ -146,25 +163,81 @@ export function PartDetailModal() {
         </div>
 
         <div className="shrink-0 border-b border-border p-4">
-          <div className="grid grid-cols-2 gap-3 rounded-card bg-surfaceMuted p-3 text-xs sm:grid-cols-5">
-            <Field label="SKU" value={part.sku} />
-            <Field label="Manufacturer" value={part.manufacturer || '—'} />
-            <Field label="Bin" value={part.binLocation || '—'} />
-            <Field label="System QOH" value={String(part.qoh)} />
-            <Field label="Site" value={part.inventorySite || '—'} />
+          <div className="space-y-3 rounded-card bg-surfaceMuted p-3 text-xs">
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
+              <Field label="SKU" value={part.sku} />
+              <Field label="Manufacturer" value={part.manufacturer || '—'} />
+              <Field label="Bin" value={part.binLocation || '—'} />
+              <Field label="System QOH" value={String(part.qoh)} />
+              <Field label="Site" value={part.inventorySite || '—'} />
+            </div>
+            {hasRecoveryData && (
+              <div className="grid grid-cols-2 gap-3 border-t border-border pt-3 sm:grid-cols-4">
+                <Field label="Revenue Priority" value={part.revenuePriorityRank != null ? `#${part.revenuePriorityRank}` : '—'} />
+                <Field label="Field Review Priority" value={part.fieldReviewPriority || '—'} />
+                <Field label="Recovery Price Basis" value={formatMoney(part.activeRecoveryPriceBasis)} />
+                <Field
+                  label="Expected Gross Margin"
+                  value={formatMoney(part.expectedGrossRecoveryMargin)}
+                  tone={
+                    part.expectedGrossRecoveryMargin == null
+                      ? undefined
+                      : part.expectedGrossRecoveryMargin < 0
+                        ? 'negative'
+                        : 'positive'
+                  }
+                />
+              </div>
+            )}
           </div>
         </div>
 
-        <form onSubmit={onSubmit} className="min-h-0 flex-1 space-y-5 overflow-y-auto p-4">
+        <form onSubmit={onSubmit} className="min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain p-4">
           <PhotoUploader sku={part.sku} itemId={part.id} photos={part.photos} />
 
           <div>
             <label className="mb-1 block text-xs font-semibold text-textMuted">Confirmed Quantity On Hand</label>
-            <Controller
-              control={control}
-              name="confirmedQoh"
-              render={({ field }) => <QtyStepper value={field.value} onChange={field.onChange} />}
-            />
+            <div className="flex flex-wrap items-center gap-2">
+              <Controller
+                control={control}
+                name="confirmedQoh"
+                render={({ field }) => (
+                  <QtyStepper
+                    value={field.value}
+                    onChange={(v) => {
+                      field.onChange(v);
+                      // Changing the count invalidates a prior confirmation — they need to
+                      // re-confirm the number they actually landed on.
+                      setValue('qohConfirmed', false, { shouldDirty: true });
+                    }}
+                  />
+                )}
+              />
+              <Controller
+                control={control}
+                name="qohConfirmed"
+                render={({ field }) =>
+                  field.value ? (
+                    <button
+                      type="button"
+                      onClick={() => field.onChange(false)}
+                      title="Confirmed — click to undo"
+                      className="flex items-center gap-1.5 rounded-btn border border-primary/30 bg-primary/10 px-3 py-2 text-xs font-medium text-primary"
+                    >
+                      <Check size={14} />
+                      Confirmed
+                    </button>
+                  ) : (
+                    <Button variant="outline" type="button" onClick={() => field.onChange(true)}>
+                      Confirm
+                    </Button>
+                  )
+                }
+              />
+            </div>
+            {!watch('qohConfirmed') && (
+              <p className="mt-1 text-[11px] text-textMuted">Click Confirm once you've counted this quantity.</p>
+            )}
           </div>
 
           <div>
@@ -302,11 +375,23 @@ export function PartDetailModal() {
   );
 }
 
-function Field({ label, value }: { label: string; value: string }) {
+function formatMoney(value: number | null | undefined): string {
+  if (value == null) return '—';
+  return value.toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
+}
+
+function Field({ label, value, tone }: { label: string; value: string; tone?: 'positive' | 'negative' }) {
   return (
     <div>
       <div className="text-xs text-textMuted">{label}</div>
-      <div className="font-medium text-textPri">{value}</div>
+      <div
+        className={cn(
+          'font-medium',
+          tone === 'positive' ? 'text-primary' : tone === 'negative' ? 'text-red-600' : 'text-textPri'
+        )}
+      >
+        {value}
+      </div>
     </div>
   );
 }

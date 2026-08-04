@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { X } from 'lucide-react';
+import { useBodyScrollLock } from '../hooks/useBodyScrollLock';
 import { useCreatePart } from '../hooks/useCreatePart';
 import { useUIStore } from '../state/useUIStore';
 import { Button } from './ui/Button';
@@ -24,6 +25,7 @@ export function AddPartModal({ onClose, manufacturerOptions, siteOptions }: AddP
   const [manufacturer, setManufacturer] = useState('');
   const [inventorySite, setInventorySite] = useState(DEFAULT_SITE);
   const [createdId, setCreatedId] = useState<string | null>(null);
+  useBodyScrollLock();
 
   const submit = async () => {
     const trimmedSku = sku.trim();

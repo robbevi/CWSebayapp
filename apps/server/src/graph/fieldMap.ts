@@ -24,6 +24,11 @@ export const DISPLAY = {
   catalogingStartDate: 'Cataloging Start Date',
   legacyPartId: 'Inventory Part ID',
   importSequenceNumber: 'Import Sequence Number',
+  revenuePriorityRank: 'Revenue Priority Rank',
+  fieldReviewPriority: 'Field Review Priority',
+  activeRecoveryPriceBasis: 'Active Recovery Price Basis',
+  expectedGrossRecoveryMargin: 'Expected Gross Recovery Margin',
+  grossMarginStatus: 'Gross Margin Status',
 } as const;
 
 export type FieldKey = keyof typeof DISPLAY;

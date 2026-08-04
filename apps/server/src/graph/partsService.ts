@@ -46,6 +46,12 @@ function mapItemToPart(
     catalogingStartDate: (get('catalogingStartDate') as string) ?? null,
     legacyPartId: (get('legacyPartId') as string) ?? undefined,
     importSequenceNumber: get('importSequenceNumber') != null ? Number(get('importSequenceNumber')) : null,
+    revenuePriorityRank: get('revenuePriorityRank') != null ? Number(get('revenuePriorityRank')) : null,
+    fieldReviewPriority: (get('fieldReviewPriority') as string) ?? undefined,
+    activeRecoveryPriceBasis: get('activeRecoveryPriceBasis') != null ? Number(get('activeRecoveryPriceBasis')) : null,
+    expectedGrossRecoveryMargin:
+      get('expectedGrossRecoveryMargin') != null ? Number(get('expectedGrossRecoveryMargin')) : null,
+    grossMarginStatus: (get('grossMarginStatus') as string) ?? undefined,
     photos,
     updatedAt: item.lastModifiedDateTime,
   };

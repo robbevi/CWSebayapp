@@ -27,6 +27,8 @@ export function MultiSelectDropdown({
   const [query, setQuery] = useState('');
   const containerRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
+  // See SelectDropdown: stops the opening tap from carrying through onto an option.
+  const openedAt = useRef(0);
   // Measure the trigger button (fixed height), not the container — the container also
   // holds the popover, which briefly renders in-flow on first open and would corrupt the
   // measurement, throwing the popover to the wrong place until reopened.
@@ -54,6 +56,7 @@ export function MultiSelectDropdown({
   const mobileTriggerText = selectionText ?? mobileLabel ?? `All ${label}s`;
 
   const toggle = (option: string) => {
+    if (Date.now() - openedAt.current < 300) return;
     onChange(selected.includes(option) ? selected.filter((o) => o !== option) : [...selected, option]);
   };
 
@@ -62,7 +65,10 @@ export function MultiSelectDropdown({
       <button
         ref={triggerRef}
         type="button"
-        onClick={() => setOpen((o) => !o)}
+        onClick={() => {
+          openedAt.current = Date.now();
+          setOpen((o) => !o);
+        }}
         className={cn(
           'flex w-full items-center gap-2 rounded-btn border border-border bg-surface px-3 py-2 text-left text-xs text-textPri',
           open && 'ring-2 ring-primary/40'

@@ -33,12 +33,49 @@ const SORT_FIELD: Partial<Record<SortKey, keyof InventoryPart>> = {
   'Inventory Site': 'inventorySite',
 };
 
+// Sorts where "best first" means descending (bigger money is more interesting), versus
+// rank-style fields where 1 is best and ascending is correct.
+const DESCENDING_NUMERIC: Partial<Record<SortKey, keyof InventoryPart>> = {
+  'Recovery Price': 'activeRecoveryPriceBasis',
+  'Gross Margin': 'expectedGrossRecoveryMargin',
+};
+
+// Parts imported before these columns existed have no value. They sort to the end rather
+// than the top, so an unscored backlog never buries the ranked work.
+function byNumberDesc(a: number | null | undefined, b: number | null | undefined): number {
+  if (a == null && b == null) return 0;
+  if (a == null) return 1;
+  if (b == null) return -1;
+  return b - a;
+}
+
+function byNumberAsc(a: number | null | undefined, b: number | null | undefined): number {
+  if (a == null && b == null) return 0;
+  if (a == null) return 1;
+  if (b == null) return -1;
+  return a - b;
+}
+
 function sortParts(parts: InventoryPart[], sort: SortKey): InventoryPart[] {
   if (sort === 'Quantity On Hand') {
     return [...parts].sort((a, b) => a.qoh - b.qoh);
   }
   if (sort === 'Progress') {
     return [...parts].sort((a, b) => checkpointCount(a) - checkpointCount(b));
+  }
+  if (sort === 'Revenue Priority') {
+    return [...parts].sort((a, b) => byNumberAsc(a.revenuePriorityRank, b.revenuePriorityRank));
+  }
+  if (sort === 'Field Review Priority') {
+    // The values are prefixed with their tier ("1 - Highest Priority"), so a plain string
+    // compare already orders them 1 → 4; only the empty case needs special handling.
+    return [...parts].sort((a, b) =>
+      (a.fieldReviewPriority || '￿').localeCompare(b.fieldReviewPriority || '￿')
+    );
+  }
+  const descField = DESCENDING_NUMERIC[sort];
+  if (descField) {
+    return [...parts].sort((a, b) => byNumberDesc(a[descField] as number | null, b[descField] as number | null));
   }
   const field = SORT_FIELD[sort]!;
   return [...parts].sort((a, b) => String(a[field] ?? '').localeCompare(String(b[field] ?? '')));
@@ -56,7 +93,7 @@ const GRID_COLS: Record<number, string> = {
 
 export function KanbanBoard() {
   const { data, isLoading } = useInventoryParts();
-  const { search, sites, bins, manufacturers, statuses, missingTasks, sort } = useUIStore();
+  const { search, sites, bins, manufacturers, statuses, missingTasks, margins, sort } = useUIStore();
 
   const filtered = useMemo(() => {
     const parts = data ?? [];
@@ -66,10 +103,11 @@ export function KanbanBoard() {
         matchesSet(p.binLocation, bins) &&
         matchesSet(p.manufacturer, manufacturers) &&
         matchesMissingTasks(p, missingTasks) &&
+        (margins.length === 0 || margins.includes(p.grossMarginStatus as (typeof margins)[number])) &&
         matchesSearch(p, search)
     );
     return sortParts(result, sort);
-  }, [data, search, sites, bins, manufacturers, missingTasks, sort]);
+  }, [data, search, sites, bins, manufacturers, missingTasks, margins, sort]);
 
   if (isLoading) {
     return <div className="py-16 text-center text-textMuted">Loading inventory…</div>;

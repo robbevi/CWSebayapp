@@ -1,5 +1,7 @@
 import { Camera, ClipboardCheck, Factory, ListChecks, MapPin, Tag, TruckIcon, Wrench, X } from 'lucide-react';
 import type { TaskKey, WorkflowStatus } from '@warehouse/shared';
+import { useBodyScrollLock } from '../hooks/useBodyScrollLock';
+import type { MarginFilter } from '../state/useUIStore';
 import { Button } from './ui/Button';
 import { MultiSelectDropdown } from './ui/MultiSelectDropdown';
 
@@ -7,6 +9,11 @@ export const STATUS_OPTIONS: { key: WorkflowStatus; label: string }[] = [
   { key: 'NotStarted', label: 'Not Started' },
   { key: 'Processing', label: 'Processing' },
   { key: 'Completed', label: 'Completed' },
+];
+
+export const MARGIN_OPTIONS: { key: MarginFilter; label: string }[] = [
+  { key: 'Positive Gross Margin', label: 'Positive Gross Margin' },
+  { key: 'Negative Gross Margin', label: 'Negative Gross Margin' },
 ];
 
 export const TASK_OPTIONS: { key: TaskKey; label: string; icon: React.ReactNode }[] = [
@@ -36,6 +43,8 @@ interface FilterDrawerProps {
   onToggleStatus: (key: WorkflowStatus) => void;
   missingTasks: TaskKey[];
   onToggleTask: (key: TaskKey) => void;
+  margins: MarginFilter[];
+  onToggleMargin: (key: MarginFilter) => void;
 }
 
 export function FilterDrawer({
@@ -57,10 +66,13 @@ export function FilterDrawer({
   onToggleStatus,
   missingTasks,
   onToggleTask,
+  margins,
+  onToggleMargin,
 }: FilterDrawerProps) {
+  useBodyScrollLock();
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center">
-      <div className="flex max-h-[85vh] w-full flex-col overflow-y-auto rounded-t-card bg-surface sm:max-w-md sm:rounded-card">
+      <div className="flex max-h-[85vh] w-full flex-col overflow-y-auto overscroll-contain rounded-t-card bg-surface sm:max-w-md sm:rounded-card">
         <div className="mx-auto mt-2 h-1 w-10 shrink-0 rounded-full bg-border sm:hidden" />
         <div className="flex shrink-0 items-center justify-between border-b border-border p-4">
           <h2 className="text-base font-semibold text-textPri">Filters</h2>
@@ -125,6 +137,23 @@ export function FilterDrawer({
                     type="checkbox"
                     checked={statuses.includes(opt.key)}
                     onChange={() => onToggleStatus(opt.key)}
+                    className="h-4 w-4 shrink-0 accent-primary"
+                  />
+                  {opt.label}
+                </label>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <span className="mb-1 block text-xs font-semibold text-textMuted">Gross Margin</span>
+            <div className="space-y-2 rounded-btn border border-border p-3">
+              {MARGIN_OPTIONS.map((opt) => (
+                <label key={opt.key} className="flex cursor-pointer items-center gap-2 text-xs text-textPri">
+                  <input
+                    type="checkbox"
+                    checked={margins.includes(opt.key)}
+                    onChange={() => onToggleMargin(opt.key)}
                     className="h-4 w-4 shrink-0 accent-primary"
                   />
                   {opt.label}

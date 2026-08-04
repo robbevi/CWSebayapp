@@ -20,6 +20,19 @@ export type DispositionEnum =
 
 export type WorkflowStatus = 'NotStarted' | 'Processing' | 'Completed';
 
+export type GrossMarginStatus = 'Positive Gross Margin' | 'Negative Gross Margin';
+
+// The source data labels these "1 - Highest Priority" … "4 - Low Dollar Review". Anything
+// in tier 1 or 2 is surfaced as high priority on the card.
+export function isHighPriority(fieldReviewPriority: string | undefined | null): boolean {
+  if (!fieldReviewPriority) return false;
+  return /^\s*[12]\b/.test(fieldReviewPriority);
+}
+
+export function isPositiveMargin(grossMarginStatus: string | undefined | null): boolean {
+  return grossMarginStatus === 'Positive Gross Margin';
+}
+
 export interface Photo {
   fileId: string;
   fileName: string;
@@ -50,6 +63,13 @@ export interface InventoryPart {
   catalogingStartDate?: string | null;
   legacyPartId?: string;
   importSequenceNumber?: number | null;
+  // Recovery/revenue analytics, supplied by the source spreadsheet rather than entered in
+  // the app. Optional throughout: parts loaded before these columns existed have none.
+  revenuePriorityRank?: number | null;
+  fieldReviewPriority?: string;
+  activeRecoveryPriceBasis?: number | null;
+  expectedGrossRecoveryMargin?: number | null;
+  grossMarginStatus?: GrossMarginStatus | string;
   photos: Photo[];
   updatedAt?: string;
   workflowStatus: WorkflowStatus;

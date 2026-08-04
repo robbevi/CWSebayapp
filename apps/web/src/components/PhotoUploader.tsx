@@ -4,6 +4,7 @@ import type { Photo } from '@warehouse/shared';
 import { prepareUpload } from '../lib/image';
 import { useDeletePhoto } from '../hooks/useDeletePhoto';
 import { useUploadPhoto } from '../hooks/useUploadPhoto';
+import { useUserStore } from '../state/useUserStore';
 import { Pill } from './ui/Pill';
 
 interface PhotoUploaderProps {
@@ -31,13 +32,14 @@ export function PhotoUploader({ sku, itemId, photos }: PhotoUploaderProps) {
   const [failed, setFailed] = useState<FailedUpload[]>([]);
   const uploadPhoto = useUploadPhoto();
   const deletePhoto = useDeletePhoto();
+  const currentUser = useUserStore((s) => s.currentUser);
 
   const handleFiles = async (files: FileList | null) => {
     if (!files) return;
     for (const file of Array.from(files)) {
       try {
         const prepared = await prepareUpload(file);
-        await uploadPhoto.mutateAsync({ sku, itemId, file: prepared });
+        await uploadPhoto.mutateAsync({ sku, itemId, file: prepared, submittedBy: currentUser ?? undefined });
       } catch (err) {
         setFailed((f) => [
           ...f,

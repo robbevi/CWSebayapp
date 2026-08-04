@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { PartyPopper, Target, X } from 'lucide-react';
 import { GOALS } from '@warehouse/shared';
+import { useBodyScrollLock } from '../hooks/useBodyScrollLock';
 import { useSubmissionSummary } from '../hooks/useSubmissionSummary';
 import { useGoalsPopupStore } from '../state/useGoalsPopupStore';
 import { useUserStore } from '../state/useUserStore';
@@ -29,6 +30,7 @@ export function GoalsPopup() {
   const currentUser = useUserStore((s) => s.currentUser);
   const { open, setOpen } = useGoalsPopupStore();
   const { data: summary } = useSubmissionSummary();
+  useBodyScrollLock(open && !!currentUser);
 
   // Auto-open once per calendar day, the first time we know who's using the app.
   useEffect(() => {

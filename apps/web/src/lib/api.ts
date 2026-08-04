@@ -53,11 +53,12 @@ export async function deletePart(id: string): Promise<void> {
   }
 }
 
-export async function uploadPhoto(sku: string, itemId: string, file: File): Promise<Photo> {
+export async function uploadPhoto(sku: string, itemId: string, file: File, submittedBy?: string): Promise<Photo> {
   const form = new FormData();
   form.append('sku', sku);
   form.append('itemId', itemId);
   form.append('file', file);
+  if (submittedBy) form.append('submittedBy', submittedBy);
   const res = await fetch('/api/photos', { method: 'POST', body: form });
   return parseJson(res);
 }

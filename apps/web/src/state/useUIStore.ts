@@ -1,7 +1,19 @@
 import { create } from 'zustand';
 import type { TaskKey, WorkflowStatus } from '@warehouse/shared';
 
-export type SortKey = 'SKU' | 'Bin Location' | 'Manufacturer' | 'Inventory Site' | 'Quantity On Hand' | 'Progress';
+export type SortKey =
+  | 'SKU'
+  | 'Bin Location'
+  | 'Manufacturer'
+  | 'Inventory Site'
+  | 'Quantity On Hand'
+  | 'Progress'
+  | 'Revenue Priority'
+  | 'Recovery Price'
+  | 'Gross Margin'
+  | 'Field Review Priority';
+
+export type MarginFilter = 'Positive Gross Margin' | 'Negative Gross Margin';
 
 interface UIState {
   search: string;
@@ -10,6 +22,7 @@ interface UIState {
   manufacturers: string[];
   statuses: WorkflowStatus[];
   missingTasks: TaskKey[];
+  margins: MarginFilter[];
   sort: SortKey;
   selectedId: string | null;
   modalOpen: boolean;
@@ -24,6 +37,7 @@ const DEFAULTS = {
   manufacturers: [] as string[],
   statuses: [] as WorkflowStatus[],
   missingTasks: [] as TaskKey[],
+  margins: [] as MarginFilter[],
   sort: 'Bin Location' as SortKey,
 };
 

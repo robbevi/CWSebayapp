@@ -1,11 +1,14 @@
 import { useAppUsers } from '../hooks/useAppUsers';
+import { useBodyScrollLock } from '../hooks/useBodyScrollLock';
 import { useUserStore } from '../state/useUserStore';
 
 export function UserPicker() {
   const { currentUser, setUser } = useUserStore();
   const { data: users } = useAppUsers();
+  const showing = !currentUser && !!users?.length;
+  useBodyScrollLock(showing);
 
-  if (currentUser || !users?.length) return null;
+  if (!showing) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">

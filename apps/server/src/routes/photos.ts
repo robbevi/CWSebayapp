@@ -31,6 +31,7 @@ photosRouter.post('/photos', upload.single('file'), async (req, res, next) => {
     }
     const sku = (req.body?.sku as string | undefined)?.trim();
     const itemId = (req.body?.itemId as string | undefined)?.trim();
+    const submittedBy = (req.body?.submittedBy as string | undefined)?.trim() || undefined;
     if (!sku || !req.file) {
       res.status(400).json({ error: 'sku and file are required.' });
       return;
@@ -39,7 +40,11 @@ photosRouter.post('/photos', upload.single('file'), async (req, res, next) => {
     if (isGoogleConfigured()) {
       const photo = await uploadPhotoGoogle(sku, req.file.buffer);
       if (itemId) {
-        await setPhotographedGoogle(itemId, true).catch((err) => console.error('Failed to flag photographed:', err));
+        // Passing submittedBy matters for more than bookkeeping: uploading a photo can be
+        // the action that completes a part, and that win is only credited if we know who did it.
+        await setPhotographedGoogle(itemId, true, submittedBy).catch((err) =>
+          console.error('Failed to flag photographed:', err)
+        );
       }
       res.json(photo);
       return;

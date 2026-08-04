@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { ArrowUpDown, Filter, Plus, Search, X } from 'lucide-react';
 import { useInventoryParts } from '../hooks/useInventoryParts';
 import { useUIStore, type SortKey } from '../state/useUIStore';
+import { cn } from '../lib/cn';
 import { AddPartModal } from './AddPartModal';
 import { FilterDrawer, STATUS_OPTIONS, TASK_OPTIONS } from './FilterDrawer';
 import { Input } from './ui/Input';
@@ -14,6 +15,10 @@ const SORT_OPTIONS: SortKey[] = [
   'Inventory Site',
   'Quantity On Hand',
   'Progress',
+  'Revenue Priority',
+  'Field Review Priority',
+  'Recovery Price',
+  'Gross Margin',
 ];
 
 function uniqueSorted(values: (string | undefined)[]): string[] {
@@ -31,7 +36,7 @@ function countBy(values: (string | undefined)[]): Record<string, number> {
 
 export function FilterPanel() {
   const { data: parts } = useInventoryParts();
-  const { search, sites, bins, manufacturers, statuses, missingTasks, sort, set, clearAll } = useUIStore();
+  const { search, sites, bins, manufacturers, statuses, missingTasks, margins, sort, set, clearAll } = useUIStore();
   const [searchInput, setSearchInput] = useState(search);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [addPartOpen, setAddPartOpen] = useState(false);
@@ -62,6 +67,10 @@ export function FilterPanel() {
     set({ missingTasks: missingTasks.includes(key) ? missingTasks.filter((t) => t !== key) : [...missingTasks, key] });
   };
 
+  const toggleMargin = (key: (typeof margins)[number]) => {
+    set({ margins: margins.includes(key) ? margins.filter((m) => m !== key) : [...margins, key] });
+  };
+
   const chips = [
     sites.length > 0 && { key: 'sites', label: `Inventory Site: ${sites.join(', ')}`, onRemove: () => set({ sites: [] }) },
     bins.length > 0 && { key: 'bins', label: `Bin Location: ${bins.join(', ')}`, onRemove: () => set({ bins: [] }) },
@@ -80,6 +89,11 @@ export function FilterPanel() {
       label: `Missing: ${missingTasks.map((t) => TASK_OPTIONS.find((o) => o.key === t)?.label ?? t).join(', ')}`,
       onRemove: () => set({ missingTasks: [] }),
     },
+    margins.length > 0 && {
+      key: 'margins',
+      label: `Margin: ${margins.map((m) => m.replace(' Gross Margin', '')).join(', ')}`,
+      onRemove: () => set({ margins: [] }),
+    },
   ].filter((c): c is { key: string; label: string; onRemove: () => void } => !!c);
 
   return (
@@ -88,11 +102,21 @@ export function FilterPanel() {
         <div className="relative flex-1">
           <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-textMuted" />
           <Input
-            className="pl-9"
+            className={cn('pl-9', searchInput && 'pr-9')}
             placeholder="Search SKU, description, manufacturer, site, or bin"
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
           />
+          {searchInput && (
+            <button
+              type="button"
+              onClick={() => setSearchInput('')}
+              aria-label="Clear search"
+              className="absolute right-1.5 top-1/2 flex h-7 w-7 min-h-0 -translate-y-1/2 items-center justify-center rounded-full text-textMuted hover:bg-surfaceMuted hover:text-textPri"
+            >
+              <X size={14} />
+            </button>
+          )}
         </div>
 
         <div className="w-full sm:w-48">
@@ -175,6 +199,8 @@ export function FilterPanel() {
           onToggleStatus={toggleStatus}
           missingTasks={missingTasks}
           onToggleTask={toggleTask}
+          margins={margins}
+          onToggleMargin={toggleMargin}
         />
       )}
 

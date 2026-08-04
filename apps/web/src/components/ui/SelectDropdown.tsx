@@ -48,6 +48,10 @@ export function SelectDropdown({
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
+  // The popover renders directly over the trigger, so on touch the tap that opened it can
+  // continue through onto whichever option landed under the finger — selecting a value the
+  // user never chose. Ignore option presses for a beat after opening.
+  const openedAt = useRef(0);
   // Measure the trigger button (fixed height), not the container — see MultiSelectDropdown.
   const { style: popoverStyle, popoverRef } = useDropdownPosition(open, triggerRef, 256);
 
@@ -63,6 +67,7 @@ export function SelectDropdown({
   }, [open]);
 
   const select = (option: string) => {
+    if (Date.now() - openedAt.current < 300) return;
     onChange(option);
     setOpen(false);
   };
@@ -78,7 +83,10 @@ export function SelectDropdown({
       <button
         ref={triggerRef}
         type="button"
-        onClick={() => setOpen((o) => !o)}
+        onClick={() => {
+          openedAt.current = Date.now();
+          setOpen((o) => !o);
+        }}
         className={cn(
           'flex w-full items-center gap-2 rounded-btn border border-border bg-surface px-3 py-2 text-left text-xs',
           isMuted ? 'text-textMuted' : 'text-textPri',
