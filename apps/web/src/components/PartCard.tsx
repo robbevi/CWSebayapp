@@ -1,4 +1,4 @@
-import { AlertTriangle, DollarSign, Factory, MapPin, Package, Wrench } from 'lucide-react';
+import { AlertTriangle, ArrowRight, DollarSign, Factory, MapPin, Package, Wrench } from 'lucide-react';
 import { isHighPriority, isPositiveMargin, type InventoryPart } from '@warehouse/shared';
 import { useUIStore } from '../state/useUIStore';
 import { Pill } from './ui/Pill';
@@ -47,6 +47,17 @@ export function PartCard({ part }: { part: InventoryPart }) {
           <MapPin size={12} />
           {part.binLocation || '—'}
         </Pill>
+        {/* Only shown once the part has actually been moved, so an un-moved part's card
+            looks exactly as it did before. */}
+        {part.newBinLocation && (
+          <span
+            title={`Moved to recovery bin ${part.newBinLocation}`}
+            className="inline-flex items-center gap-1 rounded-pill bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary"
+          >
+            <ArrowRight size={12} />
+            {part.newBinLocation}
+          </span>
+        )}
         <Pill tone="chip">
           <Package size={12} />
           QOH: {part.qoh}

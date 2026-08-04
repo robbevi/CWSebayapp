@@ -160,7 +160,9 @@ export function PartDetailModal() {
           <div>
             <div className="text-base font-semibold text-textPri">{part.sku}</div>
             <div className="text-xs text-textMuted">
-              Bin {part.binLocation || '—'} · {part.description}
+              Bin {part.binLocation || '—'}
+              {part.newBinLocation && <span className="text-primary"> → {part.newBinLocation}</span>} ·{' '}
+              {part.description}
             </div>
           </div>
           <button onClick={close} className="rounded-btn p-2 hover:bg-surfaceMuted" aria-label="Close" type="button">
@@ -170,12 +172,19 @@ export function PartDetailModal() {
 
         <div className="shrink-0 border-b border-border p-4">
           <div className="space-y-3 rounded-card bg-surfaceMuted p-3 text-xs">
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-6">
               <Field label="SKU" value={part.sku} />
               <Field label="Manufacturer" value={part.manufacturer || '—'} />
-              <Field label="Bin" value={part.binLocation || '—'} />
-              <Field label="System QOH" value={String(part.qoh)} />
               <Field label="Site" value={part.inventorySite || '—'} />
+              {/* Both locations sit side by side: the warehouse bin is where the part came
+                  from and is never overwritten, the recovery bin is where it now sits. */}
+              <Field label="Warehouse Bin" value={part.binLocation || '—'} />
+              <Field
+                label="Recovery Bin"
+                value={part.newBinLocation || '—'}
+                tone={part.newBinLocation ? 'positive' : undefined}
+              />
+              <Field label="System QOH" value={String(part.qoh)} />
             </div>
             {hasRecoveryData && (
               <div className="grid grid-cols-2 gap-3 border-t border-border pt-3 sm:grid-cols-4">
