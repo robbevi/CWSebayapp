@@ -17,6 +17,7 @@ const KNOWN_FIELDS = [
   'manufacturer',
   'inventorySite',
   'binLocation',
+  'newBinLocation',
   'qoh',
   'confirmedQoh',
   'notes',
@@ -49,6 +50,7 @@ export interface CreatePartFields {
   manufacturer?: string;
   inventorySite?: string;
   binLocation?: string;
+  newBinLocation?: string;
   qoh?: number;
   confirmedQoh?: number | null;
   itemCondition?: string;
@@ -104,6 +106,7 @@ export function mapRowToPart(headers: string[], row: unknown[], photos: Photo[])
     manufacturer: get('manufacturer') ?? '',
     inventorySite: get('inventorySite') ?? '',
     binLocation: get('binLocation') ?? '',
+    newBinLocation: get('newBinLocation'),
     qoh: parseNumberOrNull(get('qoh')) ?? 0,
     confirmedQoh: parseNumberOrNull(get('confirmedQoh')),
     notes: get('notes'),
@@ -184,6 +187,7 @@ function buildCreateRecord(data: CreatePartFields, updatedAt: string): Partial<R
     manufacturer: data.manufacturer,
     inventorySite: data.inventorySite,
     binLocation: data.binLocation,
+    newBinLocation: data.newBinLocation,
     qoh: data.qoh,
     confirmedQoh: data.confirmedQoh,
     itemCondition: data.itemCondition,
@@ -354,6 +358,7 @@ export async function updatePart(id: string, patch: InventoryPartPatch, submitte
   if (patch.transferredToMarketRecovery !== undefined) record.transferredToMarketRecovery = patch.transferredToMarketRecovery;
   if (patch.transferId !== undefined) record.transferId = patch.transferId;
   if (patch.catalogingStartDate !== undefined) record.catalogingStartDate = patch.catalogingStartDate;
+  if (patch.newBinLocation !== undefined) record.newBinLocation = patch.newBinLocation;
   record.updatedAt = new Date().toISOString();
 
   const lastCol = colLetter(headers.length - 1);

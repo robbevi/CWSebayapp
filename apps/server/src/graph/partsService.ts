@@ -28,6 +28,7 @@ function mapItemToPart(
     manufacturer: String(get('manufacturer') ?? ''),
     inventorySite: String(get('inventorySite') ?? ''),
     binLocation: String(get('binLocation') ?? ''),
+    newBinLocation: (get('newBinLocation') as string) ?? undefined,
     qoh: Number(get('qoh') ?? 0),
     confirmedQoh: confirmedQohRaw === undefined || confirmedQohRaw === null || confirmedQohRaw === ''
       ? null
@@ -108,6 +109,7 @@ export async function updatePart(itemId: string, patch: InventoryPartPatch): Pro
   setIfPresent('transferredToMarketRecovery', patch.transferredToMarketRecovery);
   setIfPresent('transferId', patch.transferId);
   setIfPresent('catalogingStartDate', patch.catalogingStartDate);
+  setIfPresent('newBinLocation', patch.newBinLocation);
 
   if (Object.keys(fieldsPayload).length > 0) {
     await client.api(`/sites/${siteId}/lists/${listId}/items/${itemId}/fields`).update(fieldsPayload);
@@ -136,6 +138,7 @@ export interface CreatePartFields {
   manufacturer?: string;
   inventorySite?: string;
   binLocation?: string;
+  newBinLocation?: string;
   qoh?: number;
   confirmedQoh?: number | null;
   itemCondition?: string;
@@ -168,6 +171,7 @@ export async function createPart(data: CreatePartFields): Promise<string> {
   set('manufacturer', data.manufacturer);
   set('inventorySite', data.inventorySite);
   set('binLocation', data.binLocation);
+  set('newBinLocation', data.newBinLocation);
   set('qoh', data.qoh);
   set('confirmedQoh', data.confirmedQoh);
   set('itemCondition', data.itemCondition);
@@ -202,6 +206,7 @@ export async function updatePartFields(itemId: string, data: Partial<CreatePartF
   set('manufacturer', data.manufacturer);
   set('inventorySite', data.inventorySite);
   set('binLocation', data.binLocation);
+  set('newBinLocation', data.newBinLocation);
   set('qoh', data.qoh);
   set('confirmedQoh', data.confirmedQoh);
   set('itemCondition', data.itemCondition);

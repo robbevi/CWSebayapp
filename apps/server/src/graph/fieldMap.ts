@@ -8,6 +8,7 @@ export const DISPLAY = {
   manufacturer: 'Manufacturer Name',
   inventorySite: 'Inventory Site',
   binLocation: 'Bin Location',
+  newBinLocation: 'New Bin Location',
   qoh: 'Quantity On Hand',
   confirmedQoh: 'Confirmed Quantity On Hand',
   itemCondition: 'Item Condition',

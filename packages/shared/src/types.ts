@@ -47,6 +47,8 @@ export interface InventoryPart {
   manufacturer: string;
   inventorySite: string;
   binLocation: string;
+  /** Shelf the part is moved to at the Iron Barn once it leaves the Williston warehouse. */
+  newBinLocation?: string;
   qoh: number;
   confirmedQoh: number | null;
   notes?: string;
@@ -99,6 +101,7 @@ export type InventoryPartPatch = Partial<
     | 'transferredToMarketRecovery'
     | 'transferId'
     | 'catalogingStartDate'
+    | 'newBinLocation'
   >
 >;
 

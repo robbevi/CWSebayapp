@@ -3,6 +3,7 @@ import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Check, Trash2, X } from 'lucide-react';
+import { IRON_BARN_BINS } from '@warehouse/shared';
 import { useBodyScrollLock } from '../hooks/useBodyScrollLock';
 import { useDeletePart } from '../hooks/useDeletePart';
 import { useInventoryParts } from '../hooks/useInventoryParts';
@@ -11,6 +12,7 @@ import { useUIStore } from '../state/useUIStore';
 import { useUserStore } from '../state/useUserStore';
 import { cn } from '../lib/cn';
 import { Button } from './ui/Button';
+import { ComboBox } from './ui/ComboBox';
 import { SelectDropdown } from './ui/SelectDropdown';
 import { Input } from './ui/Input';
 import { Textarea } from './ui/Textarea';
@@ -44,6 +46,7 @@ const schema = z.object({
   dispositionNote: z.string().optional(),
   transferredToMarketRecovery: z.boolean(),
   transferId: z.string().optional(),
+  newBinLocation: z.string().optional(),
   itemListed: z.boolean(),
   itemListedDate: z.string().optional(),
   ebayListingId: z.string().optional(),
@@ -72,6 +75,7 @@ export function PartDetailModal() {
       dispositionNote: '',
       transferredToMarketRecovery: false,
       transferId: '',
+      newBinLocation: '',
       itemListed: false,
       itemListedDate: '',
       ebayListingId: '',
@@ -90,6 +94,7 @@ export function PartDetailModal() {
         dispositionNote: part.dispositionNote ?? '',
         transferredToMarketRecovery: part.transferredToMarketRecovery,
         transferId: part.transferId ?? '',
+        newBinLocation: part.newBinLocation ?? '',
         itemListed: part.itemListed,
         // itemListedDate is stored as a full ISO datetime ("2026-07-16T00:00:00.000Z"),
         // but a native <input type="date"> only accepts exactly "YYYY-MM-DD" as its
@@ -132,6 +137,7 @@ export function PartDetailModal() {
         dispositionNote: values.disposition === 'Other' ? values.dispositionNote || undefined : undefined,
         transferredToMarketRecovery: values.transferredToMarketRecovery,
         transferId: values.transferredToMarketRecovery ? values.transferId || undefined : null,
+        newBinLocation: values.newBinLocation?.trim() || undefined,
         itemListed: values.itemListed,
         itemListedDate: values.itemListed ? values.itemListedDate || new Date().toISOString() : null,
         ebayListingId: values.itemListed ? values.ebayListingId || undefined : null,
@@ -320,6 +326,23 @@ export function PartDetailModal() {
                 <Input placeholder="Cetaris Transfer ID" {...register('transferId')} />
               </div>
             )}
+
+            <div>
+              <label className="mb-1 block text-xs font-semibold text-textMuted">New Bin Location</label>
+              <Controller
+                control={control}
+                name="newBinLocation"
+                render={({ field }) => (
+                  <ComboBox
+                    options={IRON_BARN_BINS}
+                    value={field.value ?? ''}
+                    onChange={field.onChange}
+                    label="New Bin Location"
+                    placeholder="Iron Barn shelf, e.g. A-1-1"
+                  />
+                )}
+              />
+            </div>
 
             <div>
               <label className="mb-1 block text-xs font-semibold text-textMuted">Item Listed</label>

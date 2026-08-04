@@ -81,12 +81,19 @@ export function AddPartModal({ onClose, manufacturerOptions, siteOptions }: AddP
                 options={manufacturerOptions}
                 value={manufacturer}
                 onChange={setManufacturer}
+                label="Manufacturer"
                 placeholder="Manufacturer"
               />
             </div>
             <div>
               <label className="mb-1 block text-xs font-semibold text-textMuted">Inventory Site</label>
-              <ComboBox options={siteOptions} value={inventorySite} onChange={setInventorySite} placeholder="Inventory Site" />
+              <ComboBox
+                options={siteOptions}
+                value={inventorySite}
+                onChange={setInventorySite}
+                label="Inventory Site"
+                placeholder="Inventory Site"
+              />
             </div>
           </div>
         ) : (

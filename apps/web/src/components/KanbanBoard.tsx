@@ -7,7 +7,7 @@ import { BucketColumn } from './BucketColumn';
 function matchesSearch(p: InventoryPart, query: string): boolean {
   if (!query) return true;
   const needle = query.toLowerCase();
-  return [p.sku, p.description, p.manufacturer, p.inventorySite, p.binLocation, p.notes]
+  return [p.sku, p.description, p.manufacturer, p.inventorySite, p.binLocation, p.newBinLocation, p.notes]
     .filter((v): v is string => !!v)
     .some((v) => v.toLowerCase().includes(needle));
 }
