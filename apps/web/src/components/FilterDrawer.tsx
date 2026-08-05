@@ -1,7 +1,7 @@
 import { Camera, ClipboardCheck, Factory, ListChecks, MapPin, Tag, TruckIcon, Wrench, X } from 'lucide-react';
 import type { TaskKey, WorkflowStatus } from '@warehouse/shared';
 import { useBodyScrollLock } from '../hooks/useBodyScrollLock';
-import type { MarginFilter } from '../state/useUIStore';
+import type { DiscrepancyFilter, MarginFilter } from '../state/useUIStore';
 import { Button } from './ui/Button';
 import { MultiSelectDropdown } from './ui/MultiSelectDropdown';
 
@@ -14,6 +14,12 @@ export const STATUS_OPTIONS: { key: WorkflowStatus; label: string }[] = [
 export const MARGIN_OPTIONS: { key: MarginFilter; label: string }[] = [
   { key: 'Positive Gross Margin', label: 'Positive Gross Margin' },
   { key: 'Negative Gross Margin', label: 'Negative Gross Margin' },
+];
+
+export const DISCREPANCY_OPTIONS: { key: DiscrepancyFilter; label: string }[] = [
+  { key: 'shortage', label: 'Short (fewer than expected)' },
+  { key: 'notFound', label: 'Not Found (none on shelf)' },
+  { key: 'overage', label: 'Over (more than expected)' },
 ];
 
 export const TASK_OPTIONS: { key: TaskKey; label: string; icon: React.ReactNode }[] = [
@@ -45,6 +51,8 @@ interface FilterDrawerProps {
   onToggleTask: (key: TaskKey) => void;
   margins: MarginFilter[];
   onToggleMargin: (key: MarginFilter) => void;
+  discrepancies: DiscrepancyFilter[];
+  onToggleDiscrepancy: (key: DiscrepancyFilter) => void;
 }
 
 export function FilterDrawer({
@@ -68,6 +76,8 @@ export function FilterDrawer({
   onToggleTask,
   margins,
   onToggleMargin,
+  discrepancies,
+  onToggleDiscrepancy,
 }: FilterDrawerProps) {
   useBodyScrollLock();
   return (
@@ -143,6 +153,24 @@ export function FilterDrawer({
                 </label>
               ))}
             </div>
+          </div>
+
+          <div>
+            <span className="mb-1 block text-xs font-semibold text-textMuted">Quantity Discrepancy</span>
+            <div className="space-y-2 rounded-btn border border-border p-3">
+              {DISCREPANCY_OPTIONS.map((opt) => (
+                <label key={opt.key} className="flex cursor-pointer items-center gap-2 text-xs text-textPri">
+                  <input
+                    type="checkbox"
+                    checked={discrepancies.includes(opt.key)}
+                    onChange={() => onToggleDiscrepancy(opt.key)}
+                    className="h-4 w-4 shrink-0 accent-primary"
+                  />
+                  {opt.label}
+                </label>
+              ))}
+            </div>
+            <p className="mt-1.5 text-[11px] text-textMuted">Only counted parts appear — uncounted parts aren't a discrepancy yet.</p>
           </div>
 
           <div>

@@ -8,6 +8,7 @@ import { healthRouter } from './routes/health.js';
 import { importRouter } from './routes/import.js';
 import { partsRouter } from './routes/parts.js';
 import { photosRouter } from './routes/photos.js';
+import { discrepanciesRouter } from './routes/discrepancies.js';
 import { submissionsRouter } from './routes/submissions.js';
 import { usersRouter } from './routes/users.js';
 
@@ -22,6 +23,7 @@ app.use('/api', partsRouter);
 app.use('/api', photosRouter);
 app.use('/api', importRouter);
 app.use('/api', submissionsRouter);
+app.use('/api', discrepanciesRouter);
 app.use('/api', usersRouter);
 
 if (process.env.NODE_ENV === 'production') {

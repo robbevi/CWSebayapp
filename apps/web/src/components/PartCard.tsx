@@ -1,11 +1,19 @@
 import { AlertTriangle, ArrowRight, DollarSign, Factory, MapPin, Package, Wrench } from 'lucide-react';
-import { isHighPriority, isPositiveMargin, type InventoryPart } from '@warehouse/shared';
+import {
+  formatVariance,
+  getDiscrepancy,
+  isHighPriority,
+  isPositiveMargin,
+  type InventoryPart,
+} from '@warehouse/shared';
+import { cn } from '../lib/cn';
 import { useUIStore } from '../state/useUIStore';
 import { Pill } from './ui/Pill';
 import { ProcessingStatusChips } from './ProcessingStatusChips';
 
 export function PartCard({ part }: { part: InventoryPart }) {
   const set = useUIStore((s) => s.set);
+  const discrepancy = getDiscrepancy(part);
 
   return (
     <button
@@ -62,6 +70,22 @@ export function PartCard({ part }: { part: InventoryPart }) {
           <Package size={12} />
           QOH: {part.qoh}
         </Pill>
+        {/* A counted-but-mismatched quantity is the one thing on a card that needs chasing,
+            so it gets a hard colour rather than the neutral chip treatment. */}
+        {discrepancy && discrepancy.kind !== 'none' && (
+          <span
+            title={`Counted ${part.confirmedQoh}, system says ${part.qoh}`}
+            className={cn(
+              'inline-flex items-center gap-1 rounded-pill px-2 py-0.5 text-[11px] font-semibold',
+              discrepancy.variance < 0 ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'
+            )}
+          >
+            <AlertTriangle size={12} />
+            {discrepancy.kind === 'notFound'
+              ? `Not Found (${formatVariance(discrepancy.variance)})`
+              : formatVariance(discrepancy.variance)}
+          </span>
+        )}
       </div>
       {part.workflowStatus === 'Processing' && (
         <div className="mt-3">

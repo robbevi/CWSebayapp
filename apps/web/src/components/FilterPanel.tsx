@@ -4,6 +4,7 @@ import { useInventoryParts } from '../hooks/useInventoryParts';
 import { useUIStore, type SortKey } from '../state/useUIStore';
 import { cn } from '../lib/cn';
 import { AddPartModal } from './AddPartModal';
+import { DISCREPANCY_LABELS } from '@warehouse/shared';
 import { FilterDrawer, STATUS_OPTIONS, TASK_OPTIONS } from './FilterDrawer';
 import { Input } from './ui/Input';
 import { SelectDropdown } from './ui/SelectDropdown';
@@ -19,6 +20,7 @@ const SORT_OPTIONS: SortKey[] = [
   'Field Review Priority',
   'Recovery Price',
   'Gross Margin',
+  'Qty Discrepancy',
 ];
 
 function uniqueSorted(values: (string | undefined)[]): string[] {
@@ -36,7 +38,8 @@ function countBy(values: (string | undefined)[]): Record<string, number> {
 
 export function FilterPanel() {
   const { data: parts } = useInventoryParts();
-  const { search, sites, bins, manufacturers, statuses, missingTasks, margins, sort, set, clearAll } = useUIStore();
+  const { search, sites, bins, manufacturers, statuses, missingTasks, margins, discrepancies, sort, set, clearAll } =
+    useUIStore();
   const [searchInput, setSearchInput] = useState(search);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [addPartOpen, setAddPartOpen] = useState(false);
@@ -71,6 +74,10 @@ export function FilterPanel() {
     set({ margins: margins.includes(key) ? margins.filter((m) => m !== key) : [...margins, key] });
   };
 
+  const toggleDiscrepancy = (key: (typeof discrepancies)[number]) => {
+    set({ discrepancies: discrepancies.includes(key) ? discrepancies.filter((d) => d !== key) : [...discrepancies, key] });
+  };
+
   const chips = [
     sites.length > 0 && { key: 'sites', label: `Inventory Site: ${sites.join(', ')}`, onRemove: () => set({ sites: [] }) },
     bins.length > 0 && { key: 'bins', label: `Bin Location: ${bins.join(', ')}`, onRemove: () => set({ bins: [] }) },
@@ -93,6 +100,11 @@ export function FilterPanel() {
       key: 'margins',
       label: `Margin: ${margins.map((m) => m.replace(' Gross Margin', '')).join(', ')}`,
       onRemove: () => set({ margins: [] }),
+    },
+    discrepancies.length > 0 && {
+      key: 'discrepancies',
+      label: `Qty: ${discrepancies.map((d) => DISCREPANCY_LABELS[d]).join(', ')}`,
+      onRemove: () => set({ discrepancies: [] }),
     },
   ].filter((c): c is { key: string; label: string; onRemove: () => void } => !!c);
 
@@ -201,6 +213,8 @@ export function FilterPanel() {
           onToggleTask={toggleTask}
           margins={margins}
           onToggleMargin={toggleMargin}
+          discrepancies={discrepancies}
+          onToggleDiscrepancy={toggleDiscrepancy}
         />
       )}
 

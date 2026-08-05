@@ -2,8 +2,8 @@ import { useEffect } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Check, Trash2, X } from 'lucide-react';
-import { IRON_BARN_BINS } from '@warehouse/shared';
+import { AlertTriangle, Check, Trash2, X } from 'lucide-react';
+import { formatVariance, getDiscrepancy, IRON_BARN_BINS } from '@warehouse/shared';
 import { useBodyScrollLock } from '../hooks/useBodyScrollLock';
 import { useDeletePart } from '../hooks/useDeletePart';
 import { useInventoryParts } from '../hooks/useInventoryParts';
@@ -111,6 +111,11 @@ export function PartDetailModal() {
   const itemListed = watch('itemListed');
   const transferred = watch('transferredToMarketRecovery');
   const disposition = watch('disposition');
+
+  // Only meaningful once they've confirmed — before that the stepper still holds the
+  // pre-filled system quantity, and flagging "0 vs 5" while they're mid-count is noise.
+  const qohConfirmed = watch('qohConfirmed');
+  const liveDiscrepancy = qohConfirmed ? getDiscrepancy({ qoh: part.qoh, confirmedQoh: watch('confirmedQoh') }) : null;
 
   // Parts loaded before the recovery columns existed have none of these — hide the whole
   // row rather than show four em-dashes.
@@ -249,6 +254,20 @@ export function PartDetailModal() {
                   )
                 }
               />
+              {/* Live variance against the system quantity, updating as the stepper moves so
+                  the counter sees the shortfall before they commit to it. */}
+              {liveDiscrepancy && liveDiscrepancy.kind !== 'none' && (
+                <span
+                  className={cn(
+                    'flex items-center gap-1.5 rounded-btn px-3 py-2 text-xs font-semibold',
+                    liveDiscrepancy.variance < 0 ? 'bg-red-50 text-red-700' : 'bg-amber-50 text-amber-700'
+                  )}
+                >
+                  <AlertTriangle size={14} />
+                  {formatVariance(liveDiscrepancy.variance)} vs system ({part.qoh})
+                  {liveDiscrepancy.kind === 'notFound' && ' — none found'}
+                </span>
+              )}
             </div>
             {!watch('qohConfirmed') && (
               <p className="mt-1 text-[11px] text-textMuted">Click Confirm once you've counted this quantity.</p>

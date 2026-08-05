@@ -1,6 +1,12 @@
 import { randomUUID } from 'node:crypto';
-import { deriveStatus, isWinForRole, roleForUser } from '@warehouse/shared';
-import type { InventoryPart, InventoryPartPatch, Photo, Submission } from '@warehouse/shared';
+import { deriveStatus, getDiscrepancy, isWinForRole, roleForUser } from '@warehouse/shared';
+import type {
+  DiscrepancyLogEntry,
+  InventoryPart,
+  InventoryPartPatch,
+  Photo,
+  Submission,
+} from '@warehouse/shared';
 import { env } from '../config/env.js';
 import { parseBoolean, parseDateOrNull, parseNumberOrNull } from '../lib/csv.js';
 import { getSheetsClient } from './client.js';
@@ -9,6 +15,18 @@ import { listPhotosGrouped, type GroupedPhotos } from './driveService.js';
 const SHEET_NAME = 'Parts';
 const SUBMISSIONS_SHEET = 'Submissions';
 const SUBMISSIONS_HEADERS = ['sku', 'user', 'role', 'completedAt'];
+const DISCREPANCIES_SHEET = 'Discrepancies';
+const DISCREPANCIES_HEADERS = [
+  'sku',
+  'inventorySite',
+  'binLocation',
+  'expectedQoh',
+  'countedQoh',
+  'variance',
+  'kind',
+  'user',
+  'recordedAt',
+];
 
 const KNOWN_FIELDS = [
   'partId',
@@ -265,28 +283,32 @@ export async function getPartById(id: string): Promise<InventoryPart> {
   return { ...bare, photos, photographed: bare.photographed || photos.length > 0 };
 }
 
-let submissionsSheetReady = false;
+const readyLogSheets = new Set<string>();
 
-// Creates the "Submissions" tab (with a header row) the first time it's needed, so
-// tracking works without anyone having to manually prep the spreadsheet first.
-async function ensureSubmissionsSheet(): Promise<void> {
-  if (submissionsSheetReady) return;
+// Creates a log tab (with its header row) the first time it's needed, so tracking works
+// without anyone having to manually prep the spreadsheet first.
+async function ensureLogSheet(title: string, headers: string[]): Promise<void> {
+  if (readyLogSheets.has(title)) return;
   const sheets = getSheetsClient();
   const res = await sheets.spreadsheets.get({ spreadsheetId: env.googleSheetId, fields: 'sheets.properties' });
-  const exists = res.data.sheets?.some((s) => s.properties?.title === SUBMISSIONS_SHEET);
+  const exists = res.data.sheets?.some((s) => s.properties?.title === title);
   if (!exists) {
     await sheets.spreadsheets.batchUpdate({
       spreadsheetId: env.googleSheetId,
-      requestBody: { requests: [{ addSheet: { properties: { title: SUBMISSIONS_SHEET } } }] },
+      requestBody: { requests: [{ addSheet: { properties: { title } } }] },
     });
     await sheets.spreadsheets.values.update({
       spreadsheetId: env.googleSheetId,
-      range: `${SUBMISSIONS_SHEET}!A1:D1`,
+      range: `${title}!A1:${colLetter(headers.length - 1)}1`,
       valueInputOption: 'USER_ENTERED',
-      requestBody: { values: [SUBMISSIONS_HEADERS] },
+      requestBody: { values: [headers] },
     });
   }
-  submissionsSheetReady = true;
+  readyLogSheets.add(title);
+}
+
+async function ensureSubmissionsSheet(): Promise<void> {
+  await ensureLogSheet(SUBMISSIONS_SHEET, SUBMISSIONS_HEADERS);
 }
 
 async function appendSubmission(submission: Submission): Promise<void> {
@@ -314,6 +336,78 @@ export async function getSubmissions(): Promise<Submission[]> {
       role: String(row[2] ?? '') as Submission['role'],
       completedAt: String(row[3] ?? ''),
     }));
+}
+
+export async function getDiscrepancyLog(): Promise<DiscrepancyLogEntry[]> {
+  await ensureLogSheet(DISCREPANCIES_SHEET, DISCREPANCIES_HEADERS);
+  const sheets = getSheetsClient();
+  const res = await sheets.spreadsheets.values.get({ spreadsheetId: env.googleSheetId, range: DISCREPANCIES_SHEET });
+  const [, ...rows] = res.data.values ?? [];
+  return rows
+    .filter((row) => row.length > 0 && row[0])
+    .map((row) => ({
+      sku: String(row[0] ?? ''),
+      inventorySite: String(row[1] ?? ''),
+      binLocation: String(row[2] ?? ''),
+      expectedQoh: Number(row[3] ?? 0),
+      countedQoh: Number(row[4] ?? 0),
+      variance: Number(row[5] ?? 0),
+      kind: String(row[6] ?? '') as DiscrepancyLogEntry['kind'],
+      user: String(row[7] ?? ''),
+      recordedAt: String(row[8] ?? ''),
+    }));
+}
+
+// Recorded as a point-in-time row rather than derived on the fly, because the expected
+// quantity is refreshed from the source spreadsheet on every import — a variance computed
+// later against a changed qoh would silently misstate what the counter actually found.
+async function appendDiscrepancy(entry: DiscrepancyLogEntry): Promise<void> {
+  await ensureLogSheet(DISCREPANCIES_SHEET, DISCREPANCIES_HEADERS);
+  const sheets = getSheetsClient();
+  await sheets.spreadsheets.values.append({
+    spreadsheetId: env.googleSheetId,
+    range: DISCREPANCIES_SHEET,
+    valueInputOption: 'USER_ENTERED',
+    insertDataOption: 'INSERT_ROWS',
+    requestBody: {
+      values: [
+        [
+          entry.sku,
+          entry.inventorySite,
+          entry.binLocation,
+          entry.expectedQoh,
+          entry.countedQoh,
+          entry.variance,
+          entry.kind,
+          entry.user,
+          entry.recordedAt,
+        ],
+      ],
+    },
+  });
+}
+
+// Only fires when the counted quantity actually changes, so re-saving a part that already
+// has a logged variance doesn't pile up duplicate rows.
+async function logDiscrepancyIfChanged(
+  before: InventoryPart,
+  after: InventoryPart,
+  submittedBy: string | undefined
+): Promise<void> {
+  if (before.confirmedQoh === after.confirmedQoh) return;
+  const d = getDiscrepancy(after);
+  if (!d || d.kind === 'none') return;
+  await appendDiscrepancy({
+    sku: after.sku,
+    inventorySite: after.inventorySite,
+    binLocation: after.binLocation,
+    expectedQoh: after.qoh,
+    countedQoh: after.confirmedQoh as number,
+    variance: d.variance,
+    kind: d.kind,
+    user: submittedBy ?? 'unknown',
+    recordedAt: new Date().toISOString(),
+  });
 }
 
 // A "win" can be completed by either of two independent code paths — saving the detail
@@ -369,7 +463,9 @@ export async function updatePart(id: string, patch: InventoryPartPatch, submitte
     requestBody: { values: [recordToRow(headers, record)] },
   });
 
-  await logWinIfCompleted(before.sku, before, mapRowToPart(headers, recordToRow(headers, record), []), submittedBy);
+  const after = mapRowToPart(headers, recordToRow(headers, record), []);
+  await logWinIfCompleted(before.sku, before, after, submittedBy);
+  await logDiscrepancyIfChanged(before, after, submittedBy);
 
   return getPartById(id);
 }

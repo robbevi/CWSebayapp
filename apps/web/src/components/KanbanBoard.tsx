@@ -1,5 +1,12 @@
 import { useMemo } from 'react';
-import { checkpointCount, getCheckpoints, type InventoryPart, type TaskKey, type WorkflowStatus } from '@warehouse/shared';
+import {
+  checkpointCount,
+  getCheckpoints,
+  getDiscrepancy,
+  type InventoryPart,
+  type TaskKey,
+  type WorkflowStatus,
+} from '@warehouse/shared';
 import { useInventoryParts } from '../hooks/useInventoryParts';
 import { useUIStore, type SortKey } from '../state/useUIStore';
 import { BucketColumn } from './BucketColumn';
@@ -63,6 +70,14 @@ function sortParts(parts: InventoryPart[], sort: SortKey): InventoryPart[] {
   if (sort === 'Progress') {
     return [...parts].sort((a, b) => checkpointCount(a) - checkpointCount(b));
   }
+  if (sort === 'Qty Discrepancy') {
+    // Worst shortfall first; uncounted and reconciled parts fall to the bottom.
+    const rank = (p: InventoryPart) => {
+      const d = getDiscrepancy(p);
+      return d && d.kind !== 'none' ? d.variance : Number.POSITIVE_INFINITY;
+    };
+    return [...parts].sort((a, b) => rank(a) - rank(b));
+  }
   if (sort === 'Revenue Priority') {
     return [...parts].sort((a, b) => byNumberAsc(a.revenuePriorityRank, b.revenuePriorityRank));
   }
@@ -93,7 +108,7 @@ const GRID_COLS: Record<number, string> = {
 
 export function KanbanBoard() {
   const { data, isLoading } = useInventoryParts();
-  const { search, sites, bins, manufacturers, statuses, missingTasks, margins, sort } = useUIStore();
+  const { search, sites, bins, manufacturers, statuses, missingTasks, margins, discrepancies, sort } = useUIStore();
 
   const filtered = useMemo(() => {
     const parts = data ?? [];
@@ -104,10 +119,12 @@ export function KanbanBoard() {
         matchesSet(p.manufacturer, manufacturers) &&
         matchesMissingTasks(p, missingTasks) &&
         (margins.length === 0 || margins.includes(p.grossMarginStatus as (typeof margins)[number])) &&
+        (discrepancies.length === 0 ||
+          discrepancies.includes(getDiscrepancy(p)?.kind as (typeof discrepancies)[number])) &&
         matchesSearch(p, search)
     );
     return sortParts(result, sort);
-  }, [data, search, sites, bins, manufacturers, missingTasks, margins, sort]);
+  }, [data, search, sites, bins, manufacturers, missingTasks, margins, discrepancies, sort]);
 
   if (isLoading) {
     return <div className="py-16 text-center text-textMuted">Loading inventory…</div>;
