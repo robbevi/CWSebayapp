@@ -42,49 +42,56 @@ export function PartCard({ part }: { part: InventoryPart }) {
         )}
       </div>
       <div className="mb-2 line-clamp-2 min-h-[2rem] text-xs leading-snug text-textMuted">{part.description}</div>
-      <div className="flex flex-wrap gap-1.5">
-        <Pill tone="chip">
-          <Wrench size={12} />
-          {part.manufacturer || '—'}
+      {/* Same two-column grid as ProcessingStatusChips below, so the two blocks line up
+          instead of one being a ragged wrap and the other a tidy grid. */}
+      <div className="grid grid-cols-2 gap-1.5">
+        <Pill tone="chip" className="w-full">
+          <Wrench size={12} className="shrink-0" />
+          <span className="truncate">{part.manufacturer || '—'}</span>
         </Pill>
-        <Pill tone="chip">
-          <Factory size={12} />
-          {part.inventorySite || '—'}
+        <Pill tone="chip" className="w-full">
+          <Factory size={12} className="shrink-0" />
+          <span className="truncate">{part.inventorySite || '—'}</span>
         </Pill>
-        <Pill tone="chip">
-          <MapPin size={12} />
-          {part.binLocation || '—'}
+        <Pill tone="chip" className="w-full">
+          <MapPin size={12} className="shrink-0" />
+          <span className="truncate">{part.binLocation || '—'}</span>
+        </Pill>
+        <Pill tone="chip" className="w-full">
+          <Package size={12} className="shrink-0" />
+          <span className="truncate">QOH: {part.qoh}</span>
         </Pill>
         {/* Only shown once the part has actually been moved, so an un-moved part's card
             looks exactly as it did before. */}
         {part.newBinLocation && (
-          <span
-            title={`Moved to recovery bin ${part.newBinLocation}`}
-            className="inline-flex items-center gap-1 rounded-pill bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary"
+          <Pill
+            tone="chip"
+            className="w-full border-primary/20 bg-primary/10 font-semibold text-primary"
           >
-            <ArrowRight size={12} />
-            {part.newBinLocation}
-          </span>
+            <ArrowRight size={12} className="shrink-0" />
+            <span className="truncate" title={`Moved to recovery bin ${part.newBinLocation}`}>
+              {part.newBinLocation}
+            </span>
+          </Pill>
         )}
-        <Pill tone="chip">
-          <Package size={12} />
-          QOH: {part.qoh}
-        </Pill>
         {/* A counted-but-mismatched quantity is the one thing on a card that needs chasing,
             so it gets a hard colour rather than the neutral chip treatment. */}
         {discrepancy && discrepancy.kind !== 'none' && (
-          <span
-            title={`Counted ${part.confirmedQoh}, system says ${part.qoh}`}
+          <Pill
             className={cn(
-              'inline-flex items-center gap-1 rounded-pill px-2 py-0.5 text-[11px] font-semibold',
-              discrepancy.variance < 0 ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'
+              'w-full font-semibold',
+              discrepancy.variance < 0
+                ? 'border-red-200 bg-red-100 text-red-700'
+                : 'border-amber-200 bg-amber-100 text-amber-700'
             )}
           >
-            <AlertTriangle size={12} />
-            {discrepancy.kind === 'notFound'
-              ? `Not Found (${formatVariance(discrepancy.variance)})`
-              : formatVariance(discrepancy.variance)}
-          </span>
+            <AlertTriangle size={12} className="shrink-0" />
+            <span className="truncate" title={`Counted ${part.confirmedQoh}, system says ${part.qoh}`}>
+              {discrepancy.kind === 'notFound'
+                ? `Not Found (${formatVariance(discrepancy.variance)})`
+                : formatVariance(discrepancy.variance)}
+            </span>
+          </Pill>
         )}
       </div>
       {part.workflowStatus === 'Processing' && (

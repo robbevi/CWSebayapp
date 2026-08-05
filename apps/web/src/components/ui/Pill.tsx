@@ -4,9 +4,10 @@ import { cn } from '../../lib/cn';
 interface PillProps {
   active?: boolean;
   tone?: 'default' | 'dark' | 'chip';
+  className?: string;
 }
 
-export function Pill({ active, tone = 'default', children }: PropsWithChildren<PillProps>) {
+export function Pill({ active, tone = 'default', className, children }: PropsWithChildren<PillProps>) {
   return (
     <span
       className={cn(
@@ -17,7 +18,8 @@ export function Pill({ active, tone = 'default', children }: PropsWithChildren<P
             ? 'bg-primaryDeep/10 text-primaryDeep border-primaryDeep/20'
             : tone === 'chip'
               ? 'bg-surfaceMuted text-textMuted border-transparent'
-              : 'bg-surface text-textMuted border-border'
+              : 'bg-surface text-textMuted border-border',
+        className
       )}
     >
       {children}

@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -62,6 +62,7 @@ export function PartDetailModal() {
 
   const part = parts?.find((p) => p.id === selectedId);
   useBodyScrollLock(modalOpen && !!part);
+  const [summaryCollapsed, setSummaryCollapsed] = useState(false);
 
   const { register, control, handleSubmit, reset, watch, setValue, formState } = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -175,8 +176,15 @@ export function PartDetailModal() {
           </button>
         </div>
 
-        <div className="shrink-0 border-b border-border p-4">
-          <div className="space-y-3 rounded-card bg-surfaceMuted p-3 text-xs">
+        {/* Collapses out of the way once the form is scrolled, but only on mobile, where it
+            was eating most of the screen. Desktop has the room and keeps it pinned. */}
+        <div
+          className={cn(
+            'shrink-0 overflow-hidden border-b border-border transition-all duration-200 sm:max-h-[400px] sm:border-b sm:opacity-100',
+            summaryCollapsed ? 'max-h-0 border-b-0 opacity-0' : 'max-h-[400px] opacity-100'
+          )}
+        >
+          <div className="space-y-3 rounded-card bg-surfaceMuted p-3 text-xs m-4">
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-6">
               <Field label="SKU" value={part.sku} />
               <Field label="Manufacturer" value={part.manufacturer || '—'} />
@@ -212,7 +220,11 @@ export function PartDetailModal() {
           </div>
         </div>
 
-        <form onSubmit={onSubmit} className="min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain p-4">
+        <form
+          onSubmit={onSubmit}
+          onScroll={(e) => setSummaryCollapsed(e.currentTarget.scrollTop > 24)}
+          className="min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain p-4"
+        >
           <PhotoUploader sku={part.sku} itemId={part.id} photos={part.photos} site={part.inventorySite} />
 
           <div>
@@ -233,44 +245,58 @@ export function PartDetailModal() {
                   />
                 )}
               />
+              {/* Icon-only and fixed-size in both states: a "Confirm" -> "Confirmed" label
+                  change grew the button mid-row on mobile and pushed the layout down. */}
               <Controller
                 control={control}
                 name="qohConfirmed"
-                render={({ field }) =>
-                  field.value ? (
-                    <button
-                      type="button"
-                      onClick={() => field.onChange(false)}
-                      title="Confirmed — click to undo"
-                      className="flex items-center gap-1.5 rounded-btn border border-primary/30 bg-primary/10 px-3 py-2 text-xs font-medium text-primary"
-                    >
-                      <Check size={14} />
-                      Confirmed
-                    </button>
-                  ) : (
-                    <Button variant="outline" type="button" onClick={() => field.onChange(true)}>
-                      Confirm
-                    </Button>
-                  )
-                }
+                render={({ field }) => (
+                  <button
+                    type="button"
+                    onClick={() => field.onChange(!field.value)}
+                    aria-pressed={field.value}
+                    aria-label={field.value ? 'Quantity confirmed — tap to undo' : 'Confirm this quantity'}
+                    title={field.value ? 'Confirmed — tap to undo' : 'Confirm this quantity'}
+                    className={cn(
+                      'flex h-11 w-11 shrink-0 items-center justify-center rounded-btn border transition-colors',
+                      field.value
+                        ? 'border-primary bg-primary text-white hover:bg-primaryHover'
+                        : 'border-border text-textMuted hover:bg-surfaceMuted'
+                    )}
+                  >
+                    <Check size={18} />
+                  </button>
+                )}
               />
-              {/* Live variance against the system quantity, updating as the stepper moves so
-                  the counter sees the shortfall before they commit to it. */}
+              {/* Live variance, updating as the stepper moves so the counter sees the
+                  shortfall before committing. Same height as the controls beside it. */}
               {liveDiscrepancy && liveDiscrepancy.kind !== 'none' && (
                 <span
                   className={cn(
-                    'flex items-center gap-1.5 rounded-btn px-3 py-2 text-xs font-semibold',
+                    'flex h-11 shrink-0 items-center gap-1.5 rounded-btn px-3 text-xs font-semibold',
                     liveDiscrepancy.variance < 0 ? 'bg-red-50 text-red-700' : 'bg-amber-50 text-amber-700'
                   )}
                 >
                   <AlertTriangle size={14} />
-                  {formatVariance(liveDiscrepancy.variance)} vs system ({part.qoh})
-                  {liveDiscrepancy.kind === 'notFound' && ' — none found'}
+                  {formatVariance(liveDiscrepancy.variance)}
                 </span>
               )}
             </div>
-            {!watch('qohConfirmed') && (
-              <p className="mt-1 text-[11px] text-textMuted">Click Confirm once you've counted this quantity.</p>
+            {liveDiscrepancy && liveDiscrepancy.kind !== 'none' ? (
+              <p
+                className={cn(
+                  'mt-1 text-[11px] font-medium',
+                  liveDiscrepancy.variance < 0 ? 'text-red-700' : 'text-amber-700'
+                )}
+              >
+                {liveDiscrepancy.kind === 'notFound'
+                  ? `None found — system expects ${part.qoh}.`
+                  : `System expects ${part.qoh}, counted ${watch('confirmedQoh')}.`}
+              </p>
+            ) : (
+              !watch('qohConfirmed') && (
+                <p className="mt-1 text-[11px] text-textMuted">Tap the check once you've counted this quantity.</p>
+              )
             )}
           </div>
 

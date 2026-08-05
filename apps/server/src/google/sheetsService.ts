@@ -361,7 +361,22 @@ export async function getDiscrepancyLog(): Promise<DiscrepancyLogEntry[]> {
 // Recorded as a point-in-time row rather than derived on the fly, because the expected
 // quantity is refreshed from the source spreadsheet on every import — a variance computed
 // later against a changed qoh would silently misstate what the counter actually found.
-async function appendDiscrepancy(entry: DiscrepancyLogEntry): Promise<void> {
+function discrepancyToRow(e: DiscrepancyLogEntry): (string | number)[] {
+  return [
+    e.sku,
+    e.inventorySite,
+    e.binLocation,
+    e.expectedQoh,
+    e.countedQoh,
+    e.variance,
+    e.kind,
+    e.user,
+    e.recordedAt,
+  ];
+}
+
+export async function appendDiscrepancies(entries: DiscrepancyLogEntry[]): Promise<void> {
+  if (entries.length === 0) return;
   await ensureLogSheet(DISCREPANCIES_SHEET, DISCREPANCIES_HEADERS);
   const sheets = getSheetsClient();
   await sheets.spreadsheets.values.append({
@@ -369,22 +384,12 @@ async function appendDiscrepancy(entry: DiscrepancyLogEntry): Promise<void> {
     range: DISCREPANCIES_SHEET,
     valueInputOption: 'USER_ENTERED',
     insertDataOption: 'INSERT_ROWS',
-    requestBody: {
-      values: [
-        [
-          entry.sku,
-          entry.inventorySite,
-          entry.binLocation,
-          entry.expectedQoh,
-          entry.countedQoh,
-          entry.variance,
-          entry.kind,
-          entry.user,
-          entry.recordedAt,
-        ],
-      ],
-    },
+    requestBody: { values: entries.map(discrepancyToRow) },
   });
+}
+
+async function appendDiscrepancy(entry: DiscrepancyLogEntry): Promise<void> {
+  await appendDiscrepancies([entry]);
 }
 
 // Only fires when the counted quantity actually changes, so re-saving a part that already
