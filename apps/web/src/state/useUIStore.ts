@@ -4,6 +4,7 @@ import type { TaskKey, WorkflowStatus } from '@warehouse/shared';
 export type SortKey =
   | 'SKU'
   | 'Bin Location'
+  | 'Recovery Bin'
   | 'Manufacturer'
   | 'Inventory Site'
   | 'Quantity On Hand'
@@ -22,6 +23,7 @@ interface UIState {
   search: string;
   sites: string[];
   bins: string[];
+  recoveryBins: string[];
   manufacturers: string[];
   statuses: WorkflowStatus[];
   missingTasks: TaskKey[];
@@ -38,6 +40,7 @@ const DEFAULTS = {
   search: '',
   sites: [] as string[],
   bins: [] as string[],
+  recoveryBins: [] as string[],
   manufacturers: [] as string[],
   statuses: [] as WorkflowStatus[],
   missingTasks: [] as TaskKey[],

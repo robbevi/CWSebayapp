@@ -12,6 +12,7 @@ import { SelectDropdown } from './ui/SelectDropdown';
 const SORT_OPTIONS: SortKey[] = [
   'SKU',
   'Bin Location',
+  'Recovery Bin',
   'Manufacturer',
   'Inventory Site',
   'Quantity On Hand',
@@ -38,8 +39,20 @@ function countBy(values: (string | undefined)[]): Record<string, number> {
 
 export function FilterPanel() {
   const { data: parts } = useInventoryParts();
-  const { search, sites, bins, manufacturers, statuses, missingTasks, margins, discrepancies, sort, set, clearAll } =
-    useUIStore();
+  const {
+    search,
+    sites,
+    bins,
+    recoveryBins,
+    manufacturers,
+    statuses,
+    missingTasks,
+    margins,
+    discrepancies,
+    sort,
+    set,
+    clearAll,
+  } = useUIStore();
   const [searchInput, setSearchInput] = useState(search);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [addPartOpen, setAddPartOpen] = useState(false);
@@ -51,10 +64,12 @@ export function FilterPanel() {
 
   const siteOptions = useMemo(() => uniqueSorted((parts ?? []).map((p) => p.inventorySite)), [parts]);
   const binOptions = useMemo(() => uniqueSorted((parts ?? []).map((p) => p.binLocation)), [parts]);
+  const recoveryBinOptions = useMemo(() => uniqueSorted((parts ?? []).map((p) => p.newBinLocation)), [parts]);
   const mfrOptions = useMemo(() => uniqueSorted((parts ?? []).map((p) => p.manufacturer)), [parts]);
 
   const siteCounts = useMemo(() => countBy((parts ?? []).map((p) => p.inventorySite)), [parts]);
   const binCounts = useMemo(() => countBy((parts ?? []).map((p) => p.binLocation)), [parts]);
+  const recoveryBinCounts = useMemo(() => countBy((parts ?? []).map((p) => p.newBinLocation)), [parts]);
   const mfrCounts = useMemo(() => countBy((parts ?? []).map((p) => p.manufacturer)), [parts]);
 
   const handleClearAll = () => {
@@ -81,6 +96,11 @@ export function FilterPanel() {
   const chips = [
     sites.length > 0 && { key: 'sites', label: `Inventory Site: ${sites.join(', ')}`, onRemove: () => set({ sites: [] }) },
     bins.length > 0 && { key: 'bins', label: `Bin Location: ${bins.join(', ')}`, onRemove: () => set({ bins: [] }) },
+    recoveryBins.length > 0 && {
+      key: 'recoveryBins',
+      label: `Recovery Bin: ${recoveryBins.join(', ')}`,
+      onRemove: () => set({ recoveryBins: [] }),
+    },
     manufacturers.length > 0 && {
       key: 'manufacturers',
       label: `Manufacturer: ${manufacturers.join(', ')}`,
@@ -203,6 +223,10 @@ export function FilterPanel() {
           binCounts={binCounts}
           bins={bins}
           onBinsChange={(next) => set({ bins: next })}
+          recoveryBinOptions={recoveryBinOptions}
+          recoveryBinCounts={recoveryBinCounts}
+          recoveryBins={recoveryBins}
+          onRecoveryBinsChange={(next) => set({ recoveryBins: next })}
           mfrOptions={mfrOptions}
           mfrCounts={mfrCounts}
           manufacturers={manufacturers}

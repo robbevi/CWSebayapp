@@ -1,4 +1,4 @@
-import { Camera, ClipboardCheck, Factory, ListChecks, MapPin, Tag, TruckIcon, Wrench, X } from 'lucide-react';
+import { ArrowRight, Camera, ClipboardCheck, Factory, ListChecks, MapPin, Tag, TruckIcon, Wrench, X } from 'lucide-react';
 import type { TaskKey, WorkflowStatus } from '@warehouse/shared';
 import { useBodyScrollLock } from '../hooks/useBodyScrollLock';
 import type { DiscrepancyFilter, MarginFilter } from '../state/useUIStore';
@@ -41,6 +41,10 @@ interface FilterDrawerProps {
   binCounts: Record<string, number>;
   bins: string[];
   onBinsChange: (next: string[]) => void;
+  recoveryBinOptions: string[];
+  recoveryBinCounts: Record<string, number>;
+  recoveryBins: string[];
+  onRecoveryBinsChange: (next: string[]) => void;
   mfrOptions: string[];
   mfrCounts: Record<string, number>;
   manufacturers: string[];
@@ -66,6 +70,10 @@ export function FilterDrawer({
   binCounts,
   bins,
   onBinsChange,
+  recoveryBinOptions,
+  recoveryBinCounts,
+  recoveryBins,
+  onRecoveryBinsChange,
   mfrOptions,
   mfrCounts,
   manufacturers,
@@ -125,6 +133,22 @@ export function FilterDrawer({
               onChange={onBinsChange}
             />
           </div>
+
+          {/* Only offered once something has actually been shelved at the Iron Barn —
+              an empty dropdown is just noise on a drawer this long. */}
+          {recoveryBinOptions.length > 0 && (
+            <div>
+              <label className="mb-1 block text-xs font-semibold text-textMuted">Recovery Bin</label>
+              <MultiSelectDropdown
+                icon={<ArrowRight size={14} />}
+                label="Recovery Bin"
+                options={recoveryBinOptions}
+                selected={recoveryBins}
+                counts={recoveryBinCounts}
+                onChange={onRecoveryBinsChange}
+              />
+            </div>
+          )}
 
           <div>
             <label className="mb-1 block text-xs font-semibold text-textMuted">Manufacturer</label>

@@ -64,6 +64,13 @@ export function PartDetailModal() {
   useBodyScrollLock(modalOpen && !!part);
   const [summaryCollapsed, setSummaryCollapsed] = useState(false);
 
+  // Separate collapse/expand thresholds: with a single cut-off, scrolling that hovers right
+  // on the line makes the panel flap open and shut on every jitter of the finger.
+  const handleFormScroll = (e: React.UIEvent<HTMLFormElement>) => {
+    const y = e.currentTarget.scrollTop;
+    setSummaryCollapsed((collapsed) => (collapsed ? y > 8 : y > 48));
+  };
+
   const { register, control, handleSubmit, reset, watch, setValue, formState } = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: {
@@ -176,15 +183,9 @@ export function PartDetailModal() {
           </button>
         </div>
 
-        {/* Collapses out of the way once the form is scrolled, but only on mobile, where it
-            was eating most of the screen. Desktop has the room and keeps it pinned. */}
-        <div
-          className={cn(
-            'shrink-0 overflow-hidden border-b border-border transition-all duration-200 sm:max-h-[400px] sm:border-b sm:opacity-100',
-            summaryCollapsed ? 'max-h-0 border-b-0 opacity-0' : 'max-h-[400px] opacity-100'
-          )}
-        >
-          <div className="space-y-3 rounded-card bg-surfaceMuted p-3 text-xs m-4">
+        <div className="shrink-0 border-b border-border p-4">
+          <div className="rounded-card bg-surfaceMuted p-3 text-xs">
+            {/* Identity and location stay put — this is what you check while working. */}
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-6">
               <Field label="SKU" value={part.sku} />
               <Field label="Manufacturer" value={part.manufacturer || '—'} />
@@ -199,22 +200,32 @@ export function PartDetailModal() {
               />
               <Field label="System QOH" value={String(part.qoh)} />
             </div>
+            {/* The revenue/priority figures are reference material rather than something you
+                act on mid-count, so on mobile they fold away once the form is scrolled.
+                Desktop has the room and keeps them open. */}
             {hasRecoveryData && (
-              <div className="grid grid-cols-2 gap-3 border-t border-border pt-3 sm:grid-cols-4">
-                <Field label="Revenue Priority" value={part.revenuePriorityRank != null ? `#${part.revenuePriorityRank}` : '—'} />
-                <Field label="Field Review Priority" value={part.fieldReviewPriority || '—'} />
-                <Field label="Recovery Price Basis" value={formatMoney(part.activeRecoveryPriceBasis)} />
-                <Field
-                  label="Expected Gross Margin"
-                  value={formatMoney(part.expectedGrossRecoveryMargin)}
-                  tone={
-                    part.expectedGrossRecoveryMargin == null
-                      ? undefined
-                      : part.expectedGrossRecoveryMargin < 0
-                        ? 'negative'
-                        : 'positive'
-                  }
-                />
+              <div
+                className={cn(
+                  'overflow-hidden transition-all duration-500 ease-in-out sm:max-h-40 sm:opacity-100',
+                  summaryCollapsed ? 'max-h-0 opacity-0' : 'max-h-40 opacity-100'
+                )}
+              >
+                <div className="mt-3 grid grid-cols-2 gap-3 border-t border-border pt-3 sm:grid-cols-4">
+                  <Field label="Revenue Priority" value={part.revenuePriorityRank != null ? `#${part.revenuePriorityRank}` : '—'} />
+                  <Field label="Field Review Priority" value={part.fieldReviewPriority || '—'} />
+                  <Field label="Recovery Price Basis" value={formatMoney(part.activeRecoveryPriceBasis)} />
+                  <Field
+                    label="Expected Gross Margin"
+                    value={formatMoney(part.expectedGrossRecoveryMargin)}
+                    tone={
+                      part.expectedGrossRecoveryMargin == null
+                        ? undefined
+                        : part.expectedGrossRecoveryMargin < 0
+                          ? 'negative'
+                          : 'positive'
+                    }
+                  />
+                </div>
               </div>
             )}
           </div>
@@ -222,7 +233,7 @@ export function PartDetailModal() {
 
         <form
           onSubmit={onSubmit}
-          onScroll={(e) => setSummaryCollapsed(e.currentTarget.scrollTop > 24)}
+          onScroll={handleFormScroll}
           className="min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain p-4"
         >
           <PhotoUploader sku={part.sku} itemId={part.id} photos={part.photos} site={part.inventorySite} />

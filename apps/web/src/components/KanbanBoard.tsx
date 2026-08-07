@@ -78,6 +78,13 @@ function sortParts(parts: InventoryPart[], sort: SortKey): InventoryPart[] {
     };
     return [...parts].sort((a, b) => rank(a) - rank(b));
   }
+  if (sort === 'Recovery Bin') {
+    // Parts not yet moved to the Iron Barn have no code — they sort after the ones that
+    // do, so the shelved stock reads as a contiguous list.
+    return [...parts].sort((a, b) =>
+      (a.newBinLocation || '￿').localeCompare(b.newBinLocation || '￿')
+    );
+  }
   if (sort === 'Revenue Priority') {
     return [...parts].sort((a, b) => byNumberAsc(a.revenuePriorityRank, b.revenuePriorityRank));
   }
@@ -108,7 +115,8 @@ const GRID_COLS: Record<number, string> = {
 
 export function KanbanBoard() {
   const { data, isLoading } = useInventoryParts();
-  const { search, sites, bins, manufacturers, statuses, missingTasks, margins, discrepancies, sort } = useUIStore();
+  const { search, sites, bins, recoveryBins, manufacturers, statuses, missingTasks, margins, discrepancies, sort } =
+    useUIStore();
 
   const filtered = useMemo(() => {
     const parts = data ?? [];
@@ -116,6 +124,7 @@ export function KanbanBoard() {
       (p) =>
         matchesSet(p.inventorySite, sites) &&
         matchesSet(p.binLocation, bins) &&
+        matchesSet(p.newBinLocation ?? '', recoveryBins) &&
         matchesSet(p.manufacturer, manufacturers) &&
         matchesMissingTasks(p, missingTasks) &&
         (margins.length === 0 || margins.includes(p.grossMarginStatus as (typeof margins)[number])) &&
@@ -124,7 +133,7 @@ export function KanbanBoard() {
         matchesSearch(p, search)
     );
     return sortParts(result, sort);
-  }, [data, search, sites, bins, manufacturers, missingTasks, margins, discrepancies, sort]);
+  }, [data, search, sites, bins, recoveryBins, manufacturers, missingTasks, margins, discrepancies, sort]);
 
   if (isLoading) {
     return <div className="py-16 text-center text-textMuted">Loading inventory…</div>;
