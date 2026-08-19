@@ -17,6 +17,8 @@ export const DISPLAY = {
   dispositionNote: 'Disposition Notes',
   notes: 'Notes',
   photographed: 'Item Photographed',
+  needsReview: 'Needs Review',
+  needsReviewNote: 'Needs Review Note',
   itemListed: 'Item Listed',
   itemListedDate: 'Item Listed Date',
   ebayListingId: 'eBay Listing ID',

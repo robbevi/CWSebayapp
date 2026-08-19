@@ -1,19 +1,22 @@
-import { AlertTriangle, ArrowRight, DollarSign, Factory, MapPin, Package, Wrench } from 'lucide-react';
+import { AlertTriangle, ArrowRight, DollarSign, Factory, Flag, Layers, MapPin, Package, Wrench } from 'lucide-react';
 import {
   formatVariance,
-  getDiscrepancy,
+  getGroupDiscrepancy,
   isHighPriority,
   isPositiveMargin,
-  type InventoryPart,
+  type PartGroup,
 } from '@warehouse/shared';
 import { cn } from '../lib/cn';
 import { useUIStore } from '../state/useUIStore';
 import { Pill } from './ui/Pill';
 import { ProcessingStatusChips } from './ProcessingStatusChips';
 
-export function PartCard({ part }: { part: InventoryPart }) {
+export function PartCard({ part }: { part: PartGroup }) {
   const set = useUIStore((s) => s.set);
-  const discrepancy = getDiscrepancy(part);
+  const discrepancy = getGroupDiscrepancy(part);
+  // A SKU stocked in more than one bin collapses to a single card, so the card has to say
+  // so — otherwise the quantity looks wrong against any one shelf.
+  const multiLocation = part.locations.length > 1;
 
   return (
     <button
@@ -29,6 +32,15 @@ export function PartCard({ part }: { part: InventoryPart }) {
             className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-700"
           >
             <AlertTriangle size={12} />
+          </span>
+        )}
+        {part.needsReview && (
+          <span
+            title={part.needsReviewNote || 'Flagged for review'}
+            aria-label={`Needs review${part.needsReviewNote ? `: ${part.needsReviewNote}` : ''}`}
+            className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-purple-100 text-purple-700"
+          >
+            <Flag size={12} />
           </span>
         )}
         {isPositiveMargin(part.grossMarginStatus) && (
@@ -49,17 +61,35 @@ export function PartCard({ part }: { part: InventoryPart }) {
           <Wrench size={12} className="shrink-0" />
           <span className="truncate">{part.manufacturer || '—'}</span>
         </Pill>
-        <Pill tone="chip" className="w-full">
-          <Factory size={12} className="shrink-0" />
-          <span className="truncate">{part.inventorySite || '—'}</span>
-        </Pill>
+        {multiLocation ? (
+          <Pill tone="chip" className="w-full">
+            <Layers size={12} className="shrink-0" />
+            <span
+              className="truncate"
+              title={part.locations.map((l) => `${l.inventorySite} ${l.binLocation} (${l.qoh})`).join(' · ')}
+            >
+              {part.locations.length} locations
+            </span>
+          </Pill>
+        ) : (
+          <Pill tone="chip" className="w-full">
+            <Factory size={12} className="shrink-0" />
+            <span className="truncate">{part.inventorySite || '—'}</span>
+          </Pill>
+        )}
         <Pill tone="chip" className="w-full">
           <MapPin size={12} className="shrink-0" />
-          <span className="truncate">{part.binLocation || '—'}</span>
+          <span className="truncate" title={part.locations.map((l) => l.binLocation || '—').join(' · ')}>
+            {multiLocation
+              ? part.locations.map((l) => l.binLocation || '—').join(', ')
+              : part.binLocation || '—'}
+          </span>
         </Pill>
         <Pill tone="chip" className="w-full">
           <Package size={12} className="shrink-0" />
-          <span className="truncate">QOH: {part.qoh}</span>
+          <span className="truncate" title={multiLocation ? 'Total across all locations' : undefined}>
+            QOH: {part.qoh}
+          </span>
         </Pill>
         {/* Only shown once the part has actually been moved, so an un-moved part's card
             looks exactly as it did before. */}
@@ -86,7 +116,10 @@ export function PartCard({ part }: { part: InventoryPart }) {
             )}
           >
             <AlertTriangle size={12} className="shrink-0" />
-            <span className="truncate" title={`Counted ${part.confirmedQoh}, system says ${part.qoh}`}>
+            <span
+              className="truncate"
+              title={`Counted ${part.confirmedQoh}, system says ${part.expectedForCounted}`}
+            >
               {discrepancy.kind === 'notFound'
                 ? `Not Found (${formatVariance(discrepancy.variance)})`
                 : formatVariance(discrepancy.variance)}

@@ -1,4 +1,4 @@
-import { ArrowRight, Camera, ClipboardCheck, Factory, ListChecks, MapPin, Tag, TruckIcon, Wrench, X } from 'lucide-react';
+import { ArrowRight, Camera, ClipboardCheck, Factory, Flag, ListChecks, MapPin, Tag, TruckIcon, Wrench, X } from 'lucide-react';
 import type { TaskKey, WorkflowStatus } from '@warehouse/shared';
 import { useBodyScrollLock } from '../hooks/useBodyScrollLock';
 import type { DiscrepancyFilter, MarginFilter } from '../state/useUIStore';
@@ -57,6 +57,8 @@ interface FilterDrawerProps {
   onToggleMargin: (key: MarginFilter) => void;
   discrepancies: DiscrepancyFilter[];
   onToggleDiscrepancy: (key: DiscrepancyFilter) => void;
+  needsReview: boolean;
+  onToggleNeedsReview: () => void;
 }
 
 export function FilterDrawer({
@@ -86,6 +88,8 @@ export function FilterDrawer({
   onToggleMargin,
   discrepancies,
   onToggleDiscrepancy,
+  needsReview,
+  onToggleNeedsReview,
 }: FilterDrawerProps) {
   useBodyScrollLock();
   return (
@@ -176,6 +180,24 @@ export function FilterDrawer({
                   {opt.label}
                 </label>
               ))}
+            </div>
+          </div>
+
+          <div>
+            <span className="mb-1 block text-xs font-semibold text-textMuted">Review</span>
+            <div className="rounded-btn border border-border p-3">
+              <label className="flex cursor-pointer items-center gap-2 text-xs text-textPri">
+                <input
+                  type="checkbox"
+                  checked={needsReview}
+                  onChange={onToggleNeedsReview}
+                  className="h-4 w-4 shrink-0 accent-primary"
+                />
+                <span className="text-textMuted">
+                  <Flag size={14} />
+                </span>
+                Flagged for review
+              </label>
             </div>
           </div>
 

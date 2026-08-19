@@ -57,6 +57,9 @@ export interface InventoryPart {
   disposition?: DispositionEnum | string;
   dispositionNote?: string;
   photographed: boolean;
+  /** Flagged by a user as something that needs a second look before it moves on. */
+  needsReview?: boolean;
+  needsReviewNote?: string;
   itemListed: boolean;
   itemListedDate?: string | null;
   ebayListingId?: string | null;
@@ -85,9 +88,19 @@ export interface CreatePartInput {
   inventorySite?: string;
 }
 
+// SKU is deliberately absent: photos are located in Drive by a `sku` file property, so
+// renaming one here would silently orphan its pictures. Everything else in the Part Detail
+// header is editable.
 export type InventoryPartPatch = Partial<
   Pick<
     InventoryPart,
+    | 'description'
+    | 'manufacturer'
+    | 'inventorySite'
+    | 'binLocation'
+    | 'qoh'
+    | 'needsReview'
+    | 'needsReviewNote'
     | 'confirmedQoh'
     | 'notes'
     | 'itemCondition'

@@ -29,6 +29,7 @@ interface UIState {
   missingTasks: TaskKey[];
   margins: MarginFilter[];
   discrepancies: DiscrepancyFilter[];
+  needsReview: boolean;
   sort: SortKey;
   selectedId: string | null;
   modalOpen: boolean;
@@ -46,6 +47,7 @@ const DEFAULTS = {
   missingTasks: [] as TaskKey[],
   margins: [] as MarginFilter[],
   discrepancies: [] as DiscrepancyFilter[],
+  needsReview: false,
   sort: 'Bin Location' as SortKey,
 };
 

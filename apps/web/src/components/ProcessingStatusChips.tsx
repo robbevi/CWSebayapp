@@ -3,7 +3,14 @@ import { checkpointCount } from '@warehouse/shared';
 import type { InventoryPart } from '@warehouse/shared';
 import { Pill } from './ui/Pill';
 
-export function ProcessingStatusChips({ part }: { part: InventoryPart }) {
+// Structurally typed rather than tied to InventoryPart, so a grouped SKU — which carries
+// the same merged checkpoint fields — renders through this component unchanged.
+type Checkpointed = Pick<
+  InventoryPart,
+  'photographed' | 'confirmedQoh' | 'boxCondition' | 'transferredToMarketRecovery' | 'itemListed'
+>;
+
+export function ProcessingStatusChips({ part }: { part: Checkpointed }) {
   const count = checkpointCount(part);
   const chips = [
     { label: 'Photographed', active: part.photographed, icon: <Camera size={12} /> },

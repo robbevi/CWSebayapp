@@ -39,6 +39,8 @@ function mapItemToPart(
     disposition: (get('disposition') as string) ?? undefined,
     dispositionNote: (get('dispositionNote') as string) ?? undefined,
     photographed: Boolean(get('photographed')) || photos.length > 0,
+    needsReview: Boolean(get('needsReview')),
+    needsReviewNote: (get('needsReviewNote') as string) ?? undefined,
     itemListed: Boolean(get('itemListed')),
     itemListedDate: (get('itemListedDate') as string) ?? null,
     ebayListingId: (get('ebayListingId') as string) ?? null,
@@ -96,6 +98,13 @@ export async function updatePart(itemId: string, patch: InventoryPartPatch): Pro
     if (value !== undefined) fieldsPayload[internalName(columnMap, DISPLAY[key])] = value;
   };
 
+  setIfPresent('description', patch.description);
+  setIfPresent('manufacturer', patch.manufacturer);
+  setIfPresent('inventorySite', patch.inventorySite);
+  setIfPresent('binLocation', patch.binLocation);
+  setIfPresent('qoh', patch.qoh);
+  setIfPresent('needsReview', patch.needsReview);
+  setIfPresent('needsReviewNote', patch.needsReviewNote);
   setIfPresent('confirmedQoh', patch.confirmedQoh);
   setIfPresent('notes', patch.notes);
   setIfPresent('itemCondition', patch.itemCondition);

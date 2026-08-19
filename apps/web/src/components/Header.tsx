@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Info, Moon, Sun, Target, Trophy, X } from 'lucide-react';
+import { Download, Info, Moon, Sun, Target, Trophy, X } from 'lucide-react';
 import calfracLogo from '../assets/calfrac-logo.png';
 import { useDarkMode } from '../hooks/useDarkMode';
 import { useGoalsPopupStore } from '../state/useGoalsPopupStore';
@@ -37,6 +37,16 @@ export function Header() {
       >
         <Trophy size={20} />
       </button>
+      {/* A plain link, not a fetch: the endpoint sends Content-Disposition: attachment, so
+          the browser saves it directly and never has to hold the whole file in memory. */}
+      <a
+        href="/api/export"
+        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-white hover:bg-white/10"
+        aria-label="Export all data to a spreadsheet"
+        title="Export all data to a spreadsheet"
+      >
+        <Download size={20} />
+      </a>
       <button
         type="button"
         onClick={() => setDark((d) => !d)}

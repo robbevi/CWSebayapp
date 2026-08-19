@@ -1,6 +1,6 @@
 import { useState, type ReactElement } from 'react';
 import { CheckCircle2, ChevronDown, ClipboardList, Wrench } from 'lucide-react';
-import type { InventoryPart, WorkflowStatus } from '@warehouse/shared';
+import type { PartGroup, WorkflowStatus } from '@warehouse/shared';
 import { cn } from '../lib/cn';
 import { PartCard } from './PartCard';
 
@@ -10,7 +10,7 @@ const BUCKET_META: Record<WorkflowStatus, { label: string; icon: ReactElement; b
   Completed: { label: 'Completed', icon: <CheckCircle2 size={18} />, badgeBg: 'bg-primary', iconColor: 'text-white' },
 };
 
-export function BucketColumn({ status, parts }: { status: WorkflowStatus; parts: InventoryPart[] }) {
+export function BucketColumn({ status, parts }: { status: WorkflowStatus; parts: PartGroup[] }) {
   const meta = BUCKET_META[status];
   // Mobile stacks all three buckets vertically, so an expanded one buries the others under
   // hundreds of cards. Collapsed by default there; on desktop the columns sit side by side

@@ -49,6 +49,7 @@ export function FilterPanel() {
     missingTasks,
     margins,
     discrepancies,
+    needsReview,
     sort,
     set,
     clearAll,
@@ -120,6 +121,11 @@ export function FilterPanel() {
       key: 'margins',
       label: `Margin: ${margins.map((m) => m.replace(' Gross Margin', '')).join(', ')}`,
       onRemove: () => set({ margins: [] }),
+    },
+    needsReview && {
+      key: 'needsReview',
+      label: 'Flagged for review',
+      onRemove: () => set({ needsReview: false }),
     },
     discrepancies.length > 0 && {
       key: 'discrepancies',
@@ -239,6 +245,8 @@ export function FilterPanel() {
           onToggleMargin={toggleMargin}
           discrepancies={discrepancies}
           onToggleDiscrepancy={toggleDiscrepancy}
+          needsReview={needsReview}
+          onToggleNeedsReview={() => set({ needsReview: !needsReview })}
         />
       )}
 

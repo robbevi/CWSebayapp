@@ -44,6 +44,8 @@ const KNOWN_FIELDS = [
   'disposition',
   'dispositionNote',
   'photographed',
+  'needsReview',
+  'needsReviewNote',
   'itemListed',
   'itemListedDate',
   'ebayListingId',
@@ -76,6 +78,8 @@ export interface CreatePartFields {
   disposition?: string;
   dispositionNote?: string;
   notes?: string;
+  needsReview?: boolean;
+  needsReviewNote?: string;
   itemListed?: boolean;
   itemListedDate?: string | null;
   ebayListingId?: string | null;
@@ -133,6 +137,8 @@ export function mapRowToPart(headers: string[], row: unknown[], photos: Photo[])
     disposition: get('disposition'),
     dispositionNote: get('dispositionNote'),
     photographed: parseBoolean(get('photographed')) || photos.length > 0,
+    needsReview: parseBoolean(get('needsReview')),
+    needsReviewNote: get('needsReviewNote'),
     itemListed: parseBoolean(get('itemListed')),
     itemListedDate: parseDateOrNull(get('itemListedDate')),
     ebayListingId: get('ebayListingId') ?? null,
@@ -444,6 +450,15 @@ export async function updatePart(id: string, patch: InventoryPartPatch, submitte
     if (KNOWN_FIELDS.includes(h as FieldName)) record[h as FieldName] = cellToString(found.row[i]);
   });
 
+  // Header fields are editable from Part Detail. SKU is not in the patch type, so a row's
+  // identity — and the Drive photos keyed to it — can't be changed out from under it here.
+  if (patch.description !== undefined) record.description = patch.description;
+  if (patch.manufacturer !== undefined) record.manufacturer = patch.manufacturer;
+  if (patch.inventorySite !== undefined) record.inventorySite = patch.inventorySite;
+  if (patch.binLocation !== undefined) record.binLocation = patch.binLocation;
+  if (patch.qoh !== undefined) record.qoh = patch.qoh;
+  if (patch.needsReview !== undefined) record.needsReview = patch.needsReview;
+  if (patch.needsReviewNote !== undefined) record.needsReviewNote = patch.needsReviewNote;
   if (patch.confirmedQoh !== undefined) record.confirmedQoh = patch.confirmedQoh;
   if (patch.notes !== undefined) record.notes = patch.notes;
   if (patch.itemCondition !== undefined) record.itemCondition = patch.itemCondition;

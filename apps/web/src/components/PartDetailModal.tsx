@@ -1,9 +1,15 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { AlertTriangle, Check, Trash2, X } from 'lucide-react';
-import { formatVariance, getDiscrepancy, IRON_BARN_BINS } from '@warehouse/shared';
+import { AlertTriangle, Check, Flag, Pencil, Trash2, X } from 'lucide-react';
+import {
+  formatVariance,
+  getDiscrepancy,
+  groupPartsBySku,
+  IRON_BARN_BINS,
+  type InventoryPartPatch,
+} from '@warehouse/shared';
 import { useBodyScrollLock } from '../hooks/useBodyScrollLock';
 import { useDeletePart } from '../hooks/useDeletePart';
 import { useInventoryParts } from '../hooks/useInventoryParts';
@@ -34,6 +40,21 @@ const EXCEPTION_PLACEHOLDER = 'No Exception';
 const YES_NO = ['No', 'Yes'];
 
 const schema = z.object({
+  // Identity fields shared by every row of this SKU.
+  description: z.string().optional(),
+  manufacturer: z.string().optional(),
+  // One entry per underlying row, so a SKU stocked in several bins can have each of them
+  // corrected without merging the rows together.
+  locations: z.array(
+    z.object({
+      id: z.string(),
+      inventorySite: z.string().optional(),
+      binLocation: z.string().optional(),
+      qoh: z.number().min(0),
+    })
+  ),
+  needsReview: z.boolean(),
+  needsReviewNote: z.string().optional(),
   confirmedQoh: z.number().min(0),
   // Tracked separately from the number itself: the stepper is pre-filled with the system
   // quantity, so without an explicit confirm the "Qty Confirmed" checkpoint would be
@@ -60,7 +81,12 @@ export function PartDetailModal() {
   const deletePart = useDeletePart();
   const currentUser = useUserStore((s) => s.currentUser);
 
-  const part = parts?.find((p) => p.id === selectedId);
+  // The board shows one card per SKU, so the modal resolves the same way: find the group
+  // whose primary record was selected, then work against that group.
+  const groups = useMemo(() => groupPartsBySku(parts ?? []), [parts]);
+  const group = groups.find((g) => g.id === selectedId) ?? groups.find((g) => g.records.some((r) => r.id === selectedId));
+  const part = group?.primary;
+  const [editingHeader, setEditingHeader] = useState(false);
   useBodyScrollLock(modalOpen && !!part);
   const [summaryCollapsed, setSummaryCollapsed] = useState(false);
 
@@ -74,6 +100,11 @@ export function PartDetailModal() {
   const { register, control, handleSubmit, reset, watch, setValue, formState } = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: {
+      description: '',
+      manufacturer: '',
+      locations: [],
+      needsReview: false,
+      needsReviewNote: '',
       confirmedQoh: 0,
       qohConfirmed: false,
       notes: '',
@@ -91,8 +122,18 @@ export function PartDetailModal() {
   });
 
   useEffect(() => {
-    if (part) {
+    if (part && group) {
       reset({
+        description: group.description,
+        manufacturer: group.manufacturer,
+        locations: group.locations.map((l) => ({
+          id: l.id,
+          inventorySite: l.inventorySite ?? '',
+          binLocation: l.binLocation ?? '',
+          qoh: l.qoh,
+        })),
+        needsReview: group.needsReview,
+        needsReviewNote: group.needsReviewNote ?? '',
         confirmedQoh: part.confirmedQoh ?? part.qoh,
         qohConfirmed: part.confirmedQoh !== null && part.confirmedQoh !== undefined,
         notes: part.notes ?? '',
@@ -111,12 +152,15 @@ export function PartDetailModal() {
         itemListedDate: part.itemListedDate ? part.itemListedDate.slice(0, 10) : '',
         ebayListingId: part.ebayListingId ?? '',
       });
+      setEditingHeader(false);
     }
-  }, [part, reset]);
+  }, [part, group, reset]);
 
-  if (!modalOpen || !part) return null;
+  if (!modalOpen || !part || !group) return null;
 
+  const multiLocation = group.locations.length > 1;
   const itemListed = watch('itemListed');
+  const needsReview = watch('needsReview');
   const transferred = watch('transferredToMarketRecovery');
   const disposition = watch('disposition');
 
@@ -128,10 +172,10 @@ export function PartDetailModal() {
   // Parts loaded before the recovery columns existed have none of these — hide the whole
   // row rather than show four em-dashes.
   const hasRecoveryData =
-    part.revenuePriorityRank != null ||
-    !!part.fieldReviewPriority ||
-    part.activeRecoveryPriceBasis != null ||
-    part.expectedGrossRecoveryMargin != null;
+    group.revenuePriorityRank != null ||
+    !!group.fieldReviewPriority ||
+    group.activeRecoveryPriceBasis != null ||
+    group.expectedGrossRecoveryMargin != null;
 
   const close = () => {
     if (formState.isDirty && !window.confirm('Discard unsaved changes?')) return;
@@ -139,24 +183,59 @@ export function PartDetailModal() {
   };
 
   const onSubmit = handleSubmit(async (values) => {
-    await savePart.mutateAsync({
-      id: part.id,
-      patch: {
-        confirmedQoh: values.qohConfirmed ? values.confirmedQoh : null,
-        notes: values.notes,
-        itemCondition: values.itemCondition || undefined,
-        boxCondition: values.boxCondition || undefined,
-        disposition: values.disposition || undefined,
-        dispositionNote: values.disposition === 'Other' ? values.dispositionNote || undefined : undefined,
-        transferredToMarketRecovery: values.transferredToMarketRecovery,
-        transferId: values.transferredToMarketRecovery ? values.transferId || undefined : null,
-        newBinLocation: values.newBinLocation?.trim() || undefined,
-        itemListed: values.itemListed,
-        itemListedDate: values.itemListed ? values.itemListedDate || new Date().toISOString() : null,
-        ebayListingId: values.itemListed ? values.ebayListingId || undefined : null,
-      },
-      submittedBy: currentUser ?? undefined,
+    // Identity edits can touch any row of the SKU, so patches are collected per record and
+    // only sent where something actually changed — a save shouldn't rewrite untouched rows.
+    const patches = new Map<string, InventoryPartPatch>();
+    const addPatch = (id: string, patch: InventoryPartPatch) => {
+      patches.set(id, { ...(patches.get(id) ?? {}), ...patch });
+    };
+
+    // Keyed off what was actually typed in, not off what merely differs. The rows of a SKU
+    // often disagree about manufacturer or description already, and a plain Save must not
+    // quietly rewrite rows the user never opened the editor on.
+    const dirty = formState.dirtyFields;
+    if (dirty.manufacturer || dirty.description) {
+      for (const record of group.records) {
+        if (dirty.manufacturer) addPatch(record.id, { manufacturer: values.manufacturer ?? '' });
+        if (dirty.description) addPatch(record.id, { description: values.description ?? '' });
+      }
+    }
+
+    values.locations.forEach((loc, i) => {
+      const dirtyLoc = dirty.locations?.[i];
+      if (!dirtyLoc) return;
+      if (dirtyLoc.inventorySite) addPatch(loc.id, { inventorySite: loc.inventorySite ?? '' });
+      if (dirtyLoc.binLocation) addPatch(loc.id, { binLocation: loc.binLocation ?? '' });
+      if (dirtyLoc.qoh) addPatch(loc.id, { qoh: Number(loc.qoh) });
     });
+
+    if (dirty.needsReview || dirty.needsReviewNote) {
+      addPatch(part.id, {
+        needsReview: values.needsReview,
+        needsReviewNote: values.needsReview ? values.needsReviewNote || undefined : undefined,
+      });
+    }
+
+    addPatch(part.id, {
+      confirmedQoh: values.qohConfirmed ? values.confirmedQoh : null,
+      notes: values.notes,
+      itemCondition: values.itemCondition || undefined,
+      boxCondition: values.boxCondition || undefined,
+      disposition: values.disposition || undefined,
+      dispositionNote: values.disposition === 'Other' ? values.dispositionNote || undefined : undefined,
+      transferredToMarketRecovery: values.transferredToMarketRecovery,
+      transferId: values.transferredToMarketRecovery ? values.transferId || undefined : null,
+      newBinLocation: values.newBinLocation?.trim() || undefined,
+      itemListed: values.itemListed,
+      itemListedDate: values.itemListed ? values.itemListedDate || new Date().toISOString() : null,
+      ebayListingId: values.itemListed ? values.ebayListingId || undefined : null,
+    });
+
+    // Sequential rather than parallel: each write is a read-modify-write of the same sheet,
+    // so overlapping calls can round-trip a stale copy of a neighbouring row.
+    for (const [id, patch] of patches) {
+      await savePart.mutateAsync({ id, patch, submittedBy: currentUser ?? undefined });
+    }
     set({ modalOpen: false, selectedId: null });
   });
 
@@ -173,9 +252,11 @@ export function PartDetailModal() {
           <div>
             <div className="text-base font-semibold text-textPri">{part.sku}</div>
             <div className="text-xs text-textMuted">
-              Bin {part.binLocation || '—'}
-              {part.newBinLocation && <span className="text-primary"> → {part.newBinLocation}</span>} ·{' '}
-              {part.description}
+              {multiLocation
+                ? `${group.locations.length} locations · ${group.qoh} total`
+                : `Bin ${part.binLocation || '—'}`}
+              {group.newBinLocation && <span className="text-primary"> → {group.newBinLocation}</span>} ·{' '}
+              {group.description}
             </div>
           </div>
           <button onClick={close} className="rounded-btn p-2 hover:bg-surfaceMuted" aria-label="Close" type="button">
@@ -183,23 +264,108 @@ export function PartDetailModal() {
           </button>
         </div>
 
-        <div className="shrink-0 border-b border-border p-4">
+        <div
+          className={cn(
+            'shrink-0 border-b border-border p-4',
+            // Editing a SKU with several locations makes this block taller than a phone
+            // screen; capping and scrolling it keeps the form and Save reachable.
+            editingHeader && 'max-h-[45vh] overflow-y-auto overscroll-contain'
+          )}
+        >
           <div className="rounded-card bg-surfaceMuted p-3 text-xs">
             {/* Identity and location stay put — this is what you check while working. */}
+            <div className="mb-2 flex items-center justify-between">
+              <span className="text-xs font-semibold text-textMuted">
+                {multiLocation ? `${group.locations.length} locations` : 'Details'}
+              </span>
+              <button
+                type="button"
+                onClick={() => setEditingHeader((e) => !e)}
+                aria-pressed={editingHeader}
+                className={cn(
+                  'flex min-h-0 items-center gap-1 rounded-pill px-2 py-1 text-[11px] font-semibold',
+                  editingHeader ? 'bg-primary text-white' : 'text-primary hover:bg-surface'
+                )}
+              >
+                <Pencil size={11} />
+                {editingHeader ? 'Done editing' : 'Edit'}
+              </button>
+            </div>
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-6">
+              {/* SKU is fixed: photos are found in Drive by this value, so renaming it here
+                  would leave the pictures behind. */}
               <Field label="SKU" value={part.sku} />
-              <Field label="Manufacturer" value={part.manufacturer || '—'} />
-              <Field label="Site" value={part.inventorySite || '—'} />
+              {editingHeader ? (
+                <EditField label="Manufacturer" className="sm:col-span-2">
+                  <Input {...register('manufacturer')} />
+                </EditField>
+              ) : (
+                <Field label="Manufacturer" value={group.manufacturer || '—'} />
+              )}
               {/* Both locations sit side by side: the warehouse bin is where the part came
                   from and is never overwritten, the recovery bin is where it now sits. */}
-              <Field label="Warehouse Bin" value={part.binLocation || '—'} />
-              <Field
-                label="Recovery Bin"
-                value={part.newBinLocation || '—'}
-                tone={part.newBinLocation ? 'positive' : undefined}
-              />
-              <Field label="System QOH" value={String(part.qoh)} />
+              {!editingHeader && (
+                <>
+                  <Field
+                    label="Site"
+                    value={multiLocation ? `${group.locations.length} sites` : part.inventorySite || '—'}
+                  />
+                  <Field
+                    label="Warehouse Bin"
+                    value={
+                      multiLocation
+                        ? group.locations.map((l) => l.binLocation || '—').join(', ')
+                        : part.binLocation || '—'
+                    }
+                  />
+                  <Field
+                    label="Recovery Bin"
+                    value={group.newBinLocation || '—'}
+                    tone={group.newBinLocation ? 'positive' : undefined}
+                  />
+                  <Field
+                    label="System QOH"
+                    value={String(group.qoh)}
+                    tone={multiLocation ? 'positive' : undefined}
+                  />
+                </>
+              )}
+              {editingHeader && (
+                <EditField label="Description" className="sm:col-span-3">
+                  <Input {...register('description')} />
+                </EditField>
+              )}
             </div>
+            {/* Site, bin and quantity belong to a specific row, so they are edited per
+                location rather than once for the whole SKU. */}
+            {editingHeader && (
+              <div className="mt-3 space-y-2 border-t border-border pt-3">
+                <span className="block text-xs font-semibold text-textMuted">
+                  {multiLocation ? 'Locations' : 'Location'}
+                </span>
+                {group.locations.map((loc, i) => (
+                  <div
+                    key={loc.id}
+                    className={cn(
+                      'grid grid-cols-2 gap-2 sm:grid-cols-[2fr_2fr_1fr]',
+                      // A rule between locations so three stacked blocks don't read as one
+                      // long run of identical fields on a phone.
+                      i > 0 && 'border-t border-border pt-2 sm:border-0 sm:pt-0'
+                    )}
+                  >
+                    <EditField label="Site" className="col-span-2 sm:col-span-1">
+                      <Input {...register(`locations.${i}.inventorySite` as const)} />
+                    </EditField>
+                    <EditField label="Warehouse Bin">
+                      <Input {...register(`locations.${i}.binLocation` as const)} />
+                    </EditField>
+                    <EditField label="System QOH">
+                      <Input type="number" min={0} {...register(`locations.${i}.qoh` as const, { valueAsNumber: true })} />
+                    </EditField>
+                  </div>
+                ))}
+              </div>
+            )}
             {/* The revenue/priority figures are reference material rather than something you
                 act on mid-count, so on mobile they fold away once the form is scrolled.
                 Desktop has the room and keeps them open. */}
@@ -211,16 +377,16 @@ export function PartDetailModal() {
                 )}
               >
                 <div className="mt-3 grid grid-cols-2 gap-3 border-t border-border pt-3 sm:grid-cols-4">
-                  <Field label="Revenue Priority" value={part.revenuePriorityRank != null ? `#${part.revenuePriorityRank}` : '—'} />
-                  <Field label="Field Review Priority" value={part.fieldReviewPriority || '—'} />
-                  <Field label="Recovery Price Basis" value={formatMoney(part.activeRecoveryPriceBasis)} />
+                  <Field label="Revenue Priority" value={group.revenuePriorityRank != null ? `#${group.revenuePriorityRank}` : '—'} />
+                  <Field label="Field Review Priority" value={group.fieldReviewPriority || '—'} />
+                  <Field label="Recovery Price Basis" value={formatMoney(group.activeRecoveryPriceBasis)} />
                   <Field
                     label="Expected Gross Margin"
-                    value={formatMoney(part.expectedGrossRecoveryMargin)}
+                    value={formatMoney(group.expectedGrossRecoveryMargin)}
                     tone={
-                      part.expectedGrossRecoveryMargin == null
+                      group.expectedGrossRecoveryMargin == null
                         ? undefined
-                        : part.expectedGrossRecoveryMargin < 0
+                        : group.expectedGrossRecoveryMargin < 0
                           ? 'negative'
                           : 'positive'
                     }
@@ -239,7 +405,14 @@ export function PartDetailModal() {
           <PhotoUploader sku={part.sku} itemId={part.id} photos={part.photos} site={part.inventorySite} />
 
           <div>
-            <label className="mb-1 block text-xs font-semibold text-textMuted">Confirmed Quantity On Hand</label>
+            <label className="mb-1 block text-xs font-semibold text-textMuted">
+              Confirmed Quantity On Hand
+              {multiLocation && (
+                <span className="ml-1 font-normal text-textMuted">
+                  — {part.inventorySite} · {part.binLocation || 'no bin'} ({part.qoh})
+                </span>
+              )}
+            </label>
             <div className="flex flex-wrap items-center gap-2">
               <Controller
                 control={control}
@@ -330,6 +503,13 @@ export function PartDetailModal() {
             <div>
               <label className="mb-1 block text-xs font-semibold text-textMuted">Exception Notes</label>
               <Input placeholder="Describe the reason" {...register('dispositionNote')} />
+            </div>
+          )}
+
+          {needsReview && (
+            <div>
+              <label className="mb-1 block text-xs font-semibold text-textMuted">Why does this need review?</label>
+              <Input placeholder="What should the reviewer look at?" {...register('needsReviewNote')} />
             </div>
           )}
 
@@ -444,11 +624,31 @@ export function PartDetailModal() {
           </div>
         </form>
 
-        <div className="flex shrink-0 items-center justify-between border-t border-border p-4">
-          <Button variant="danger" onClick={handleDelete} disabled={deletePart.isPending} type="button">
-            <Trash2 size={14} />
-            Delete Record
-          </Button>
+        <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-t border-border p-4">
+          <div className="flex items-center gap-2">
+            <Button variant="danger" onClick={handleDelete} disabled={deletePart.isPending} type="button">
+              <Trash2 size={14} />
+              Delete Record
+            </Button>
+            {/* Sits with Delete because both are decisions about the record rather than
+                edits to it — but this one is reversible, so it toggles instead of asking. */}
+            <Controller
+              control={control}
+              name="needsReview"
+              render={({ field }) => (
+                <Button
+                  variant={field.value ? undefined : 'outline'}
+                  onClick={() => field.onChange(!field.value)}
+                  type="button"
+                  aria-pressed={field.value}
+                  className={cn(field.value && 'bg-purple-600 hover:bg-purple-700')}
+                >
+                  <Flag size={14} />
+                  {field.value ? 'Needs Review' : 'Flag for Review'}
+                </Button>
+              )}
+            />
+          </div>
           <div className="flex gap-2">
             <Button variant="outline" onClick={close} type="button">
               Cancel
@@ -466,6 +666,15 @@ export function PartDetailModal() {
 function formatMoney(value: number | null | undefined): string {
   if (value == null) return '—';
   return value.toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
+}
+
+function EditField({ label, className, children }: { label: string; className?: string; children: React.ReactNode }) {
+  return (
+    <div className={className}>
+      <div className="mb-0.5 text-xs text-textMuted">{label}</div>
+      {children}
+    </div>
+  );
 }
 
 function Field({ label, value, tone }: { label: string; value: string; tone?: 'positive' | 'negative' }) {

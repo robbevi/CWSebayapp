@@ -2,8 +2,9 @@ import { useMemo } from 'react';
 import {
   checkpointCount,
   getCheckpoints,
-  getDiscrepancy,
-  type InventoryPart,
+  getGroupDiscrepancy,
+  groupPartsBySku,
+  type PartGroup,
   type TaskKey,
   type WorkflowStatus,
 } from '@warehouse/shared';
@@ -11,29 +12,34 @@ import { useInventoryParts } from '../hooks/useInventoryParts';
 import { useUIStore, type SortKey } from '../state/useUIStore';
 import { BucketColumn } from './BucketColumn';
 
-function matchesSearch(p: InventoryPart, query: string): boolean {
+// Searches every row behind the SKU, so a part is still findable by a bin or site that
+// belongs to one of its other locations.
+function matchesSearch(g: PartGroup, query: string): boolean {
   if (!query) return true;
   const needle = query.toLowerCase();
-  return [p.sku, p.description, p.manufacturer, p.inventorySite, p.binLocation, p.newBinLocation, p.notes]
+  return g.records
+    .flatMap((p) => [p.sku, p.description, p.manufacturer, p.inventorySite, p.binLocation, p.newBinLocation, p.notes])
     .filter((v): v is string => !!v)
     .some((v) => v.toLowerCase().includes(needle));
 }
 
-function matchesSet(value: string, selected: string[]): boolean {
-  return selected.length === 0 || selected.includes(value);
+// A grouped SKU matches when any of its locations does — filtering to a bin should still
+// surface a part that is only partly stored there.
+function matchesSet(values: (string | undefined)[], selected: string[]): boolean {
+  return selected.length === 0 || values.some((v) => selected.includes(v ?? ''));
 }
 
 // A part matches if it's still missing at least one of the checked tasks — mirrors the
 // Status filter's OR-across-checked-boxes pattern, so checking several boxes broadens
 // the results (anything left to do on any of them) rather than narrowing to parts
 // missing ALL of them at once.
-function matchesMissingTasks(p: InventoryPart, missingTasks: TaskKey[]): boolean {
+function matchesMissingTasks(g: PartGroup, missingTasks: TaskKey[]): boolean {
   if (missingTasks.length === 0) return true;
-  const checkpoints = getCheckpoints(p);
+  const checkpoints = getCheckpoints(g);
   return missingTasks.some((key) => !checkpoints[key]);
 }
 
-const SORT_FIELD: Partial<Record<SortKey, keyof InventoryPart>> = {
+const SORT_FIELD: Partial<Record<SortKey, keyof PartGroup>> = {
   SKU: 'sku',
   'Bin Location': 'binLocation',
   Manufacturer: 'manufacturer',
@@ -42,7 +48,7 @@ const SORT_FIELD: Partial<Record<SortKey, keyof InventoryPart>> = {
 
 // Sorts where "best first" means descending (bigger money is more interesting), versus
 // rank-style fields where 1 is best and ascending is correct.
-const DESCENDING_NUMERIC: Partial<Record<SortKey, keyof InventoryPart>> = {
+const DESCENDING_NUMERIC: Partial<Record<SortKey, keyof PartGroup>> = {
   'Recovery Price': 'activeRecoveryPriceBasis',
   'Gross Margin': 'expectedGrossRecoveryMargin',
 };
@@ -63,7 +69,7 @@ function byNumberAsc(a: number | null | undefined, b: number | null | undefined)
   return a - b;
 }
 
-function sortParts(parts: InventoryPart[], sort: SortKey): InventoryPart[] {
+function sortParts(parts: PartGroup[], sort: SortKey): PartGroup[] {
   if (sort === 'Quantity On Hand') {
     return [...parts].sort((a, b) => a.qoh - b.qoh);
   }
@@ -72,8 +78,8 @@ function sortParts(parts: InventoryPart[], sort: SortKey): InventoryPart[] {
   }
   if (sort === 'Qty Discrepancy') {
     // Worst shortfall first; uncounted and reconciled parts fall to the bottom.
-    const rank = (p: InventoryPart) => {
-      const d = getDiscrepancy(p);
+    const rank = (p: PartGroup) => {
+      const d = getGroupDiscrepancy(p);
       return d && d.kind !== 'none' ? d.variance : Number.POSITIVE_INFINITY;
     };
     return [...parts].sort((a, b) => rank(a) - rank(b));
@@ -115,31 +121,46 @@ const GRID_COLS: Record<number, string> = {
 
 export function KanbanBoard() {
   const { data, isLoading } = useInventoryParts();
-  const { search, sites, bins, recoveryBins, manufacturers, statuses, missingTasks, margins, discrepancies, sort } =
-    useUIStore();
+  const {
+    search,
+    sites,
+    bins,
+    recoveryBins,
+    manufacturers,
+    statuses,
+    missingTasks,
+    margins,
+    discrepancies,
+    needsReview,
+    sort,
+  } = useUIStore();
+
+  // Every row for a SKU is folded into one card. The sheet keeps its separate rows —
+  // this is purely how the board reads them.
+  const groups = useMemo(() => groupPartsBySku(data ?? []), [data]);
 
   const filtered = useMemo(() => {
-    const parts = data ?? [];
-    const result = parts.filter(
-      (p) =>
-        matchesSet(p.inventorySite, sites) &&
-        matchesSet(p.binLocation, bins) &&
-        matchesSet(p.newBinLocation ?? '', recoveryBins) &&
-        matchesSet(p.manufacturer, manufacturers) &&
-        matchesMissingTasks(p, missingTasks) &&
-        (margins.length === 0 || margins.includes(p.grossMarginStatus as (typeof margins)[number])) &&
+    const result = groups.filter(
+      (g) =>
+        matchesSet(g.records.map((r) => r.inventorySite), sites) &&
+        matchesSet(g.records.map((r) => r.binLocation), bins) &&
+        matchesSet(g.records.map((r) => r.newBinLocation), recoveryBins) &&
+        matchesSet(g.records.map((r) => r.manufacturer), manufacturers) &&
+        matchesMissingTasks(g, missingTasks) &&
+        (margins.length === 0 || margins.includes(g.grossMarginStatus as (typeof margins)[number])) &&
         (discrepancies.length === 0 ||
-          discrepancies.includes(getDiscrepancy(p)?.kind as (typeof discrepancies)[number])) &&
-        matchesSearch(p, search)
+          discrepancies.includes(getGroupDiscrepancy(g)?.kind as (typeof discrepancies)[number])) &&
+        (!needsReview || g.needsReview) &&
+        matchesSearch(g, search)
     );
     return sortParts(result, sort);
-  }, [data, search, sites, bins, recoveryBins, manufacturers, missingTasks, margins, discrepancies, sort]);
+  }, [groups, search, sites, bins, recoveryBins, manufacturers, missingTasks, margins, discrepancies, needsReview, sort]);
 
   if (isLoading) {
     return <div className="py-16 text-center text-textMuted">Loading inventory…</div>;
   }
 
-  const buckets: Record<WorkflowStatus, InventoryPart[]> = {
+  const buckets: Record<WorkflowStatus, PartGroup[]> = {
     NotStarted: filtered.filter((p) => p.workflowStatus === 'NotStarted'),
     Processing: filtered.filter((p) => p.workflowStatus === 'Processing'),
     Completed: filtered.filter((p) => p.workflowStatus === 'Completed'),
