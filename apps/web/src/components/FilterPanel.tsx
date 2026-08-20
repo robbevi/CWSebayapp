@@ -21,7 +21,6 @@ const SORT_OPTIONS: SortKey[] = [
   'Field Review Priority',
   'Recovery Price',
   'Gross Margin',
-  'Qty Discrepancy',
 ];
 
 function uniqueSorted(values: (string | undefined)[]): string[] {
@@ -46,7 +45,7 @@ export function FilterPanel() {
     recoveryBins,
     manufacturers,
     statuses,
-    missingTasks,
+    completedTasks,
     margins,
     discrepancies,
     needsReview,
@@ -82,8 +81,12 @@ export function FilterPanel() {
     set({ statuses: statuses.includes(key) ? statuses.filter((s) => s !== key) : [...statuses, key] });
   };
 
-  const toggleTask = (key: (typeof missingTasks)[number]) => {
-    set({ missingTasks: missingTasks.includes(key) ? missingTasks.filter((t) => t !== key) : [...missingTasks, key] });
+  const toggleTask = (key: (typeof completedTasks)[number]) => {
+    set({
+      completedTasks: completedTasks.includes(key)
+        ? completedTasks.filter((t) => t !== key)
+        : [...completedTasks, key],
+    });
   };
 
   const toggleMargin = (key: (typeof margins)[number]) => {
@@ -112,10 +115,10 @@ export function FilterPanel() {
       label: `Status: ${statuses.map((s) => STATUS_OPTIONS.find((o) => o.key === s)?.label ?? s).join(', ')}`,
       onRemove: () => set({ statuses: [] }),
     },
-    missingTasks.length > 0 && {
-      key: 'missingTasks',
-      label: `Missing: ${missingTasks.map((t) => TASK_OPTIONS.find((o) => o.key === t)?.label ?? t).join(', ')}`,
-      onRemove: () => set({ missingTasks: [] }),
+    completedTasks.length > 0 && {
+      key: 'completedTasks',
+      label: `Completed: ${completedTasks.map((t) => TASK_OPTIONS.find((o) => o.key === t)?.label ?? t).join(', ')}`,
+      onRemove: () => set({ completedTasks: [] }),
     },
     margins.length > 0 && {
       key: 'margins',
@@ -239,7 +242,7 @@ export function FilterPanel() {
           onManufacturersChange={(next) => set({ manufacturers: next })}
           statuses={statuses}
           onToggleStatus={toggleStatus}
-          missingTasks={missingTasks}
+          completedTasks={completedTasks}
           onToggleTask={toggleTask}
           margins={margins}
           onToggleMargin={toggleMargin}

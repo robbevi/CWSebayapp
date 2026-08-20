@@ -29,14 +29,13 @@ function matchesSet(values: (string | undefined)[], selected: string[]): boolean
   return selected.length === 0 || values.some((v) => selected.includes(v ?? ''));
 }
 
-// A part matches if it's still missing at least one of the checked tasks — mirrors the
-// Status filter's OR-across-checked-boxes pattern, so checking several boxes broadens
-// the results (anything left to do on any of them) rather than narrowing to parts
-// missing ALL of them at once.
-function matchesMissingTasks(g: PartGroup, missingTasks: TaskKey[]): boolean {
-  if (missingTasks.length === 0) return true;
+// A part matches when it has finished every checked task. Checking more boxes narrows
+// rather than broadens: "photographed and listed" means both are done, which is how the
+// checklist reads to someone ticking boxes.
+function matchesCompletedTasks(g: PartGroup, completedTasks: TaskKey[]): boolean {
+  if (completedTasks.length === 0) return true;
   const checkpoints = getCheckpoints(g);
-  return missingTasks.some((key) => !checkpoints[key]);
+  return completedTasks.every((key) => checkpoints[key]);
 }
 
 const SORT_FIELD: Partial<Record<SortKey, keyof PartGroup>> = {
@@ -75,14 +74,6 @@ function sortParts(parts: PartGroup[], sort: SortKey): PartGroup[] {
   }
   if (sort === 'Progress') {
     return [...parts].sort((a, b) => checkpointCount(a) - checkpointCount(b));
-  }
-  if (sort === 'Qty Discrepancy') {
-    // Worst shortfall first; uncounted and reconciled parts fall to the bottom.
-    const rank = (p: PartGroup) => {
-      const d = getGroupDiscrepancy(p);
-      return d && d.kind !== 'none' ? d.variance : Number.POSITIVE_INFINITY;
-    };
-    return [...parts].sort((a, b) => rank(a) - rank(b));
   }
   if (sort === 'Recovery Bin') {
     // Parts not yet moved to the Iron Barn have no code — they sort after the ones that
@@ -128,7 +119,7 @@ export function KanbanBoard() {
     recoveryBins,
     manufacturers,
     statuses,
-    missingTasks,
+    completedTasks,
     margins,
     discrepancies,
     needsReview,
@@ -146,7 +137,7 @@ export function KanbanBoard() {
         matchesSet(g.records.map((r) => r.binLocation), bins) &&
         matchesSet(g.records.map((r) => r.newBinLocation), recoveryBins) &&
         matchesSet(g.records.map((r) => r.manufacturer), manufacturers) &&
-        matchesMissingTasks(g, missingTasks) &&
+        matchesCompletedTasks(g, completedTasks) &&
         (margins.length === 0 || margins.includes(g.grossMarginStatus as (typeof margins)[number])) &&
         (discrepancies.length === 0 ||
           discrepancies.includes(getGroupDiscrepancy(g)?.kind as (typeof discrepancies)[number])) &&
@@ -154,7 +145,7 @@ export function KanbanBoard() {
         matchesSearch(g, search)
     );
     return sortParts(result, sort);
-  }, [groups, search, sites, bins, recoveryBins, manufacturers, missingTasks, margins, discrepancies, needsReview, sort]);
+  }, [groups, search, sites, bins, recoveryBins, manufacturers, completedTasks, margins, discrepancies, needsReview, sort]);
 
   if (isLoading) {
     return <div className="py-16 text-center text-textMuted">Loading inventory…</div>;

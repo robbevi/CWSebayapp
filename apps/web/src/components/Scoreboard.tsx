@@ -1,9 +1,10 @@
 import { useMemo, useState } from 'react';
-import { X } from 'lucide-react';
-import { GOALS } from '@warehouse/shared';
+import { Camera, CheckCircle2, PackagePlus, Tag, X } from 'lucide-react';
+import { computeProgramTotals, GOALS, groupPartsBySku, percentOf } from '@warehouse/shared';
 import { useAllSubmissions } from '../hooks/useAllSubmissions';
 import { useAppUsers } from '../hooks/useAppUsers';
 import { useBodyScrollLock } from '../hooks/useBodyScrollLock';
+import { useInventoryParts } from '../hooks/useInventoryParts';
 import { computeUserMetrics, countsForPeriod, type Period } from '../lib/submissionStats';
 
 const PERIOD_OPTIONS: { key: Period; label: string }[] = [
@@ -11,6 +12,29 @@ const PERIOD_OPTIONS: { key: Period; label: string }[] = [
   { key: 'week', label: 'This Week' },
   { key: 'month', label: 'This Month' },
 ];
+
+function HeadlineStat({
+  label,
+  value,
+  sub,
+  icon,
+}: {
+  label: string;
+  value: number;
+  sub?: string;
+  icon: React.ReactNode;
+}) {
+  return (
+    <div className="rounded-btn border border-border bg-surface p-3">
+      <div className="mb-1 flex items-center gap-1.5 text-textMuted">
+        {icon}
+        <span className="text-[11px] font-semibold leading-tight">{label}</span>
+      </div>
+      <div className="text-xl font-bold text-textPri">{value.toLocaleString()}</div>
+      {sub && <div className="text-[11px] text-textMuted">{sub}</div>}
+    </div>
+  );
+}
 
 function Stat({ label, value }: { label: string; value: string | number }) {
   return (
@@ -42,11 +66,13 @@ function History({ history }: { history: { date: string; count: number }[] }) {
 
 export function Scoreboard({ onClose }: { onClose: () => void }) {
   const { data: users } = useAppUsers();
+  const { data: parts } = useInventoryParts();
   const { data: submissions } = useAllSubmissions();
   const [period, setPeriod] = useState<Period>('day');
   const [selectedUser, setSelectedUser] = useState<string | null>(null);
   useBodyScrollLock();
 
+  const totals = useMemo(() => computeProgramTotals(groupPartsBySku(parts ?? [])), [parts]);
   const counts = useMemo(() => countsForPeriod(submissions ?? [], period), [submissions, period]);
   const goal = GOALS[period];
 
@@ -63,13 +89,43 @@ export function Scoreboard({ onClose }: { onClose: () => void }) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="max-h-[85vh] w-full max-w-lg overflow-y-auto overscroll-contain rounded-card bg-surface p-6">
+      <div className="max-h-[85vh] w-full max-w-xl overflow-y-auto overscroll-contain rounded-card bg-surface p-6">
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-base font-semibold text-textPri">Scoreboard</h2>
           <button onClick={onClose} className="rounded-btn p-1 hover:bg-surfaceMuted" aria-label="Close" type="button">
             <X size={18} />
           </button>
         </div>
+
+        {/* Programme-wide progress first — this is the view management asked for. The
+            per-user breakdown below keeps its own Day/Week/Month toggle; these headline
+            figures are current totals across the whole catalogue, not period counts. */}
+        <div className="mb-5">
+          <div className="mb-2 text-xs font-semibold text-textMuted">Overall Progress</div>
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+            <HeadlineStat label="Parts Added" value={totals.added} sub="in the system" icon={<PackagePlus size={13} />} />
+            <HeadlineStat
+              label="Photographed"
+              value={totals.photographed}
+              sub={`${percentOf(totals.photographed, totals.added)} of parts`}
+              icon={<Camera size={13} />}
+            />
+            <HeadlineStat
+              label="Listed"
+              value={totals.listed}
+              sub={`${percentOf(totals.listed, totals.added)} of parts`}
+              icon={<Tag size={13} />}
+            />
+            <HeadlineStat
+              label="Completed"
+              value={totals.completed}
+              sub={`${percentOf(totals.completed, totals.added)} of parts`}
+              icon={<CheckCircle2 size={13} />}
+            />
+          </div>
+        </div>
+
+        <div className="mb-2 border-t border-border pt-4 text-xs font-semibold text-textMuted">By Person</div>
 
         <div className="mb-4 flex gap-2">
           {PERIOD_OPTIONS.map((opt) => (

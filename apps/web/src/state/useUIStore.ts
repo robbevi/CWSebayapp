@@ -12,8 +12,7 @@ export type SortKey =
   | 'Revenue Priority'
   | 'Recovery Price'
   | 'Gross Margin'
-  | 'Field Review Priority'
-  | 'Qty Discrepancy';
+  | 'Field Review Priority';
 
 export type MarginFilter = 'Positive Gross Margin' | 'Negative Gross Margin';
 
@@ -26,7 +25,7 @@ interface UIState {
   recoveryBins: string[];
   manufacturers: string[];
   statuses: WorkflowStatus[];
-  missingTasks: TaskKey[];
+  completedTasks: TaskKey[];
   margins: MarginFilter[];
   discrepancies: DiscrepancyFilter[];
   needsReview: boolean;
@@ -44,7 +43,7 @@ const DEFAULTS = {
   recoveryBins: [] as string[],
   manufacturers: [] as string[],
   statuses: [] as WorkflowStatus[],
-  missingTasks: [] as TaskKey[],
+  completedTasks: [] as TaskKey[],
   margins: [] as MarginFilter[],
   discrepancies: [] as DiscrepancyFilter[],
   needsReview: false,

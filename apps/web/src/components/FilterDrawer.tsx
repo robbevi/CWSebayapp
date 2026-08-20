@@ -51,7 +51,7 @@ interface FilterDrawerProps {
   onManufacturersChange: (next: string[]) => void;
   statuses: WorkflowStatus[];
   onToggleStatus: (key: WorkflowStatus) => void;
-  missingTasks: TaskKey[];
+  completedTasks: TaskKey[];
   onToggleTask: (key: TaskKey) => void;
   margins: MarginFilter[];
   onToggleMargin: (key: MarginFilter) => void;
@@ -82,7 +82,7 @@ export function FilterDrawer({
   onManufacturersChange,
   statuses,
   onToggleStatus,
-  missingTasks,
+  completedTasks,
   onToggleTask,
   margins,
   onToggleMargin,
@@ -243,7 +243,7 @@ export function FilterDrawer({
                 <label key={opt.key} className="flex cursor-pointer items-center gap-2 text-xs text-textPri">
                   <input
                     type="checkbox"
-                    checked={missingTasks.includes(opt.key)}
+                    checked={completedTasks.includes(opt.key)}
                     onChange={() => onToggleTask(opt.key)}
                     className="h-4 w-4 shrink-0 accent-primary"
                   />
@@ -252,7 +252,10 @@ export function FilterDrawer({
                 </label>
               ))}
             </div>
-            <p className="mt-1.5 text-[11px] text-textMuted">Check a box to show only parts missing that step.</p>
+            <p className="mt-1.5 text-[11px] text-textMuted">
+              Check a box to show only parts that have finished that step. Checking several
+              narrows to parts that have finished all of them.
+            </p>
           </div>
         </div>
 
