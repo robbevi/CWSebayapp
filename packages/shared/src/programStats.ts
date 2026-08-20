@@ -1,3 +1,4 @@
+import { type DiscrepancyLogEntry } from './discrepancy.js';
 import { type PartGroup } from './grouping.js';
 import { getCheckpoints } from './status.js';
 import { chicagoDateString, mondayOf } from './submissions.js';
@@ -9,6 +10,15 @@ export interface ProgramTotals {
   photographed: number;
   listed: number;
   completed: number;
+  /** Recovery price basis of the parts listed, in dollars. */
+  recoveryValue: number;
+}
+
+export interface DiscrepancyTotals {
+  /** Distinct SKUs whose count didn't reconcile. */
+  skus: number;
+  /** Signed sum of the variances — negative means stock is missing overall. */
+  netUnits: number;
 }
 
 type DatedPeriod = Exclude<StatPeriod, 'all'>;
@@ -44,6 +54,19 @@ function isInPeriod(
   return bucketFromDay(toDay(iso), period) === bucketFromDay(instantDay(now.toISOString()), period);
 }
 
+/**
+ * A SKU's recovery price basis. Rows of the same SKU carry the same figure, so the maximum
+ * simply picks the populated one when some rows predate the column.
+ */
+function priceBasis(group: PartGroup): number {
+  return Math.max(0, ...group.records.map((r) => r.activeRecoveryPriceBasis ?? 0));
+}
+
+/** Recovery price basis across every part, listed or not — the denominator for value. */
+export function catalogueValue(groups: PartGroup[]): number {
+  return groups.reduce((sum, g) => sum + priceBasis(g), 0);
+}
+
 /** When this SKU was first photographed — a later top-up photo isn't a new part done. */
 function firstPhotographedAt(group: PartGroup): string | undefined {
   const stamps = group.photos.map((p) => p.uploadedAt).filter(Boolean).sort();
@@ -75,30 +98,59 @@ export function computeProgramTotals(
     let photographed = 0;
     let listed = 0;
     let completed = 0;
+    let recoveryValue = 0;
     for (const g of groups) {
       const checkpoints = getCheckpoints(g);
       if (checkpoints.photographed) photographed++;
-      if (checkpoints.listed) listed++;
+      if (checkpoints.listed) {
+        listed++;
+        recoveryValue += priceBasis(g);
+      }
       if (g.workflowStatus === 'Completed') completed++;
     }
-    return { added: groups.length, photographed, listed, completed };
+    return { added: groups.length, photographed, listed, completed, recoveryValue };
   }
 
   let added = 0;
   let photographed = 0;
   let listed = 0;
   let completed = 0;
+  let recoveryValue = 0;
 
   for (const g of groups) {
     if (g.records.some((r) => isInPeriod(r.createdAt, period, now, instantDay))) added++;
     if (isInPeriod(firstPhotographedAt(g), period, now, instantDay)) photographed++;
     if (isInPeriod(listedAt(g), period, now, calendarDay)) {
       listed++;
+      recoveryValue += priceBasis(g);
       if (g.workflowStatus === 'Completed') completed++;
     }
   }
 
-  return { added, photographed, listed, completed };
+  return { added, photographed, listed, completed, recoveryValue };
+}
+
+/**
+ * Counting variances, from the audit log rather than the live parts: the log is stamped
+ * with when each count happened, which is what makes a period view possible, and it keeps
+ * the expected quantity as it stood at the time even after a later import moves it.
+ */
+export function computeDiscrepancyTotals(
+  log: DiscrepancyLogEntry[],
+  period: StatPeriod = 'all',
+  now: Date = new Date()
+): DiscrepancyTotals {
+  const inWindow =
+    period === 'all' ? log : log.filter((e) => isInPeriod(e.recordedAt, period, now, instantDay));
+  // One SKU counted twice is still one SKU with a problem; the latest entry wins.
+  const latestBySku = new Map<string, DiscrepancyLogEntry>();
+  for (const e of inWindow) {
+    const prev = latestBySku.get(e.sku);
+    if (!prev || e.recordedAt > prev.recordedAt) latestBySku.set(e.sku, e);
+  }
+  let netUnits = 0;
+  for (const e of latestBySku.values()) netUnits += e.variance;
+  return { skus: latestBySku.size, netUnits };
 }
 
 export function percentOf(value: number, total: number): string {

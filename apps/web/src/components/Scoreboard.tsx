@@ -1,9 +1,18 @@
 import { useMemo, useState } from 'react';
-import { Camera, CheckCircle2, PackagePlus, Tag, X } from 'lucide-react';
-import { computeProgramTotals, GOALS, groupPartsBySku, percentOf } from '@warehouse/shared';
+import { AlertTriangle, Camera, CheckCircle2, DollarSign, PackagePlus, Tag, X } from 'lucide-react';
+import {
+  catalogueValue,
+  computeDiscrepancyTotals,
+  computeProgramTotals,
+  GOALS,
+  groupPartsBySku,
+  percentOf,
+} from '@warehouse/shared';
 import { useAllSubmissions } from '../hooks/useAllSubmissions';
 import { useAppUsers } from '../hooks/useAppUsers';
 import { useBodyScrollLock } from '../hooks/useBodyScrollLock';
+import { cn } from '../lib/cn';
+import { useDiscrepancyLog } from '../hooks/useDiscrepancyLog';
 import { useInventoryParts } from '../hooks/useInventoryParts';
 import { computeUserMetrics, countsForPeriod, type Period } from '../lib/submissionStats';
 
@@ -25,19 +34,27 @@ function HeadlineStat({
   value,
   sub,
   icon,
+  format,
+  tone,
 }: {
   label: string;
   value: number;
   sub?: string;
   icon: React.ReactNode;
+  format?: 'money';
+  tone?: 'warn';
 }) {
+  const display =
+    format === 'money'
+      ? value.toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 })
+      : value.toLocaleString();
   return (
     <div className="rounded-btn border border-border bg-surface p-3">
       <div className="mb-1 flex items-center gap-1.5 text-textMuted">
         {icon}
         <span className="text-[11px] font-semibold leading-tight">{label}</span>
       </div>
-      <div className="text-xl font-bold text-textPri">{value.toLocaleString()}</div>
+      <div className={cn('text-xl font-bold', tone === 'warn' ? 'text-red-600' : 'text-textPri')}>{display}</div>
       {sub && <div className="text-[11px] text-textMuted">{sub}</div>}
     </div>
   );
@@ -75,15 +92,21 @@ export function Scoreboard({ onClose }: { onClose: () => void }) {
   const { data: users } = useAppUsers();
   const { data: parts } = useInventoryParts();
   const { data: submissions } = useAllSubmissions();
+  const { data: discrepancyLog } = useDiscrepancyLog();
   const [period, setPeriod] = useState<Period>('day');
   const [selectedUser, setSelectedUser] = useState<string | null>(null);
   useBodyScrollLock();
 
   const groups = useMemo(() => groupPartsBySku(parts ?? []), [parts]);
   const totals = useMemo(() => computeProgramTotals(groups, period), [groups, period]);
-  // Percentages only mean something against the whole catalogue; within a single day or
-  // week the denominator would be the same total and the figures would read as noise.
+  // Every figure is a share of the whole catalogue, in every period — in a dated window
+  // that reads as throughput: "we got through 4% of the catalogue this week".
   const catalogueSize = groups.length;
+  const catalogueWorth = useMemo(() => catalogueValue(groups), [groups]);
+  const variances = useMemo(
+    () => computeDiscrepancyTotals(discrepancyLog ?? [], period),
+    [discrepancyLog, period]
+  );
   const counts = useMemo(() => countsForPeriod(submissions ?? [], period), [submissions, period]);
   // All Time has no target to hit, so the bars there are scaled against the best performer
   // rather than against a goal.
@@ -132,30 +155,50 @@ export function Scoreboard({ onClose }: { onClose: () => void }) {
             Overall Progress
             {period !== 'all' && <span className="ml-1 font-normal">· {PERIOD_LABEL[period]}</span>}
           </div>
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
             <HeadlineStat
               label="Parts Added"
               value={totals.added}
-              sub={period === 'all' ? 'in the system' : undefined}
+              sub={period === 'all' ? 'in the system' : `${percentOf(totals.added, catalogueSize)} of parts`}
               icon={<PackagePlus size={13} />}
             />
             <HeadlineStat
               label="Photographed"
               value={totals.photographed}
-              sub={period === 'all' ? `${percentOf(totals.photographed, catalogueSize)} of parts` : undefined}
+              sub={`${percentOf(totals.photographed, catalogueSize)} of parts`}
               icon={<Camera size={13} />}
             />
             <HeadlineStat
               label="Listed"
               value={totals.listed}
-              sub={period === 'all' ? `${percentOf(totals.listed, catalogueSize)} of parts` : undefined}
+              sub={`${percentOf(totals.listed, catalogueSize)} of parts`}
               icon={<Tag size={13} />}
             />
             <HeadlineStat
               label="Completed"
               value={totals.completed}
-              sub={period === 'all' ? `${percentOf(totals.completed, catalogueSize)} of parts` : undefined}
+              sub={`${percentOf(totals.completed, catalogueSize)} of parts`}
               icon={<CheckCircle2 size={13} />}
+            />
+            {/* Dollars and shrinkage — the two figures that read as outcomes rather than
+                activity. Both are datable, so they follow the period toggle like the rest. */}
+            <HeadlineStat
+              label="Recovery Value"
+              value={totals.recoveryValue}
+              format="money"
+              sub={`${percentOf(totals.recoveryValue, catalogueWorth)} of catalogue`}
+              icon={<DollarSign size={13} />}
+            />
+            <HeadlineStat
+              label="Count Variances"
+              value={variances.skus}
+              sub={
+                variances.skus === 0
+                  ? 'none recorded'
+                  : `${variances.netUnits > 0 ? '+' : ''}${variances.netUnits} units net`
+              }
+              tone={variances.netUnits < 0 ? 'warn' : undefined}
+              icon={<AlertTriangle size={13} />}
             />
           </div>
         </div>

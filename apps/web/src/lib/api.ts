@@ -1,6 +1,7 @@
 import type {
   AppUser,
   CreatePartInput,
+  DiscrepancyLogEntry,
   HealthStatus,
   InventoryPart,
   InventoryPartPatch,
@@ -86,6 +87,11 @@ export async function fetchSubmissionSummary(): Promise<SubmissionSummary[]> {
 
 export async function fetchAllSubmissions(): Promise<Submission[]> {
   const res = await fetch('/api/submissions');
+  return parseJson(res);
+}
+
+export async function fetchDiscrepancyLog(): Promise<DiscrepancyLogEntry[]> {
+  const res = await fetch('/api/discrepancies');
   return parseJson(res);
 }
 

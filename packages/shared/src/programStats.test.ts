@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { groupPartsBySku } from './grouping.js';
-import { computeProgramTotals, percentOf } from './programStats.js';
+import { catalogueValue, computeDiscrepancyTotals, computeProgramTotals, percentOf } from './programStats.js';
+import type { DiscrepancyLogEntry } from './discrepancy.js';
 import type { InventoryPart } from './types.js';
 
 function part(over: Partial<InventoryPart> & { sku: string; id: string }): InventoryPart {
@@ -64,7 +65,13 @@ describe('computeProgramTotals', () => {
   });
 
   it('is all zeroes on an empty catalogue', () => {
-    expect(computeProgramTotals([])).toEqual({ added: 0, photographed: 0, listed: 0, completed: 0 });
+    expect(computeProgramTotals([])).toEqual({
+      added: 0,
+      photographed: 0,
+      listed: 0,
+      completed: 0,
+      recoveryValue: 0,
+    });
   });
 });
 
@@ -131,6 +138,75 @@ describe('computeProgramTotals over a period', () => {
     const groups = groupPartsBySku([part({ id: 'a', sku: 'X1' }), part({ id: 'b', sku: 'X2' })]);
     expect(computeProgramTotals(groups, 'month', NOW).added).toBe(0);
     expect(computeProgramTotals(groups, 'all', NOW).added).toBe(2);
+  });
+});
+
+describe('recovery value', () => {
+  it('totals the price basis of listed parts only', () => {
+    const groups = groupPartsBySku([
+      part({ id: 'a', sku: 'X1', itemListed: true, activeRecoveryPriceBasis: 100 }),
+      part({ id: 'b', sku: 'X2', activeRecoveryPriceBasis: 250 }),
+    ]);
+    expect(computeProgramTotals(groups, 'all').recoveryValue).toBe(100);
+    expect(catalogueValue(groups)).toBe(350);
+  });
+
+  it('counts a multi-row SKU basis once, not once per row', () => {
+    const groups = groupPartsBySku([
+      part({ id: 'a', sku: 'X1', itemListed: true, activeRecoveryPriceBasis: 100 }),
+      part({ id: 'b', sku: 'X1', activeRecoveryPriceBasis: 100 }),
+    ]);
+    expect(computeProgramTotals(groups, 'all').recoveryValue).toBe(100);
+  });
+});
+
+describe('computeDiscrepancyTotals', () => {
+  const NOW = new Date('2026-08-20T18:00:00Z');
+  const entry = (over: Partial<DiscrepancyLogEntry>): DiscrepancyLogEntry => ({
+    sku: 'X1',
+    inventorySite: 'NDPARTS',
+    binLocation: 'A-1-1',
+    expectedQoh: 5,
+    countedQoh: 3,
+    variance: -2,
+    kind: 'shortage',
+    user: 'someone',
+    recordedAt: '2026-08-20T14:00:00Z',
+    ...over,
+  });
+
+  it('sums the variance across distinct SKUs', () => {
+    const totals = computeDiscrepancyTotals(
+      [entry({ sku: 'X1', variance: -2 }), entry({ sku: 'X2', variance: 1 })],
+      'all',
+      NOW
+    );
+    expect(totals).toEqual({ skus: 2, netUnits: -1 });
+  });
+
+  it('counts a recounted SKU once, taking its latest entry', () => {
+    const totals = computeDiscrepancyTotals(
+      [
+        entry({ sku: 'X1', variance: -5, recordedAt: '2026-08-18T10:00:00Z' }),
+        entry({ sku: 'X1', variance: -1, recordedAt: '2026-08-20T10:00:00Z' }),
+      ],
+      'all',
+      NOW
+    );
+    expect(totals).toEqual({ skus: 1, netUnits: -1 });
+  });
+
+  it('restricts to the selected window', () => {
+    const log = [
+      entry({ sku: 'X1', recordedAt: '2026-08-20T14:00:00Z' }),
+      entry({ sku: 'X2', recordedAt: '2026-05-01T14:00:00Z' }),
+    ];
+    expect(computeDiscrepancyTotals(log, 'day', NOW).skus).toBe(1);
+    expect(computeDiscrepancyTotals(log, 'all', NOW).skus).toBe(2);
+  });
+
+  it('is empty when nothing has been counted', () => {
+    expect(computeDiscrepancyTotals([], 'all', NOW)).toEqual({ skus: 0, netUnits: 0 });
   });
 });
 
