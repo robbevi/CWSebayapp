@@ -1,0 +1,83 @@
+import { env } from '../config/env.js';
+
+/**
+ * eBay OAuth. The app holds a long-lived refresh token obtained once through the consent
+ * flow (scripts/ebay-oauth-setup.ts) and trades it for short-lived access tokens, exactly
+ * as the Drive integration does — order data is user-scoped, so a client-credentials token
+ * is not sufficient.
+ */
+
+export const EBAY_SCOPES = [
+  'https://api.ebay.com/oauth/api_scope/sell.fulfillment.readonly',
+  'https://api.ebay.com/oauth/api_scope/sell.finances',
+];
+
+export function ebayBaseUrl(): string {
+  return env.ebayEnv === 'sandbox' ? 'https://api.sandbox.ebay.com' : 'https://api.ebay.com';
+}
+
+export function ebayAuthUrl(): string {
+  return env.ebayEnv === 'sandbox' ? 'https://auth.sandbox.ebay.com' : 'https://auth.ebay.com';
+}
+
+function basicAuth(clientId: string, clientSecret: string): string {
+  return Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
+}
+
+let cached: { token: string; expiresAt: number } | undefined;
+
+export async function getAccessToken(): Promise<string> {
+  const { ebayClientId, ebayClientSecret, ebayRefreshToken } = env;
+  if (!ebayClientId || !ebayClientSecret || !ebayRefreshToken) {
+    throw new Error('eBay is not configured. Set EBAY_CLIENT_ID, EBAY_CLIENT_SECRET and EBAY_REFRESH_TOKEN.');
+  }
+  // A minute of headroom, so a token never expires mid-request.
+  if (cached && cached.expiresAt > Date.now() + 60_000) return cached.token;
+
+  const body = new URLSearchParams({
+    grant_type: 'refresh_token',
+    refresh_token: ebayRefreshToken,
+    scope: EBAY_SCOPES.join(' '),
+  });
+
+  const res = await fetch(`${ebayBaseUrl()}/identity/v1/oauth2/token`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Basic ${basicAuth(ebayClientId, ebayClientSecret)}`,
+      'Content-Type': 'application/x-www-form-urlencoded',
+    },
+    body,
+  });
+
+  const text = await res.text();
+  if (!res.ok) {
+    // eBay refresh tokens expire after about 18 months, and the failure is otherwise
+    // silent — say plainly what has to happen rather than surfacing a bare 400.
+    throw new Error(
+      `eBay token refresh failed (${res.status}). If this says invalid_grant, the refresh token has expired or been revoked — re-run scripts/ebay-oauth-setup.ts. Response: ${text.slice(0, 300)}`
+    );
+  }
+
+  const json = JSON.parse(text) as { access_token: string; expires_in: number };
+  cached = { token: json.access_token, expiresAt: Date.now() + json.expires_in * 1000 };
+  return cached.token;
+}
+
+export async function ebayGet<T>(path: string): Promise<T> {
+  const token = await getAccessToken();
+  const res = await fetch(`${ebayBaseUrl()}${path}`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'X-EBAY-C-MARKETPLACE-ID': env.ebayMarketplaceId,
+      Accept: 'application/json',
+    },
+  });
+  const text = await res.text();
+  if (!res.ok) throw new Error(`eBay GET ${path} failed (${res.status}): ${text.slice(0, 300)}`);
+  return JSON.parse(text) as T;
+}
+
+/** Clears the cached access token. Only needed by tests and the setup script. */
+export function resetTokenCache(): void {
+  cached = undefined;
+}

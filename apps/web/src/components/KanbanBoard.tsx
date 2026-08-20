@@ -4,11 +4,13 @@ import {
   getCheckpoints,
   getGroupDiscrepancy,
   groupPartsBySku,
+  indexSales,
   type PartGroup,
   type TaskKey,
   type WorkflowStatus,
 } from '@warehouse/shared';
 import { useInventoryParts } from '../hooks/useInventoryParts';
+import { useSales } from '../hooks/useSales';
 import { useUIStore, type SortKey } from '../state/useUIStore';
 import { BucketColumn } from './BucketColumn';
 
@@ -112,6 +114,7 @@ const GRID_COLS: Record<number, string> = {
 
 export function KanbanBoard() {
   const { data, isLoading } = useInventoryParts();
+  const { data: sales } = useSales();
   const {
     search,
     sites,
@@ -129,6 +132,7 @@ export function KanbanBoard() {
   // Every row for a SKU is folded into one card. The sheet keeps its separate rows —
   // this is purely how the board reads them.
   const groups = useMemo(() => groupPartsBySku(data ?? []), [data]);
+  const salesIndex = useMemo(() => indexSales(sales ?? []), [sales]);
 
   const filtered = useMemo(() => {
     const result = groups.filter(
@@ -162,7 +166,7 @@ export function KanbanBoard() {
   return (
     <div className={`grid grid-cols-1 gap-4 lg:h-full ${GRID_COLS[visibleStatuses.length]}`}>
       {visibleStatuses.map((status) => (
-        <BucketColumn key={status} status={status} parts={buckets[status]} />
+        <BucketColumn key={status} status={status} parts={buckets[status]} salesIndex={salesIndex} />
       ))}
     </div>
   );

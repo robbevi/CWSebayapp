@@ -1,9 +1,21 @@
 import { useMemo, useState } from 'react';
-import { AlertTriangle, Camera, CheckCircle2, DollarSign, PackagePlus, Tag, X } from 'lucide-react';
+import {
+  AlertTriangle,
+  Camera,
+  CheckCircle2,
+  DollarSign,
+  PackagePlus,
+  RefreshCw,
+  ShoppingCart,
+  Tag,
+  Wallet,
+  X,
+} from 'lucide-react';
 import {
   catalogueValue,
   computeDiscrepancyTotals,
   computeProgramTotals,
+  computeSalesTotals,
   GOALS,
   groupPartsBySku,
   percentOf,
@@ -13,6 +25,7 @@ import { useAppUsers } from '../hooks/useAppUsers';
 import { useBodyScrollLock } from '../hooks/useBodyScrollLock';
 import { cn } from '../lib/cn';
 import { useDiscrepancyLog } from '../hooks/useDiscrepancyLog';
+import { useSales, useSalesStatus, useSyncSales } from '../hooks/useSales';
 import { useInventoryParts } from '../hooks/useInventoryParts';
 import { computeUserMetrics, countsForPeriod, type Period } from '../lib/submissionStats';
 
@@ -22,6 +35,10 @@ const PERIOD_OPTIONS: { key: Period; label: string }[] = [
   { key: 'month', label: 'This Month' },
   { key: 'all', label: 'All Time' },
 ];
+
+function formatMoneyShort(value: number): string {
+  return value.toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
+}
 
 const PERIOD_LABEL: Record<Exclude<Period, 'all'>, string> = {
   day: 'Today',
@@ -93,6 +110,9 @@ export function Scoreboard({ onClose }: { onClose: () => void }) {
   const { data: parts } = useInventoryParts();
   const { data: submissions } = useAllSubmissions();
   const { data: discrepancyLog } = useDiscrepancyLog();
+  const { data: sales } = useSales();
+  const { data: salesStatus } = useSalesStatus();
+  const syncSales = useSyncSales();
   const [period, setPeriod] = useState<Period>('day');
   const [selectedUser, setSelectedUser] = useState<string | null>(null);
   useBodyScrollLock();
@@ -103,6 +123,7 @@ export function Scoreboard({ onClose }: { onClose: () => void }) {
   // that reads as throughput: "we got through 4% of the catalogue this week".
   const catalogueSize = groups.length;
   const catalogueWorth = useMemo(() => catalogueValue(groups), [groups]);
+  const revenue = useMemo(() => computeSalesTotals(sales ?? [], period), [sales, period]);
   const variances = useMemo(
     () => computeDiscrepancyTotals(discrepancyLog ?? [], period),
     [discrepancyLog, period]
@@ -151,11 +172,25 @@ export function Scoreboard({ onClose }: { onClose: () => void }) {
         </div>
 
         <div className="mb-5">
-          <div className="mb-2 text-xs font-semibold text-textMuted">
-            Overall Progress
-            {period !== 'all' && <span className="ml-1 font-normal">· {PERIOD_LABEL[period]}</span>}
+          <div className="mb-2 flex items-center justify-between">
+            <span className="text-xs font-semibold text-textMuted">
+              Overall Progress
+              {period !== 'all' && <span className="ml-1 font-normal">· {PERIOD_LABEL[period]}</span>}
+            </span>
+            {/* Sales also refresh on their own; this is for when you want the number now. */}
+            {salesStatus?.ebayConfigured && (
+              <button
+                type="button"
+                onClick={() => syncSales.mutate(undefined)}
+                disabled={syncSales.isPending}
+                className="flex min-h-0 items-center gap-1 rounded-pill px-2 py-1 text-[11px] font-semibold text-primary hover:bg-surfaceMuted disabled:opacity-50"
+              >
+                <RefreshCw size={11} className={syncSales.isPending ? 'animate-spin' : undefined} />
+                {syncSales.isPending ? 'Syncing…' : 'Sync eBay'}
+              </button>
+            )}
           </div>
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
             <HeadlineStat
               label="Parts Added"
               value={totals.added}
@@ -188,6 +223,19 @@ export function Scoreboard({ onClose }: { onClose: () => void }) {
               format="money"
               sub={`${percentOf(totals.recoveryValue, catalogueWorth)} of catalogue`}
               icon={<DollarSign size={13} />}
+            />
+            <HeadlineStat
+              label="Revenue Recovered"
+              value={revenue.net}
+              format="money"
+              sub={revenue.gross > 0 ? `${formatMoneyShort(revenue.gross)} gross` : 'net of eBay fees'}
+              icon={<Wallet size={13} />}
+            />
+            <HeadlineStat
+              label="Units Sold"
+              value={revenue.qty}
+              sub={revenue.orders > 0 ? `${revenue.orders} orders` : 'none yet'}
+              icon={<ShoppingCart size={13} />}
             />
             <HeadlineStat
               label="Count Variances"

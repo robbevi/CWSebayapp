@@ -2,17 +2,21 @@ import { useEffect, useMemo, useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { AlertTriangle, Check, Flag, Pencil, Trash2, X } from 'lucide-react';
+import { AlertTriangle, Check, Flag, Pencil, ShoppingCart, Trash2, X } from 'lucide-react';
 import {
   formatVariance,
   getDiscrepancy,
   groupPartsBySku,
+  indexSales,
   IRON_BARN_BINS,
+  salesForGroup,
+  soldPosition,
   type InventoryPartPatch,
 } from '@warehouse/shared';
 import { useBodyScrollLock } from '../hooks/useBodyScrollLock';
 import { useDeletePart } from '../hooks/useDeletePart';
 import { useInventoryParts } from '../hooks/useInventoryParts';
+import { useSales } from '../hooks/useSales';
 import { useSavePart } from '../hooks/useSavePart';
 import { useUIStore } from '../state/useUIStore';
 import { useUserStore } from '../state/useUserStore';
@@ -77,6 +81,7 @@ type FormValues = z.infer<typeof schema>;
 export function PartDetailModal() {
   const { selectedId, modalOpen, set } = useUIStore();
   const { data: parts } = useInventoryParts();
+  const { data: sales } = useSales();
   const savePart = useSavePart();
   const deletePart = useDeletePart();
   const currentUser = useUserStore((s) => s.currentUser);
@@ -159,6 +164,8 @@ export function PartDetailModal() {
   if (!modalOpen || !part || !group) return null;
 
   const multiLocation = group.locations.length > 1;
+  const partSales = salesForGroup(group, indexSales(sales ?? []));
+  const sold = soldPosition(group, partSales);
   const itemListed = watch('itemListed');
   const needsReview = watch('needsReview');
   const transferred = watch('transferredToMarketRecovery');
@@ -402,6 +409,53 @@ export function PartDetailModal() {
           onScroll={handleFormScroll}
           className="min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain p-4"
         >
+          {/* Only present once something has actually sold — an empty sales panel on
+              two thousand unsold parts would be pure noise. */}
+          {partSales.length > 0 && (
+            <div className="rounded-card border border-emerald-200 bg-emerald-50/60 p-3">
+              <div className="mb-2 flex items-center justify-between">
+                <span className="flex items-center gap-1.5 text-xs font-semibold text-emerald-800">
+                  <ShoppingCart size={13} />
+                  {sold.soldOut ? 'Sold Out' : 'Partially Sold'}
+                </span>
+                <span className="text-xs font-semibold text-emerald-800">
+                  {sold.soldQty} sold · {sold.remainingQty} left
+                </span>
+              </div>
+              <div className="mb-2 grid grid-cols-3 gap-2 text-xs">
+                <div>
+                  <div className="text-textMuted">Gross</div>
+                  <div className="font-semibold text-textPri">{formatMoney(sold.totals.gross)}</div>
+                </div>
+                <div>
+                  <div className="text-textMuted">Net Proceeds</div>
+                  <div className="font-semibold text-emerald-700">{formatMoney(sold.totals.net)}</div>
+                </div>
+                <div>
+                  <div className="text-textMuted">Orders</div>
+                  <div className="font-semibold text-textPri">{sold.totals.orders}</div>
+                </div>
+              </div>
+              <div className="space-y-1 border-t border-emerald-200 pt-2">
+                {partSales.map((sale) => (
+                  <div key={sale.lineItemId} className="flex items-center justify-between gap-2 text-[11px]">
+                    <span className="text-textMuted">
+                      {sale.soldAt.slice(0, 10)} · {sale.qtySold} @ {formatMoney(sale.grossSale)}
+                    </span>
+                    <span className="font-medium text-textPri">
+                      {formatMoney(sale.netProceeds)}
+                      {sale.feesEstimated && (
+                        <span className="ml-1 font-normal text-textMuted" title="eBay has not posted the fee record yet">
+                          est.
+                        </span>
+                      )}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           <PhotoUploader sku={part.sku} itemId={part.id} photos={part.photos} site={part.inventorySite} />
 
           <div>

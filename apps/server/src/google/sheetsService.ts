@@ -5,6 +5,7 @@ import type {
   InventoryPart,
   InventoryPartPatch,
   Photo,
+  Sale,
   Submission,
 } from '@warehouse/shared';
 import { env } from '../config/env.js';
@@ -15,6 +16,23 @@ import { listPhotosGrouped, type GroupedPhotos } from './driveService.js';
 const SHEET_NAME = 'Parts';
 const SUBMISSIONS_SHEET = 'Submissions';
 const SUBMISSIONS_HEADERS = ['sku', 'user', 'role', 'completedAt'];
+const SALES_SHEET = 'Sales';
+const SALES_HEADERS = [
+  'lineItemId',
+  'orderId',
+  'soldAt',
+  'ebayListingId',
+  'sku',
+  'qtySold',
+  'grossSale',
+  'shipping',
+  'tax',
+  'fees',
+  'netProceeds',
+  'currency',
+  'feesEstimated',
+  'syncedAt',
+];
 const DISCREPANCIES_SHEET = 'Discrepancies';
 const DISCREPANCIES_HEADERS = [
   'sku',
@@ -605,4 +623,120 @@ export async function updatePartFields(sku: string, data: Partial<CreatePartFiel
     valueInputOption: 'USER_ENTERED',
     requestBody: { values: [recordToRow(headers, record)] },
   });
+}
+
+
+async function ensureSalesSheet(): Promise<void> {
+  await ensureLogSheet(SALES_SHEET, SALES_HEADERS);
+}
+
+export async function getSales(): Promise<Sale[]> {
+  await ensureSalesSheet();
+  const sheets = getSheetsClient();
+  const res = await sheets.spreadsheets.values.get({ spreadsheetId: env.googleSheetId, range: SALES_SHEET });
+  const [, ...rows] = res.data.values ?? [];
+  return rows
+    .filter((row) => row.length > 0 && row[0])
+    .map((row) => ({
+      lineItemId: String(row[0] ?? ''),
+      orderId: String(row[1] ?? ''),
+      soldAt: String(row[2] ?? ''),
+      ebayListingId: String(row[3] ?? ''),
+      sku: String(row[4] ?? ''),
+      qtySold: Number(row[5] ?? 0),
+      grossSale: Number(row[6] ?? 0),
+      shipping: Number(row[7] ?? 0),
+      tax: Number(row[8] ?? 0),
+      fees: Number(row[9] ?? 0),
+      netProceeds: Number(row[10] ?? 0),
+      currency: String(row[11] ?? 'USD'),
+      feesEstimated: parseBoolean(String(row[12] ?? '')),
+      syncedAt: String(row[13] ?? ''),
+    }));
+}
+
+function saleToRow(sale: Sale): unknown[] {
+  return [
+    sale.lineItemId,
+    sale.orderId,
+    sale.soldAt,
+    sale.ebayListingId,
+    sale.sku,
+    sale.qtySold,
+    sale.grossSale,
+    sale.shipping,
+    sale.tax,
+    sale.fees,
+    sale.netProceeds,
+    sale.currency,
+    sale.feesEstimated,
+    sale.syncedAt,
+  ];
+}
+
+export interface SaleWriteResult {
+  added: number;
+  updated: number;
+  unchanged: number;
+}
+
+/**
+ * Writes synced sales, keyed on eBay's line item id.
+ *
+ * A sync always overlaps the previous one, so the same sale arrives repeatedly — it must
+ * land once. Existing rows are rewritten in place rather than appended, which also lets an
+ * estimated fee be replaced by the real one once eBay posts the finance record.
+ */
+export async function upsertSales(sales: Sale[]): Promise<SaleWriteResult> {
+  if (sales.length === 0) return { added: 0, updated: 0, unchanged: 0 };
+  await ensureSalesSheet();
+  const sheets = getSheetsClient();
+  const existing = await getSales();
+  const rowByLineItem = new Map<string, number>();
+  existing.forEach((s, i) => rowByLineItem.set(s.lineItemId, i + 2));
+  const currentByLineItem = new Map(existing.map((s) => [s.lineItemId, s]));
+
+  const updates: { range: string; values: unknown[][] }[] = [];
+  const appends: unknown[][] = [];
+  let unchanged = 0;
+  const lastCol = colLetter(SALES_HEADERS.length - 1);
+
+  for (const sale of sales) {
+    const rowNumber = rowByLineItem.get(sale.lineItemId);
+    if (rowNumber === undefined) {
+      appends.push(saleToRow(sale));
+      continue;
+    }
+    const current = currentByLineItem.get(sale.lineItemId)!;
+    // syncedAt always differs, so compare the parts that carry meaning.
+    const same =
+      current.qtySold === sale.qtySold &&
+      current.grossSale === sale.grossSale &&
+      current.fees === sale.fees &&
+      current.netProceeds === sale.netProceeds &&
+      current.feesEstimated === sale.feesEstimated;
+    if (same) {
+      unchanged++;
+      continue;
+    }
+    updates.push({ range: `${SALES_SHEET}!A${rowNumber}:${lastCol}${rowNumber}`, values: [saleToRow(sale)] });
+  }
+
+  if (updates.length > 0) {
+    await sheets.spreadsheets.values.batchUpdate({
+      spreadsheetId: env.googleSheetId,
+      requestBody: { valueInputOption: 'USER_ENTERED', data: updates },
+    });
+  }
+  if (appends.length > 0) {
+    await sheets.spreadsheets.values.append({
+      spreadsheetId: env.googleSheetId,
+      range: SALES_SHEET,
+      valueInputOption: 'USER_ENTERED',
+      insertDataOption: 'INSERT_ROWS',
+      requestBody: { values: appends },
+    });
+  }
+
+  return { added: appends.length, updated: updates.length, unchanged };
 }

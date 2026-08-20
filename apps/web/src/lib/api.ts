@@ -6,6 +6,7 @@ import type {
   InventoryPart,
   InventoryPartPatch,
   Photo,
+  Sale,
   Submission,
   SubmissionSummary,
 } from '@warehouse/shared';
@@ -87,6 +88,34 @@ export async function fetchSubmissionSummary(): Promise<SubmissionSummary[]> {
 
 export async function fetchAllSubmissions(): Promise<Submission[]> {
   const res = await fetch('/api/submissions');
+  return parseJson(res);
+}
+
+export interface SalesSyncResult {
+  added: number;
+  updated: number;
+  unchanged: number;
+  fetched: number;
+  estimatedFees: number;
+  since: string;
+}
+
+export async function fetchSales(): Promise<Sale[]> {
+  const res = await fetch('/api/sales');
+  return parseJson(res);
+}
+
+export async function fetchSalesStatus(): Promise<{ ebayConfigured: boolean }> {
+  const res = await fetch('/api/sales/status');
+  return parseJson(res);
+}
+
+export async function syncSales(days?: number): Promise<SalesSyncResult> {
+  const res = await fetch('/api/sales/sync', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ days }),
+  });
   return parseJson(res);
 }
 

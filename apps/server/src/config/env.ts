@@ -29,6 +29,12 @@ const rawSchema = z.object({
   GOOGLE_OAUTH_CLIENT_SECRET: z.string().optional(),
   GOOGLE_OAUTH_REFRESH_TOKEN: z.string().optional(),
   APP_USERS_JSON: z.string().optional(),
+  EBAY_CLIENT_ID: z.string().optional(),
+  EBAY_CLIENT_SECRET: z.string().optional(),
+  EBAY_REFRESH_TOKEN: z.string().optional(),
+  EBAY_RU_NAME: z.string().optional(),
+  EBAY_ENV: z.enum(['production', 'sandbox']).optional(),
+  EBAY_MARKETPLACE_ID: z.string().optional(),
   PORT: z.string().optional(),
 });
 
@@ -65,6 +71,12 @@ export const env = {
   googleOAuthClientSecret: raw.GOOGLE_OAUTH_CLIENT_SECRET,
   googleOAuthRefreshToken: raw.GOOGLE_OAUTH_REFRESH_TOKEN,
   appUsers: parseAppUsers(raw.APP_USERS_JSON),
+  ebayClientId: raw.EBAY_CLIENT_ID,
+  ebayClientSecret: raw.EBAY_CLIENT_SECRET,
+  ebayRefreshToken: raw.EBAY_REFRESH_TOKEN,
+  ebayRuName: raw.EBAY_RU_NAME,
+  ebayEnv: raw.EBAY_ENV ?? 'production',
+  ebayMarketplaceId: raw.EBAY_MARKETPLACE_ID ?? 'EBAY_US',
   port: Number(raw.PORT ?? 4000),
 };
 

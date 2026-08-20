@@ -1,4 +1,5 @@
 import { type DiscrepancyLogEntry } from './discrepancy.js';
+import { totalsFor, type Sale, type SaleTotals } from './sales.js';
 import { type PartGroup } from './grouping.js';
 import { getCheckpoints } from './status.js';
 import { chicagoDateString, mondayOf } from './submissions.js';
@@ -163,4 +164,18 @@ export function percentOf(value: number, total: number): string {
   const pct = (value / total) * 100;
   // Sub-1% work still deserves a number rather than a flat 0%.
   return pct > 0 && pct < 1 ? '<1%' : `${Math.round(pct)}%`;
+}
+
+/**
+ * Revenue for a window, dated by when each sale happened. Sales are real instants from
+ * eBay, so they read in the site's timezone like photo uploads do.
+ */
+export function computeSalesTotals(
+  sales: Sale[],
+  period: StatPeriod = 'all',
+  now: Date = new Date()
+): SaleTotals {
+  const inWindow =
+    period === 'all' ? sales : sales.filter((s) => isInPeriod(s.soldAt, period, now, instantDay));
+  return totalsFor(inWindow);
 }

@@ -1,18 +1,33 @@
-import { AlertTriangle, ArrowRight, DollarSign, Factory, Flag, Layers, MapPin, Package, Wrench } from 'lucide-react';
+import {
+  AlertTriangle,
+  ArrowRight,
+  DollarSign,
+  Factory,
+  Flag,
+  Layers,
+  MapPin,
+  Package,
+  ShoppingCart,
+  Wrench,
+} from 'lucide-react';
 import {
   formatVariance,
   getGroupDiscrepancy,
   isHighPriority,
   isPositiveMargin,
+  salesForGroup,
+  soldPosition,
   type PartGroup,
+  type SalesIndex,
 } from '@warehouse/shared';
 import { cn } from '../lib/cn';
 import { useUIStore } from '../state/useUIStore';
 import { Pill } from './ui/Pill';
 import { ProcessingStatusChips } from './ProcessingStatusChips';
 
-export function PartCard({ part }: { part: PartGroup }) {
+export function PartCard({ part, salesIndex }: { part: PartGroup; salesIndex: SalesIndex }) {
   const set = useUIStore((s) => s.set);
+  const sold = soldPosition(part, salesForGroup(part, salesIndex));
   const discrepancy = getGroupDiscrepancy(part);
   // A SKU stocked in more than one bin collapses to a single card, so the card has to say
   // so — otherwise the quantity looks wrong against any one shelf.
@@ -32,6 +47,15 @@ export function PartCard({ part }: { part: PartGroup }) {
             className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-700"
           >
             <AlertTriangle size={12} />
+          </span>
+        )}
+        {sold.soldOut && (
+          <span
+            title={`All ${sold.soldQty} sold`}
+            aria-label={`Sold out — all ${sold.soldQty} sold`}
+            className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-700"
+          >
+            <ShoppingCart size={12} />
           </span>
         )}
         {part.needsReview && (
@@ -101,6 +125,26 @@ export function PartCard({ part }: { part: PartGroup }) {
             <ArrowRight size={12} className="shrink-0" />
             <span className="truncate" title={`Moved to recovery bin ${part.newBinLocation}`}>
               {part.newBinLocation}
+            </span>
+          </Pill>
+        )}
+        {/* Sold progress rather than a plain "sold" flag: most listings carry several
+            units, so what matters on the card is how many are still on the shelf. */}
+        {sold.soldQty > 0 && (
+          <Pill
+            className={cn(
+              'w-full font-semibold',
+              sold.soldOut
+                ? 'border-emerald-200 bg-emerald-100 text-emerald-700'
+                : 'border-emerald-200 bg-emerald-50 text-emerald-700'
+            )}
+          >
+            <ShoppingCart size={12} className="shrink-0" />
+            <span
+              className="truncate"
+              title={`${sold.soldQty} sold, ${sold.remainingQty} remaining`}
+            >
+              {sold.soldOut ? `Sold out (${sold.soldQty})` : `${sold.soldQty} sold · ${sold.remainingQty} left`}
             </span>
           </Pill>
         )}

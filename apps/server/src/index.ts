@@ -8,6 +8,7 @@ import { exportRouter } from './routes/export.js';
 import { healthRouter } from './routes/health.js';
 import { importRouter } from './routes/import.js';
 import { partsRouter } from './routes/parts.js';
+import { salesRouter } from './routes/sales.js';
 import { photosRouter } from './routes/photos.js';
 import { discrepanciesRouter } from './routes/discrepancies.js';
 import { submissionsRouter } from './routes/submissions.js';
@@ -27,6 +28,7 @@ app.use('/api', submissionsRouter);
 app.use('/api', discrepanciesRouter);
 app.use('/api', usersRouter);
 app.use('/api', exportRouter);
+app.use('/api', salesRouter);
 
 if (process.env.NODE_ENV === 'production') {
   const webDist = path.resolve(__dirname, '../../web/dist');
