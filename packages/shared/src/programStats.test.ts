@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { groupPartsBySku } from './grouping.js';
-import { catalogueValue, computeDiscrepancyTotals, computeProgramTotals, percentOf } from './programStats.js';
+import {
+  catalogueValue,
+  computeDiscrepancyTotals,
+  computeProgramTotals,
+  extendedValue,
+  percentOf,
+} from './programStats.js';
 import type { DiscrepancyLogEntry } from './discrepancy.js';
 import type { InventoryPart } from './types.js';
 
@@ -142,21 +148,30 @@ describe('computeProgramTotals over a period', () => {
 });
 
 describe('recovery value', () => {
-  it('totals the price basis of listed parts only', () => {
+  it('totals the value of listed parts only', () => {
     const groups = groupPartsBySku([
-      part({ id: 'a', sku: 'X1', itemListed: true, activeRecoveryPriceBasis: 100 }),
-      part({ id: 'b', sku: 'X2', activeRecoveryPriceBasis: 250 }),
+      part({ id: 'a', sku: 'X1', itemListed: true, activeRecoveryPriceBasis: 100, qoh: 1 }),
+      part({ id: 'b', sku: 'X2', activeRecoveryPriceBasis: 250, qoh: 1 }),
     ]);
     expect(computeProgramTotals(groups, 'all').recoveryValue).toBe(100);
     expect(catalogueValue(groups)).toBe(350);
   });
 
-  it('counts a multi-row SKU basis once, not once per row', () => {
-    const groups = groupPartsBySku([
-      part({ id: 'a', sku: 'X1', itemListed: true, activeRecoveryPriceBasis: 100 }),
-      part({ id: 'b', sku: 'X1', activeRecoveryPriceBasis: 100 }),
+  it('multiplies the unit price by the quantity on hand', () => {
+    // The basis is per unit: eleven in the bin at $44.99 is worth $494.89, not $44.99.
+    const [g] = groupPartsBySku([
+      part({ id: 'a', sku: 'X1', itemListed: true, activeRecoveryPriceBasis: 44.99, qoh: 11 }),
     ]);
-    expect(computeProgramTotals(groups, 'all').recoveryValue).toBe(100);
+    expect(extendedValue(g)).toBeCloseTo(494.89, 2);
+    expect(computeProgramTotals([g], 'all').recoveryValue).toBeCloseTo(494.89, 2);
+  });
+
+  it('applies one SKU basis across its combined quantity, not once per row', () => {
+    const groups = groupPartsBySku([
+      part({ id: 'a', sku: 'X1', itemListed: true, activeRecoveryPriceBasis: 100, qoh: 2 }),
+      part({ id: 'b', sku: 'X1', activeRecoveryPriceBasis: 100, qoh: 3 }),
+    ]);
+    expect(computeProgramTotals(groups, 'all').recoveryValue).toBe(500);
   });
 });
 

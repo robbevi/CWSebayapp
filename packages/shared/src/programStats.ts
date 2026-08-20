@@ -10,7 +10,7 @@ export interface ProgramTotals {
   photographed: number;
   listed: number;
   completed: number;
-  /** Recovery price basis of the parts listed, in dollars. */
+  /** Expected value of the parts listed — unit price times quantity, in dollars. */
   recoveryValue: number;
 }
 
@@ -55,16 +55,21 @@ function isInPeriod(
 }
 
 /**
- * A SKU's recovery price basis. Rows of the same SKU carry the same figure, so the maximum
- * simply picks the populated one when some rows predate the column.
+ * What a SKU's stock is expected to fetch.
+ *
+ * `activeRecoveryPriceBasis` is a price *per unit*, so it has to be multiplied by the
+ * quantity on hand — summing the bare basis values counts a bin of twenty the same as a
+ * bin of one. Rows of a SKU repeat the same basis, so the maximum picks the populated one
+ * where some rows predate the column.
  */
-function priceBasis(group: PartGroup): number {
-  return Math.max(0, ...group.records.map((r) => r.activeRecoveryPriceBasis ?? 0));
+export function extendedValue(group: PartGroup): number {
+  const basis = Math.max(0, ...group.records.map((r) => r.activeRecoveryPriceBasis ?? 0));
+  return basis * group.qoh;
 }
 
-/** Recovery price basis across every part, listed or not — the denominator for value. */
+/** Expected value of every part, listed or not — the denominator for recovery value. */
 export function catalogueValue(groups: PartGroup[]): number {
-  return groups.reduce((sum, g) => sum + priceBasis(g), 0);
+  return groups.reduce((sum, g) => sum + extendedValue(g), 0);
 }
 
 /** When this SKU was first photographed — a later top-up photo isn't a new part done. */
@@ -104,7 +109,7 @@ export function computeProgramTotals(
       if (checkpoints.photographed) photographed++;
       if (checkpoints.listed) {
         listed++;
-        recoveryValue += priceBasis(g);
+        recoveryValue += extendedValue(g);
       }
       if (g.workflowStatus === 'Completed') completed++;
     }
@@ -122,7 +127,7 @@ export function computeProgramTotals(
     if (isInPeriod(firstPhotographedAt(g), period, now, instantDay)) photographed++;
     if (isInPeriod(listedAt(g), period, now, calendarDay)) {
       listed++;
-      recoveryValue += priceBasis(g);
+      recoveryValue += extendedValue(g);
       if (g.workflowStatus === 'Completed') completed++;
     }
   }
