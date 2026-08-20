@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type RefObject } from 'react';
+import { ChevronDown } from 'lucide-react';
 import { useDropdownPosition } from '../../hooks/useDropdownPosition';
 import { cn } from '../../lib/cn';
 
@@ -39,16 +40,32 @@ export function ComboBox({ options, value, placeholder, label, onChange }: Combo
 
   return (
     <div ref={containerRef} className="relative">
+      {/* Free-text field that also suggests — the chevron says the suggestions exist,
+          since an unadorned text box gives no hint that anything drops down. */}
       <input
         ref={triggerRef}
         type="text"
         value={value}
         placeholder={placeholder}
         aria-label={label}
+        role="combobox"
+        aria-expanded={open}
         onFocus={() => setOpen(true)}
         onChange={(e) => onChange(e.target.value)}
-        className="min-h-[44px] w-full rounded-btn border border-border bg-surface px-3 py-2 text-xs text-textPri placeholder:text-textMuted focus:outline-none focus:ring-2 focus:ring-primary/40"
+        className="min-h-[44px] w-full rounded-btn border border-border bg-surface py-2 pl-3 pr-9 text-xs text-textPri placeholder:text-textMuted hover:border-primary/50 focus:outline-none focus:ring-2 focus:ring-primary/40"
       />
+      <button
+        type="button"
+        tabIndex={-1}
+        aria-hidden="true"
+        onClick={() => {
+          triggerRef.current?.focus();
+          setOpen((o) => !o);
+        }}
+        className="absolute right-0 top-0 flex h-[44px] w-9 min-h-0 items-center justify-center text-textMuted"
+      >
+        <ChevronDown size={14} className={open ? 'rotate-180 transition-transform' : 'transition-transform'} />
+      </button>
 
       {open && filtered.length > 0 && (
         <div

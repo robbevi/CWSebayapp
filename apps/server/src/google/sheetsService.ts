@@ -54,6 +54,7 @@ const KNOWN_FIELDS = [
   'catalogingStartDate',
   'legacyPartId',
   'importSequenceNumber',
+  'createdAt',
   'revenuePriorityRank',
   'fieldReviewPriority',
   'activeRecoveryPriceBasis',
@@ -88,6 +89,7 @@ export interface CreatePartFields {
   catalogingStartDate?: string | null;
   legacyPartId?: string;
   importSequenceNumber?: number | null;
+  createdAt?: string;
   revenuePriorityRank?: number | null;
   fieldReviewPriority?: string;
   activeRecoveryPriceBasis?: number | null;
@@ -147,6 +149,7 @@ export function mapRowToPart(headers: string[], row: unknown[], photos: Photo[])
     catalogingStartDate: parseDateOrNull(get('catalogingStartDate')),
     legacyPartId: get('legacyPartId'),
     importSequenceNumber: parseNumberOrNull(get('importSequenceNumber')),
+    createdAt: get('createdAt'),
     revenuePriorityRank: parseNumberOrNull(get('revenuePriorityRank')),
     fieldReviewPriority: get('fieldReviewPriority'),
     activeRecoveryPriceBasis: parseNumberOrNull(get('activeRecoveryPriceBasis')),
@@ -228,6 +231,9 @@ function buildCreateRecord(data: CreatePartFields, updatedAt: string): Partial<R
     catalogingStartDate: data.catalogingStartDate,
     legacyPartId: data.legacyPartId,
     importSequenceNumber: data.importSequenceNumber,
+    // Stamped here rather than passed in, so every row created through the app is dated
+    // even when the caller doesn't think to supply one.
+    createdAt: data.createdAt ?? updatedAt,
     revenuePriorityRank: data.revenuePriorityRank,
     fieldReviewPriority: data.fieldReviewPriority,
     activeRecoveryPriceBasis: data.activeRecoveryPriceBasis,

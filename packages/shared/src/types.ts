@@ -68,6 +68,8 @@ export interface InventoryPart {
   catalogingStartDate?: string | null;
   legacyPartId?: string;
   importSequenceNumber?: number | null;
+  /** Set when the row is created in the app. Absent on everything imported before it. */
+  createdAt?: string;
   // Recovery/revenue analytics, supplied by the source spreadsheet rather than entered in
   // the app. Optional throughout: parts loaded before these columns existed have none.
   revenuePriorityRank?: number | null;

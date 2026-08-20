@@ -624,38 +624,50 @@ export function PartDetailModal() {
           </div>
         </form>
 
-        <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-t border-border p-4">
-          <div className="flex items-center gap-2">
-            <Button variant="danger" onClick={handleDelete} disabled={deletePart.isPending} type="button">
-              <Trash2 size={14} />
-              Delete Record
-            </Button>
-            {/* Sits with Delete because both are decisions about the record rather than
-                edits to it — but this one is reversible, so it toggles instead of asking. */}
-            <Controller
-              control={control}
-              name="needsReview"
-              render={({ field }) => (
-                <Button
-                  variant={field.value ? undefined : 'outline'}
-                  onClick={() => field.onChange(!field.value)}
-                  type="button"
-                  aria-pressed={field.value}
-                  className={cn(field.value && 'bg-purple-600 hover:bg-purple-700')}
-                >
-                  <Flag size={14} />
-                  {field.value ? 'Needs Review' : 'Flag for Review'}
-                </Button>
-              )}
-            />
-          </div>
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={close} type="button">
-              Cancel
-            </Button>
-            <Button onClick={onSubmit} disabled={savePart.isPending} type="button">
-              Save
-            </Button>
+        {/* Four buttons don't fit one phone-width row, and letting them wrap left them
+            ragged and unevenly sized. On mobile they become two even pairs stacked with
+            Cancel/Save on top, so the actions you reach for most are nearest the thumb and
+            Delete is furthest from it. Desktop keeps the original single row. */}
+        <div className="shrink-0 border-t border-border p-4">
+          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div className="grid grid-cols-2 gap-2 sm:flex sm:items-center">
+              <Button
+                variant="danger"
+                onClick={handleDelete}
+                disabled={deletePart.isPending}
+                type="button"
+                className="w-full sm:w-auto"
+              >
+                <Trash2 size={14} />
+                Delete Record
+              </Button>
+              {/* Sits with Delete because both are decisions about the record rather than
+                  edits to it — but this one is reversible, so it toggles instead of asking. */}
+              <Controller
+                control={control}
+                name="needsReview"
+                render={({ field }) => (
+                  <Button
+                    variant={field.value ? undefined : 'outline'}
+                    onClick={() => field.onChange(!field.value)}
+                    type="button"
+                    aria-pressed={field.value}
+                    className={cn('w-full sm:w-auto', field.value && 'bg-purple-600 hover:bg-purple-700')}
+                  >
+                    <Flag size={14} />
+                    {field.value ? 'Needs Review' : 'Flag for Review'}
+                  </Button>
+                )}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-2 sm:flex sm:items-center">
+              <Button variant="outline" onClick={close} type="button" className="w-full sm:w-auto">
+                Cancel
+              </Button>
+              <Button onClick={onSubmit} disabled={savePart.isPending} type="button" className="w-full sm:w-auto">
+                Save
+              </Button>
+            </div>
           </div>
         </div>
       </div>

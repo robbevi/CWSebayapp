@@ -11,7 +11,14 @@ const PERIOD_OPTIONS: { key: Period; label: string }[] = [
   { key: 'day', label: 'Today' },
   { key: 'week', label: 'This Week' },
   { key: 'month', label: 'This Month' },
+  { key: 'all', label: 'All Time' },
 ];
+
+const PERIOD_LABEL: Record<Exclude<Period, 'all'>, string> = {
+  day: 'Today',
+  week: 'This Week',
+  month: 'This Month',
+};
 
 function HeadlineStat({
   label,
@@ -72,14 +79,20 @@ export function Scoreboard({ onClose }: { onClose: () => void }) {
   const [selectedUser, setSelectedUser] = useState<string | null>(null);
   useBodyScrollLock();
 
-  const totals = useMemo(() => computeProgramTotals(groupPartsBySku(parts ?? [])), [parts]);
+  const groups = useMemo(() => groupPartsBySku(parts ?? []), [parts]);
+  const totals = useMemo(() => computeProgramTotals(groups, period), [groups, period]);
+  // Percentages only mean something against the whole catalogue; within a single day or
+  // week the denominator would be the same total and the figures would read as noise.
+  const catalogueSize = groups.length;
   const counts = useMemo(() => countsForPeriod(submissions ?? [], period), [submissions, period]);
-  const goal = GOALS[period];
+  // All Time has no target to hit, so the bars there are scaled against the best performer
+  // rather than against a goal.
+  const goal = period === 'all' ? null : GOALS[period];
 
   const rows = (users ?? [])
     .map((u) => ({ user: u.name, count: counts.get(u.name) ?? 0 }))
     .sort((a, b) => b.count - a.count);
-  const maxBar = Math.max(goal, ...rows.map((r) => r.count), 1);
+  const maxBar = Math.max(goal ?? 0, ...rows.map((r) => r.count), 1);
 
   const activeUser = selectedUser ?? rows[0]?.user ?? null;
   const metrics = useMemo(
@@ -97,37 +110,9 @@ export function Scoreboard({ onClose }: { onClose: () => void }) {
           </button>
         </div>
 
-        {/* Programme-wide progress first — this is the view management asked for. The
-            per-user breakdown below keeps its own Day/Week/Month toggle; these headline
-            figures are current totals across the whole catalogue, not period counts. */}
-        <div className="mb-5">
-          <div className="mb-2 text-xs font-semibold text-textMuted">Overall Progress</div>
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-            <HeadlineStat label="Parts Added" value={totals.added} sub="in the system" icon={<PackagePlus size={13} />} />
-            <HeadlineStat
-              label="Photographed"
-              value={totals.photographed}
-              sub={`${percentOf(totals.photographed, totals.added)} of parts`}
-              icon={<Camera size={13} />}
-            />
-            <HeadlineStat
-              label="Listed"
-              value={totals.listed}
-              sub={`${percentOf(totals.listed, totals.added)} of parts`}
-              icon={<Tag size={13} />}
-            />
-            <HeadlineStat
-              label="Completed"
-              value={totals.completed}
-              sub={`${percentOf(totals.completed, totals.added)} of parts`}
-              icon={<CheckCircle2 size={13} />}
-            />
-          </div>
-        </div>
-
-        <div className="mb-2 border-t border-border pt-4 text-xs font-semibold text-textMuted">By Person</div>
-
-        <div className="mb-4 flex gap-2">
+        {/* One toggle for the whole dialog, so the headline figures and the per-person
+            bars below always describe the same window. */}
+        <div className="mb-4 flex flex-wrap gap-2">
           {PERIOD_OPTIONS.map((opt) => (
             <button
               key={opt.key}
@@ -142,9 +127,44 @@ export function Scoreboard({ onClose }: { onClose: () => void }) {
           ))}
         </div>
 
+        <div className="mb-5">
+          <div className="mb-2 text-xs font-semibold text-textMuted">
+            Overall Progress
+            {period !== 'all' && <span className="ml-1 font-normal">· {PERIOD_LABEL[period]}</span>}
+          </div>
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+            <HeadlineStat
+              label="Parts Added"
+              value={totals.added}
+              sub={period === 'all' ? 'in the system' : undefined}
+              icon={<PackagePlus size={13} />}
+            />
+            <HeadlineStat
+              label="Photographed"
+              value={totals.photographed}
+              sub={period === 'all' ? `${percentOf(totals.photographed, catalogueSize)} of parts` : undefined}
+              icon={<Camera size={13} />}
+            />
+            <HeadlineStat
+              label="Listed"
+              value={totals.listed}
+              sub={period === 'all' ? `${percentOf(totals.listed, catalogueSize)} of parts` : undefined}
+              icon={<Tag size={13} />}
+            />
+            <HeadlineStat
+              label="Completed"
+              value={totals.completed}
+              sub={period === 'all' ? `${percentOf(totals.completed, catalogueSize)} of parts` : undefined}
+              icon={<CheckCircle2 size={13} />}
+            />
+          </div>
+        </div>
+
+        <div className="mb-3 border-t border-border pt-4 text-xs font-semibold text-textMuted">By Person</div>
+
         <div className="mb-6 space-y-2.5">
           {rows.map((r) => {
-            const met = r.count >= goal;
+            const met = goal !== null && r.count >= goal;
             return (
               <button
                 key={r.user}
@@ -155,7 +175,7 @@ export function Scoreboard({ onClose }: { onClose: () => void }) {
                 <div className="mb-1 flex items-center justify-between text-xs">
                   <span className="font-medium text-textPri">{r.user}</span>
                   <span className={met ? 'font-semibold text-primary' : 'text-textMuted'}>
-                    {r.count} / {goal}
+                    {goal === null ? r.count : `${r.count} / ${goal}`}
                   </span>
                 </div>
                 <div className="h-2 w-full overflow-hidden rounded-pill bg-surfaceMuted">

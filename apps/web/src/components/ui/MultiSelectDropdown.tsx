@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react';
-import { Search } from 'lucide-react';
+import { ChevronDown, Search } from 'lucide-react';
 import { useDropdownPosition } from '../../hooks/useDropdownPosition';
 import { cn } from '../../lib/cn';
 
@@ -69,14 +69,28 @@ export function MultiSelectDropdown({
           openedAt.current = Date.now();
           setOpen((o) => !o);
         }}
+        aria-haspopup="listbox"
+        aria-expanded={open}
         className={cn(
           'flex w-full items-center gap-2 rounded-btn border border-border bg-surface px-3 py-2 text-left text-xs text-textPri',
-          open && 'ring-2 ring-primary/40'
+          'hover:border-primary/50 hover:bg-surfaceMuted',
+          open && 'border-primary/50 ring-2 ring-primary/40'
         )}
       >
         <span className="text-textMuted">{icon}</span>
         <span className="flex-1 truncate sm:hidden">{mobileTriggerText}</span>
         <span className="hidden flex-1 truncate sm:inline">{desktopTriggerText}</span>
+        {/* Without this the control read as a static label — people weren't discovering
+            that these filters open at all. */}
+        {selected.length > 0 && (
+          <span className="flex h-4 min-w-[1rem] shrink-0 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-bold text-white">
+            {selected.length}
+          </span>
+        )}
+        <ChevronDown
+          size={14}
+          className={cn('shrink-0 text-textMuted transition-transform', open && 'rotate-180')}
+        />
       </button>
 
       {open && (

@@ -68,6 +68,72 @@ describe('computeProgramTotals', () => {
   });
 });
 
+describe('computeProgramTotals over a period', () => {
+  const NOW = new Date('2026-08-20T18:00:00Z');
+  const photo = (uploadedAt: string) => ({ fileId: 'f', fileName: 'n', url: 'u', uploadedAt });
+
+  it('counts a part as added in the period its row was created', () => {
+    const groups = groupPartsBySku([
+      part({ id: 'a', sku: 'X1', createdAt: '2026-08-20T14:00:00Z' }),
+      part({ id: 'b', sku: 'X2', createdAt: '2026-07-02T14:00:00Z' }),
+    ]);
+    expect(computeProgramTotals(groups, 'day', NOW).added).toBe(1);
+    expect(computeProgramTotals(groups, 'month', NOW).added).toBe(1);
+    expect(computeProgramTotals(groups, 'all', NOW).added).toBe(2);
+  });
+
+  it('dates a photographed part by its first photo, not its latest', () => {
+    // First shot last month, a top-up today: the part was not photographed today.
+    const groups = groupPartsBySku([
+      part({
+        id: 'a',
+        sku: 'X1',
+        photographed: true,
+        photos: [photo('2026-08-20T15:00:00Z'), photo('2026-07-10T15:00:00Z')],
+      }),
+    ]);
+    expect(computeProgramTotals(groups, 'day', NOW).photographed).toBe(0);
+    expect(computeProgramTotals(groups, 'all', NOW).photographed).toBe(1);
+  });
+
+  it('counts listings by their listing date', () => {
+    const groups = groupPartsBySku([
+      part({ id: 'a', sku: 'X1', itemListed: true, itemListedDate: '2026-08-20T00:00:00Z' }),
+      part({ id: 'b', sku: 'X2', itemListed: true, itemListedDate: '2026-01-05T00:00:00Z' }),
+    ]);
+    expect(computeProgramTotals(groups, 'day', NOW).listed).toBe(1);
+    expect(computeProgramTotals(groups, 'all', NOW).listed).toBe(2);
+  });
+
+  it('only counts a period completion when the part is actually finished', () => {
+    const listedToday = { itemListed: true, itemListedDate: '2026-08-20T00:00:00Z' };
+    const groups = groupPartsBySku([
+      // Listed today and finished.
+      part({
+        id: 'a',
+        sku: 'X1',
+        ...listedToday,
+        photographed: true,
+        confirmedQoh: 1,
+        boxCondition: 'Good',
+        transferredToMarketRecovery: true,
+      }),
+      // Listed today but nothing else done.
+      part({ id: 'b', sku: 'X2', ...listedToday }),
+    ]);
+    const today = computeProgramTotals(groups, 'day', NOW);
+    expect(today.listed).toBe(2);
+    expect(today.completed).toBe(1);
+  });
+
+  it('leaves undated legacy rows out of period counts but keeps them in the total', () => {
+    // Nothing imported before createdAt existed carries a creation date.
+    const groups = groupPartsBySku([part({ id: 'a', sku: 'X1' }), part({ id: 'b', sku: 'X2' })]);
+    expect(computeProgramTotals(groups, 'month', NOW).added).toBe(0);
+    expect(computeProgramTotals(groups, 'all', NOW).added).toBe(2);
+  });
+});
+
 describe('percentOf', () => {
   it('rounds to whole percents', () => {
     expect(percentOf(228, 2049)).toBe('11%');

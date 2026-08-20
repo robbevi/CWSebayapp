@@ -83,6 +83,8 @@ export function SelectDropdown({
       <button
         ref={triggerRef}
         type="button"
+        aria-haspopup="listbox"
+        aria-expanded={open}
         onClick={() => {
           openedAt.current = Date.now();
           setOpen((o) => !o);
@@ -90,7 +92,8 @@ export function SelectDropdown({
         className={cn(
           'flex w-full items-center gap-2 rounded-btn border border-border bg-surface px-3 py-2 text-left text-xs',
           isMuted ? 'text-textMuted' : 'text-textPri',
-          open && 'ring-2 ring-primary/40',
+          'hover:border-primary/50',
+          open && 'border-primary/50 ring-2 ring-primary/40',
           triggerClassName
         )}
       >
@@ -98,7 +101,10 @@ export function SelectDropdown({
         <span className={cn('flex-1 truncate', valueClassName)}>
           {value ? `${valuePrefix ?? ''}${value}` : placeholder}
         </span>
-        <ChevronDown size={14} className="hidden shrink-0 text-textMuted sm:block" />
+        <ChevronDown
+          size={14}
+          className={cn('shrink-0 text-textMuted transition-transform', open && 'rotate-180')}
+        />
       </button>
 
       {open && (

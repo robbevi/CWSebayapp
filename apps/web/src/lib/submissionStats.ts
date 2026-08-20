@@ -1,25 +1,26 @@
 import { chicagoDateString, mondayOf, type Submission } from '@warehouse/shared';
 
-export type Period = 'day' | 'week' | 'month';
+export type { StatPeriod as Period } from '@warehouse/shared';
+import type { StatPeriod as Period } from '@warehouse/shared';
 
-function bucketKey(iso: string, period: Period): string {
+function bucketKey(iso: string, period: Exclude<Period, 'all'>): string {
   const day = chicagoDateString(iso);
   if (period === 'day') return day;
   if (period === 'week') return mondayOf(day);
   return day.slice(0, 7);
 }
 
-function todayKey(period: Period): string {
+function todayKey(period: Exclude<Period, 'all'>): string {
   return bucketKey(new Date().toISOString(), period);
 }
 
 // Counts per user for whichever bucket "now" falls into — the data behind the
-// rotating Day/Week/Month chart.
+// rotating Day/Week/Month chart. 'all' ignores bucketing and counts every submission.
 export function countsForPeriod(submissions: Submission[], period: Period): Map<string, number> {
-  const key = todayKey(period);
+  const key = period === 'all' ? null : todayKey(period);
   const counts = new Map<string, number>();
   for (const s of submissions) {
-    if (bucketKey(s.completedAt, period) !== key) continue;
+    if (key !== null && bucketKey(s.completedAt, period as Exclude<Period, 'all'>) !== key) continue;
     counts.set(s.user, (counts.get(s.user) ?? 0) + 1);
   }
   return counts;
