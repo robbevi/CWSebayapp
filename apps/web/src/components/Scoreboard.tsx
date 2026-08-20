@@ -66,13 +66,19 @@ function HeadlineStat({
       ? value.toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 })
       : value.toLocaleString();
   return (
-    <div className="rounded-btn border border-border bg-surface p-3">
-      <div className="mb-1 flex items-center gap-1.5 text-textMuted">
-        {icon}
+    // A two-word label like "Revenue Recovered" wraps where "Listed" doesn't, which pushed
+    // its number 14px below its neighbours'. The tile is a column with the figure pushed to
+    // the bottom, so every value in a row shares a baseline however the labels wrap.
+    <div className="flex h-full flex-col rounded-btn border border-border bg-surface p-3">
+      <div className="mb-1 flex items-start gap-1.5 text-textMuted">
+        <span className="mt-[1px] shrink-0">{icon}</span>
         <span className="text-[11px] font-semibold leading-tight">{label}</span>
       </div>
-      <div className={cn('text-xl font-bold', tone === 'warn' ? 'text-red-600' : 'text-textPri')}>{display}</div>
-      {sub && <div className="text-[11px] text-textMuted">{sub}</div>}
+      <div className={cn('mt-auto text-xl font-bold leading-tight', tone === 'warn' ? 'text-red-600' : 'text-textPri')}>
+        {display}
+      </div>
+      {/* Always rendered, so a tile without a caption still ends level with one that has. */}
+      <div className="min-h-[15px] text-[11px] text-textMuted">{sub ?? ' '}</div>
     </div>
   );
 }
@@ -146,7 +152,7 @@ export function Scoreboard({ onClose }: { onClose: () => void }) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="max-h-[85vh] w-full max-w-xl overflow-y-auto overscroll-contain rounded-card bg-surface p-6">
+      <div className="max-h-[85vh] w-full max-w-2xl overflow-y-auto overscroll-contain rounded-card bg-surface p-6">
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-base font-semibold text-textPri">Scoreboard</h2>
           <button onClick={onClose} className="rounded-btn p-1 hover:bg-surfaceMuted" aria-label="Close" type="button">
