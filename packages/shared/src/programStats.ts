@@ -1,5 +1,5 @@
 import { type DiscrepancyLogEntry } from './discrepancy.js';
-import { totalsFor, type Sale, type SaleTotals } from './sales.js';
+import { indexSales, salesForGroup, soldPosition, totalsFor, type Sale, type SaleTotals } from './sales.js';
 import { type PartGroup } from './grouping.js';
 import { getCheckpoints } from './status.js';
 import { chicagoDateString, mondayOf } from './submissions.js';
@@ -178,4 +178,45 @@ export function computeSalesTotals(
   const inWindow =
     period === 'all' ? sales : sales.filter((s) => isInPeriod(s.soldAt, period, now, instantDay));
   return totalsFor(inWindow);
+}
+
+
+export interface StandingValue {
+  /** Expected value of stock still on the shelf. Falls as things sell. */
+  potential: number;
+  /** Expected profit if the whole catalogue sold at its basis. */
+  expectedMargin: number;
+  /** SKUs whose expected margin is negative — they cost more than they will fetch. */
+  underwaterSkus: number;
+}
+
+/**
+ * Standing value of the pile as it is right now, as opposed to the dated activity measures
+ * above. Potential value is priced per remaining unit, so it draws down as stock sells
+ * rather than staying flat at the catalogue total.
+ */
+export function computeStandingValue(groups: PartGroup[], sales: Sale[]): StandingValue {
+  const index = indexSales(sales);
+  let potential = 0;
+  let expectedMargin = 0;
+  let underwaterSkus = 0;
+
+  for (const g of groups) {
+    const stock = g.confirmedQoh ?? g.qoh;
+    const unitPrice = stock > 0 ? extendedValue(g) / stock : 0;
+    const { remainingQty } = soldPosition(g, salesForGroup(g, index));
+    potential += unitPrice * remainingQty;
+
+    const margins = g.records
+      .map((r) => r.expectedGrossRecoveryMargin)
+      .filter((v): v is number => v != null);
+    if (margins.length > 0) {
+      // Rows of a SKU repeat the same figure, so take it once rather than summing rows.
+      const margin = Math.max(...margins);
+      expectedMargin += margin;
+      if (margin < 0) underwaterSkus++;
+    }
+  }
+
+  return { potential, expectedMargin, underwaterSkus };
 }

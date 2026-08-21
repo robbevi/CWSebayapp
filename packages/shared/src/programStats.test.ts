@@ -4,10 +4,12 @@ import {
   catalogueValue,
   computeDiscrepancyTotals,
   computeProgramTotals,
+  computeStandingValue,
   extendedValue,
   percentOf,
 } from './programStats.js';
 import type { DiscrepancyLogEntry } from './discrepancy.js';
+import type { Sale } from './sales.js';
 import type { InventoryPart } from './types.js';
 
 function part(over: Partial<InventoryPart> & { sku: string; id: string }): InventoryPart {
@@ -172,6 +174,66 @@ describe('recovery value', () => {
       part({ id: 'b', sku: 'X1', activeRecoveryPriceBasis: 100, qoh: 3 }),
     ]);
     expect(computeProgramTotals(groups, 'all').recoveryValue).toBe(500);
+  });
+});
+
+describe('computeStandingValue', () => {
+  const sale = (over: Partial<Sale> & { lineItemId: string }): Sale => ({
+    orderId: 'o1',
+    soldAt: '2026-08-20T12:00:00Z',
+    ebayListingId: '111',
+    sku: 'X1',
+    qtySold: 1,
+    grossSale: 100,
+    shipping: 0,
+    tax: 0,
+    fees: 10,
+    netProceeds: 90,
+    currency: 'USD',
+    feesEstimated: false,
+    syncedAt: '2026-08-20T13:00:00Z',
+    ...over,
+  });
+
+  it('values all stock when nothing has sold', () => {
+    const groups = groupPartsBySku([
+      part({ id: 'a', sku: 'X1', activeRecoveryPriceBasis: 50, qoh: 4 }),
+    ]);
+    expect(computeStandingValue(groups, []).potential).toBeCloseTo(200, 2);
+  });
+
+  it('draws down as units sell rather than staying at the catalogue total', () => {
+    const groups = groupPartsBySku([
+      part({ id: 'a', sku: 'X1', activeRecoveryPriceBasis: 50, qoh: 4, ebayListingId: '111' }),
+    ]);
+    // One of four gone leaves three on the shelf.
+    const value = computeStandingValue(groups, [sale({ lineItemId: 's1', qtySold: 1 })]);
+    expect(value.potential).toBeCloseTo(150, 2);
+  });
+
+  it('reaches zero once a listing is exhausted', () => {
+    const groups = groupPartsBySku([
+      part({ id: 'a', sku: 'X1', activeRecoveryPriceBasis: 50, qoh: 2, ebayListingId: '111' }),
+    ]);
+    expect(computeStandingValue(groups, [sale({ lineItemId: 's1', qtySold: 2 })]).potential).toBe(0);
+  });
+
+  it('takes a SKU expected margin once, not once per row', () => {
+    const groups = groupPartsBySku([
+      part({ id: 'a', sku: 'X1', expectedGrossRecoveryMargin: 429.89 }),
+      part({ id: 'b', sku: 'X1', expectedGrossRecoveryMargin: 429.89 }),
+    ]);
+    expect(computeStandingValue(groups, []).expectedMargin).toBeCloseTo(429.89, 2);
+  });
+
+  it('counts the parts that cost more than they will fetch', () => {
+    const groups = groupPartsBySku([
+      part({ id: 'a', sku: 'X1', expectedGrossRecoveryMargin: -21.02 }),
+      part({ id: 'b', sku: 'X2', expectedGrossRecoveryMargin: 130.65 }),
+    ]);
+    const value = computeStandingValue(groups, []);
+    expect(value.underwaterSkus).toBe(1);
+    expect(value.expectedMargin).toBeCloseTo(109.63, 2);
   });
 });
 

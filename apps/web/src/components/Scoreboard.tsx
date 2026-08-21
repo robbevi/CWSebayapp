@@ -3,11 +3,13 @@ import {
   AlertTriangle,
   Camera,
   CheckCircle2,
+  Coins,
   DollarSign,
   PackagePlus,
   RefreshCw,
   ShoppingCart,
   Tag,
+  TrendingUp,
   Wallet,
   X,
 } from 'lucide-react';
@@ -16,6 +18,7 @@ import {
   computeDiscrepancyTotals,
   computeProgramTotals,
   computeSalesTotals,
+  computeStandingValue,
   GOALS,
   groupPartsBySku,
   percentOf,
@@ -35,6 +38,20 @@ const PERIOD_OPTIONS: { key: Period; label: string }[] = [
   { key: 'month', label: 'This Month' },
   { key: 'all', label: 'All Time' },
 ];
+
+/**
+ * Groups the tiles by what kind of measure they are. Ten undifferentiated tiles read as
+ * soup, and dollars sitting beside counts with nothing between them invites misreading one
+ * for the other. The band keeps its columns aligned with the bands above it.
+ */
+function StatBand({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="mt-3 first:mt-0">
+      <div className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-textMuted">{label}</div>
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">{children}</div>
+    </div>
+  );
+}
 
 function formatMoneyShort(value: number): string {
   return value.toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
@@ -130,6 +147,8 @@ export function Scoreboard({ onClose }: { onClose: () => void }) {
   const catalogueSize = groups.length;
   const catalogueWorth = useMemo(() => catalogueValue(groups), [groups]);
   const revenue = useMemo(() => computeSalesTotals(sales ?? [], period), [sales, period]);
+  // Standing figures describe the pile as it is now, so they don't move with the period.
+  const standing = useMemo(() => computeStandingValue(groups, sales ?? []), [groups, sales]);
   const variances = useMemo(
     () => computeDiscrepancyTotals(discrepancyLog ?? [], period),
     [discrepancyLog, period]
@@ -196,7 +215,7 @@ export function Scoreboard({ onClose }: { onClose: () => void }) {
               </button>
             )}
           </div>
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <StatBand label="Pipeline">
             <HeadlineStat
               label="Parts Added"
               value={totals.added}
@@ -221,10 +240,20 @@ export function Scoreboard({ onClose }: { onClose: () => void }) {
               sub={`${percentOf(totals.completed, catalogueSize)} of parts`}
               icon={<CheckCircle2 size={13} />}
             />
-            {/* Dollars and shrinkage — the two figures that read as outcomes rather than
-                activity. Both are datable, so they follow the period toggle like the rest. */}
+          </StatBand>
+
+          <StatBand label="Value">
+            {/* Priced per remaining unit, so it draws down as stock sells rather than
+                sitting flat at the catalogue total. */}
             <HeadlineStat
-              label="Recovery Value"
+              label="Potential Value"
+              value={standing.potential}
+              format="money"
+              sub="unsold stock, at today's prices"
+              icon={<Coins size={13} />}
+            />
+            <HeadlineStat
+              label="Listed Value"
               value={totals.recoveryValue}
               format="money"
               sub={`${percentOf(totals.recoveryValue, catalogueWorth)} of catalogue`}
@@ -237,6 +266,20 @@ export function Scoreboard({ onClose }: { onClose: () => void }) {
               sub={revenue.gross > 0 ? `${formatMoneyShort(revenue.gross)} gross` : 'net of eBay fees'}
               icon={<Wallet size={13} />}
             />
+            <HeadlineStat
+              label="Expected Margin"
+              value={standing.expectedMargin}
+              format="money"
+              sub={
+                standing.underwaterSkus > 0
+                  ? `${standing.underwaterSkus.toLocaleString()} parts underwater`
+                  : 'if the catalogue sells'
+              }
+              icon={<TrendingUp size={13} />}
+            />
+          </StatBand>
+
+          <StatBand label="Counts">
             <HeadlineStat
               label="Units Sold"
               value={revenue.qty}
@@ -254,7 +297,7 @@ export function Scoreboard({ onClose }: { onClose: () => void }) {
               tone={variances.netUnits < 0 ? 'warn' : undefined}
               icon={<AlertTriangle size={13} />}
             />
-          </div>
+          </StatBand>
         </div>
 
         <div className="mb-3 border-t border-border pt-4 text-xs font-semibold text-textMuted">By Person</div>
