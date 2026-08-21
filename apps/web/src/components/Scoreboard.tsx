@@ -5,8 +5,10 @@ import {
   CheckCircle2,
   Coins,
   DollarSign,
+  MapPin,
   PackagePlus,
   RefreshCw,
+  ListChecks,
   ShoppingCart,
   Tag,
   TrendingUp,
@@ -18,6 +20,7 @@ import {
   computeDiscrepancyTotals,
   computeProgramTotals,
   computeSalesTotals,
+  computeStandingCounts,
   computeStandingValue,
   GOALS,
   groupPartsBySku,
@@ -149,6 +152,7 @@ export function Scoreboard({ onClose }: { onClose: () => void }) {
   const revenue = useMemo(() => computeSalesTotals(sales ?? [], period), [sales, period]);
   // Standing figures describe the pile as it is now, so they don't move with the period.
   const standing = useMemo(() => computeStandingValue(groups, sales ?? []), [groups, sales]);
+  const checkpoints = useMemo(() => computeStandingCounts(groups), [groups]);
   const variances = useMemo(
     () => computeDiscrepancyTotals(discrepancyLog ?? [], period),
     [discrepancyLog, period]
@@ -249,7 +253,7 @@ export function Scoreboard({ onClose }: { onClose: () => void }) {
               label="Potential Value"
               value={standing.potential}
               format="money"
-              sub="unsold stock, at today's prices"
+              sub="unsold stock"
               icon={<Coins size={13} />}
             />
             <HeadlineStat
@@ -280,6 +284,18 @@ export function Scoreboard({ onClose }: { onClose: () => void }) {
           </StatBand>
 
           <StatBand label="Counts">
+            <HeadlineStat
+              label="Qty Confirmed"
+              value={checkpoints.qtyConfirmed}
+              sub={`${percentOf(checkpoints.qtyConfirmed, catalogueSize)} of parts`}
+              icon={<ListChecks size={13} />}
+            />
+            <HeadlineStat
+              label="Shelved"
+              value={checkpoints.shelved}
+              sub="at the Iron Barn"
+              icon={<MapPin size={13} />}
+            />
             <HeadlineStat
               label="Units Sold"
               value={revenue.qty}

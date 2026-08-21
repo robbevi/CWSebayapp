@@ -220,3 +220,29 @@ export function computeStandingValue(groups: PartGroup[], sales: Sale[]): Standi
 
   return { potential, expectedMargin, underwaterSkus };
 }
+
+
+export interface StandingCounts {
+  qtyConfirmed: number;
+  /** Moved to a recovery shelf at the Iron Barn. */
+  shelved: number;
+  needsReview: number;
+}
+
+/**
+ * Checkpoint tallies that carry no timestamp of their own, so unlike the dated measures
+ * they describe the catalogue as it stands rather than a window of activity.
+ */
+export function computeStandingCounts(groups: PartGroup[]): StandingCounts {
+  let qtyConfirmed = 0;
+  let shelved = 0;
+  let needsReview = 0;
+
+  for (const g of groups) {
+    if (getCheckpoints(g).qtyConfirmed) qtyConfirmed++;
+    if (g.newBinLocation) shelved++;
+    if (g.needsReview) needsReview++;
+  }
+
+  return { qtyConfirmed, shelved, needsReview };
+}
