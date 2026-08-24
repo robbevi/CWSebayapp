@@ -87,11 +87,11 @@ describe('mapRowToPart', () => {
     expect(part.photographed).toBe(true);
   });
 
-  it('is Completed when all five checkpoints are set', () => {
+  it('is Listed once the row says it is on eBay', () => {
     const row = [...ROW];
     row[HEADERS.indexOf('photographed')] = 'TRUE';
     row[HEADERS.indexOf('itemListed')] = 'TRUE';
     const part = mapRowToPart(HEADERS, row, []);
-    expect(part.workflowStatus).toBe('Completed');
+    expect(part.workflowStatus).toBe('Listed');
   });
 });

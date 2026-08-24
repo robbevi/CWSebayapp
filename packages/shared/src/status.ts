@@ -24,8 +24,10 @@ export function checkpointCount(p: Pick<InventoryPart,
 export function deriveStatus(p: Pick<InventoryPart,
   'photographed' | 'confirmedQoh' | 'boxCondition' | 'transferredToMarketRecovery' | 'itemListed' | 'photos'
 >): WorkflowStatus {
+  // Listed wins outright: once something is on eBay that is the fact that matters, and
+  // anything still outstanding shows on the card's checkpoint chips.
+  if (p.itemListed === true) return 'Listed';
   const c = checkpointCount(p);
-  if (c === 5) return 'Completed';
   if (c === 0 && (p.photos?.length ?? 0) === 0) return 'NotStarted';
   return 'Processing';
 }

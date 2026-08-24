@@ -6,6 +6,8 @@ import {
   groupPartsBySku,
   indexListings,
   indexSales,
+  listingFor,
+  type Listing,
   type PartGroup,
   type TaskKey,
   type WorkflowStatus,
@@ -72,7 +74,27 @@ function byNumberAsc(a: number | null | undefined, b: number | null | undefined)
   return a - b;
 }
 
-function sortParts(parts: PartGroup[], sort: SortKey): PartGroup[] {
+// eBay figures live on the listing rather than the part, so they sort through the index.
+// Anything without a live listing sorts last rather than as zero — no listing is not the
+// same as no interest.
+function sortByListing(
+  parts: PartGroup[],
+  listingsIndex: Map<string, Listing>,
+  pick: (l: Listing) => number | null
+): PartGroup[] {
+  const value = (p: PartGroup) => {
+    const l = listingFor(p.records, listingsIndex);
+    const v = l ? pick(l) : null;
+    return v ?? -1;
+  };
+  return [...parts].sort((a, b) => value(b) - value(a));
+}
+
+function sortParts(parts: PartGroup[], sort: SortKey, listingsIndex: Map<string, Listing>): PartGroup[] {
+  if (sort === 'Watchers') return sortByListing(parts, listingsIndex, (l) => l.watchers);
+  if (sort === 'Views') return sortByListing(parts, listingsIndex, (l) => l.views);
+  if (sort === 'Impressions') return sortByListing(parts, listingsIndex, (l) => l.impressions);
+  if (sort === 'Qty Listed') return sortByListing(parts, listingsIndex, (l) => l.quantityAvailable);
   if (sort === 'Quantity On Hand') {
     return [...parts].sort((a, b) => a.qoh - b.qoh);
   }
@@ -104,7 +126,7 @@ function sortParts(parts: PartGroup[], sort: SortKey): PartGroup[] {
   return [...parts].sort((a, b) => String(a[field] ?? '').localeCompare(String(b[field] ?? '')));
 }
 
-const ALL_STATUSES: WorkflowStatus[] = ['NotStarted', 'Processing', 'Completed'];
+const ALL_STATUSES: WorkflowStatus[] = ['NotStarted', 'Processing', 'Listed'];
 
 // Tailwind needs static class names, so a computed `lg:grid-cols-${n}` string won't
 // generate — this maps the visible column count to a real class.
@@ -152,8 +174,8 @@ export function KanbanBoard() {
         (!needsReview || g.needsReview) &&
         matchesSearch(g, search)
     );
-    return sortParts(result, sort);
-  }, [groups, search, sites, bins, recoveryBins, manufacturers, completedTasks, margins, discrepancies, needsReview, sort]);
+    return sortParts(result, sort, listingsIndex);
+  }, [groups, search, sites, bins, recoveryBins, manufacturers, completedTasks, margins, discrepancies, needsReview, sort, listingsIndex]);
 
   if (isLoading) {
     return <div className="py-16 text-center text-textMuted">Loading inventory…</div>;
@@ -162,7 +184,7 @@ export function KanbanBoard() {
   const buckets: Record<WorkflowStatus, PartGroup[]> = {
     NotStarted: filtered.filter((p) => p.workflowStatus === 'NotStarted'),
     Processing: filtered.filter((p) => p.workflowStatus === 'Processing'),
-    Completed: filtered.filter((p) => p.workflowStatus === 'Completed'),
+    Listed: filtered.filter((p) => p.workflowStatus === 'Listed'),
   };
 
   const visibleStatuses = statuses.length === 0 ? ALL_STATUSES : ALL_STATUSES.filter((s) => statuses.includes(s));

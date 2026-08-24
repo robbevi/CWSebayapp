@@ -8,7 +8,7 @@ import { MultiSelectDropdown } from './ui/MultiSelectDropdown';
 export const STATUS_OPTIONS: { key: WorkflowStatus; label: string }[] = [
   { key: 'NotStarted', label: 'Not Started' },
   { key: 'Processing', label: 'Processing' },
-  { key: 'Completed', label: 'Completed' },
+  { key: 'Listed', label: 'Listed / Sold' },
 ];
 
 export const MARGIN_OPTIONS: { key: MarginFilter; label: string }[] = [

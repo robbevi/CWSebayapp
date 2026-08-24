@@ -1,5 +1,33 @@
 import { useState } from 'react';
-import { Download, Info, Moon, RefreshCw, Sun, Target, Trophy, X } from 'lucide-react';
+import {
+  AlertTriangle,
+  ArrowRight,
+  Boxes,
+  Camera,
+  ClipboardList,
+  DollarSign,
+  Download,
+  Eye,
+  Factory,
+  Flag,
+  Info,
+  Layers,
+  MapPin,
+  Moon,
+  Package,
+  RefreshCw,
+  ShieldCheck,
+  ShoppingCart,
+  Signal,
+  Star,
+  Sun,
+  Tag,
+  Target,
+  Trophy,
+  Truck,
+  Wrench,
+  X,
+} from 'lucide-react';
 import calfracLogo from '../assets/calfrac-logo.png';
 import spareWordmark from '../assets/spare-wordmark-light.png';
 
@@ -9,6 +37,26 @@ import { useSalesStatus, useSyncSales } from '../hooks/useSales';
 import { useUserStore } from '../state/useUserStore';
 import { Scoreboard } from './Scoreboard';
 import { SpareMark } from './ui/SpareMark';
+
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <section className="mb-5 last:mb-0">
+      <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-textMuted">{title}</h3>
+      <dl className="space-y-1.5">{children}</dl>
+    </section>
+  );
+}
+
+/** One glossary entry: the mark as it appears on a card, then what it means. */
+function Row({ icon, term, children }: { icon: React.ReactNode; term: string; children: React.ReactNode }) {
+  return (
+    <div className="flex items-start gap-2 text-xs">
+      <span className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center text-textMuted">{icon}</span>
+      <dt className="w-28 shrink-0 font-semibold text-textPri">{term}</dt>
+      <dd className="m-0 flex-1 text-textMuted">{children}</dd>
+    </div>
+  );
+}
 
 export function Header() {
   const [infoOpen, setInfoOpen] = useState(false);
@@ -102,9 +150,9 @@ export function Header() {
 
       {infoOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-md rounded-card bg-surface p-6">
+          <div className="max-h-[85vh] w-full max-w-lg overflow-y-auto overscroll-contain rounded-card bg-surface p-6">
             <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-lg font-bold text-textPri">Inventory Workflow</h2>
+              <h2 className="text-lg font-bold text-textPri">Reading the board</h2>
               <button
                 type="button"
                 onClick={() => setInfoOpen(false)}
@@ -114,19 +162,74 @@ export function Header() {
                 <X size={18} />
               </button>
             </div>
-            <div className="space-y-3 text-sm text-textPri">
-              <p>
-                <span className="font-semibold">Not Started</span> — No processing checkpoints have been completed yet.
+
+            <Section title="Columns">
+              <Row icon={<ClipboardList size={14} />} term="Not Started">
+                Nothing done yet — no photos, no count, no condition.
+              </Row>
+              <Row icon={<Wrench size={14} />} term="Processing">
+                Somebody has started: at least one step done, but it isn't on eBay yet.
+              </Row>
+              <Row icon={<Tag size={14} />} term="Listed / Sold">
+                On eBay. Use the All / Listed / Sold buttons to see everything, only what is
+                still for sale, or only what has sold.
+              </Row>
+            </Section>
+
+            <Section title="On a card that is on eBay">
+              <Row icon={<Star size={14} />} term="watching">People watching the listing.</Row>
+              <Row icon={<Eye size={14} />} term="views">Times the listing was opened, last 30 days.</Row>
+              <Row icon={<Signal size={14} />} term="impr">
+                Impressions — times it appeared in search or the store, last 30 days.
+              </Row>
+              <Row icon={<Boxes size={14} />} term="Qty">Quantity still available on the listing.</Row>
+              <Row icon={<span className="block h-2 w-2 rounded-full bg-primary" />} term="Active on eBay">
+                Listed and unsold. Amber means part-sold, green means sold out. The price on
+                the right is what eBay is asking; once sold it is what it fetched.
+              </Row>
+            </Section>
+
+            <Section title="On every other card">
+              <Row icon={<Wrench size={14} />} term="Manufacturer">Who made the part.</Row>
+              <Row icon={<Factory size={14} />} term="Site">Inventory site it belongs to.</Row>
+              <Row icon={<Layers size={14} />} term="N locations">
+                One SKU stocked in more than one bin. Quantities are added together.
+              </Row>
+              <Row icon={<MapPin size={14} />} term="Bin">Where it sits in the warehouse.</Row>
+              <Row icon={<Package size={14} />} term="QOH">Quantity on hand, per the system.</Row>
+              <Row icon={<ArrowRight size={14} />} term="Recovery bin">
+                Shelf it was moved to at the Iron Barn.
+              </Row>
+            </Section>
+
+            <Section title="Badges and flags">
+              <Row icon={<AlertTriangle size={14} className="text-amber-600" />} term="High priority">
+                Field review priority 1 or 2.
+              </Row>
+              <Row icon={<DollarSign size={14} className="text-primary" />} term="Positive margin">
+                Expected to sell for more than it is carried at.
+              </Row>
+              <Row icon={<Flag size={14} className="text-purple-600" />} term="Needs review">
+                Someone flagged it for a second look. Hover to read why.
+              </Row>
+              <Row icon={<ShoppingCart size={14} className="text-emerald-600" />} term="Sold out">
+                Every unit accounted for.
+              </Row>
+              <Row icon={<AlertTriangle size={14} className="text-red-600" />} term="-2 / Not Found">
+                Counted fewer than expected. Not Found means none were on the shelf at all.
+              </Row>
+            </Section>
+
+            <Section title="Processing Status chips">
+              <Row icon={<Camera size={14} />} term="Photographed">At least one photo saved.</Row>
+              <Row icon={<Package size={14} />} term="Qty Confirmed">Somebody counted it.</Row>
+              <Row icon={<ShieldCheck size={14} />} term="Condition">Box condition recorded.</Row>
+              <Row icon={<Truck size={14} />} term="Transferred">Moved in Cetaris to market recovery.</Row>
+              <Row icon={<Tag size={14} />} term="Listed">Live on eBay.</Row>
+              <p className="mt-2 text-[11px] text-textMuted">
+                A filled chip is done. "3/5 complete" counts them.
               </p>
-              <p>
-                <span className="font-semibold">Processing</span> — At least one checkpoint is complete: Photographed,
-                Qty Confirmed, Condition, Transferred, or eBay Listed.
-              </p>
-              <p>
-                <span className="font-semibold">Completed</span> — All five checkpoints are satisfied and the part is
-                listing-ready.
-              </p>
-            </div>
+            </Section>
           </div>
         </div>
       )}

@@ -7,8 +7,12 @@ import {
   Flag,
   Layers,
   MapPin,
+  Boxes,
+  Eye,
   Package,
   ShoppingCart,
+  Signal,
+  Star,
   Wrench,
 } from 'lucide-react';
 import {
@@ -59,6 +63,7 @@ export function PartCard({
     ? `https://www.ebay.com/itm/${part.records.find((r) => r.ebayListingId)!.ebayListingId}`
     : null;
   const showEbayRow = sold.soldQty > 0 || part.itemListed;
+  const onEbay = part.itemListed || sold.soldQty > 0;
 
   return (
     <div className="shrink-0 overflow-hidden rounded-[10px] border border-border bg-surface transition-shadow hover:shadow-md">
@@ -109,52 +114,87 @@ export function PartCard({
       {/* Same two-column grid as ProcessingStatusChips below, so the two blocks line up
           instead of one being a ragged wrap and the other a tidy grid. */}
       <div className="grid grid-cols-2 gap-1.5">
-        <Pill tone="chip" className="w-full">
-          <Wrench size={12} className="shrink-0" />
-          <span className="truncate">{part.manufacturer || '—'}</span>
-        </Pill>
-        {multiLocation ? (
-          <Pill tone="chip" className="w-full">
-            <Layers size={12} className="shrink-0" />
-            <span
-              className="truncate"
-              title={part.locations.map((l) => `${l.inventorySite} ${l.binLocation} (${l.qoh})`).join(' · ')}
-            >
-              {part.locations.length} locations
-            </span>
-          </Pill>
+        {onEbay ? (
+          /* Once something is on eBay, how it is performing is the useful thing to see at
+             a glance. Manufacturer, site, bin and quantity are a click away in Part
+             Detail, and remain sortable and filterable from the toolbar. */
+          <>
+            <Pill tone="chip" className="w-full">
+              <Star size={12} className="shrink-0" />
+              <span className="truncate" title="People watching this listing">
+                {listing ? `${listing.watchers} watching` : 'Watchers —'}
+              </span>
+            </Pill>
+            <Pill tone="chip" className="w-full">
+              <Eye size={12} className="shrink-0" />
+              <span className="truncate" title="Views in the last 30 days">
+                {listing?.views != null ? `${listing.views} views` : 'Views —'}
+              </span>
+            </Pill>
+            <Pill tone="chip" className="w-full">
+              <Signal size={12} className="shrink-0" />
+              <span className="truncate" title="Times shown in search or the store, last 30 days">
+                {listing?.impressions != null ? `${listing.impressions.toLocaleString()} impr` : 'Impr —'}
+              </span>
+            </Pill>
+            <Pill tone="chip" className="w-full">
+              <Boxes size={12} className="shrink-0" />
+              <span className="truncate" title="Quantity available on the listing">
+                {listing ? `Qty ${listing.quantityAvailable}` : `Qty ${part.qoh}`}
+              </span>
+            </Pill>
+          </>
         ) : (
+          <>
+
           <Pill tone="chip" className="w-full">
-            <Factory size={12} className="shrink-0" />
-            <span className="truncate">{part.inventorySite || '—'}</span>
+            <Wrench size={12} className="shrink-0" />
+            <span className="truncate">{part.manufacturer || '—'}</span>
           </Pill>
-        )}
-        <Pill tone="chip" className="w-full">
-          <MapPin size={12} className="shrink-0" />
-          <span className="truncate" title={part.locations.map((l) => l.binLocation || '—').join(' · ')}>
-            {multiLocation
-              ? part.locations.map((l) => l.binLocation || '—').join(', ')
-              : part.binLocation || '—'}
-          </span>
-        </Pill>
-        <Pill tone="chip" className="w-full">
-          <Package size={12} className="shrink-0" />
-          <span className="truncate" title={multiLocation ? 'Total across all locations' : undefined}>
-            QOH: {part.qoh}
-          </span>
-        </Pill>
-        {/* Only shown once the part has actually been moved, so an un-moved part's card
-            looks exactly as it did before. */}
-        {part.newBinLocation && (
-          <Pill
-            tone="chip"
-            className="w-full border-primary/20 bg-primary/10 font-semibold text-primary"
-          >
-            <ArrowRight size={12} className="shrink-0" />
-            <span className="truncate" title={`Moved to recovery bin ${part.newBinLocation}`}>
-              {part.newBinLocation}
+          {multiLocation ? (
+            <Pill tone="chip" className="w-full">
+              <Layers size={12} className="shrink-0" />
+              <span
+                className="truncate"
+                title={part.locations.map((l) => `${l.inventorySite} ${l.binLocation} (${l.qoh})`).join(' · ')}
+              >
+                {part.locations.length} locations
+              </span>
+            </Pill>
+          ) : (
+            <Pill tone="chip" className="w-full">
+              <Factory size={12} className="shrink-0" />
+              <span className="truncate">{part.inventorySite || '—'}</span>
+            </Pill>
+          )}
+          <Pill tone="chip" className="w-full">
+            <MapPin size={12} className="shrink-0" />
+            <span className="truncate" title={part.locations.map((l) => l.binLocation || '—').join(' · ')}>
+              {multiLocation
+                ? part.locations.map((l) => l.binLocation || '—').join(', ')
+                : part.binLocation || '—'}
             </span>
           </Pill>
+          <Pill tone="chip" className="w-full">
+            <Package size={12} className="shrink-0" />
+            <span className="truncate" title={multiLocation ? 'Total across all locations' : undefined}>
+              QOH: {part.qoh}
+            </span>
+          </Pill>
+          {/* Only shown once the part has actually been moved, so an un-moved part's card
+              looks exactly as it did before. */}
+          {part.newBinLocation && (
+            <Pill
+              tone="chip"
+              className="w-full border-primary/20 bg-primary/10 font-semibold text-primary"
+            >
+              <ArrowRight size={12} className="shrink-0" />
+              <span className="truncate" title={`Moved to recovery bin ${part.newBinLocation}`}>
+                {part.newBinLocation}
+              </span>
+            </Pill>
+          )}
+          </>
         )}
         {/* A counted-but-mismatched quantity is the one thing on a card that needs chasing,
             so it gets a hard colour rather than the neutral chip treatment. */}

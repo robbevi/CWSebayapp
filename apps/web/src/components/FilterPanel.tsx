@@ -21,6 +21,10 @@ const SORT_OPTIONS: SortKey[] = [
   'Field Review Priority',
   'Recovery Price',
   'Gross Margin',
+  'Watchers',
+  'Views',
+  'Impressions',
+  'Qty Listed',
 ];
 
 function uniqueSorted(values: (string | undefined)[]): string[] {

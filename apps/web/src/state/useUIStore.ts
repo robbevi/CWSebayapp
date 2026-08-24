@@ -12,7 +12,11 @@ export type SortKey =
   | 'Revenue Priority'
   | 'Recovery Price'
   | 'Gross Margin'
-  | 'Field Review Priority';
+  | 'Field Review Priority'
+  | 'Watchers'
+  | 'Views'
+  | 'Impressions'
+  | 'Qty Listed';
 
 export type MarginFilter = 'Positive Gross Margin' | 'Negative Gross Margin';
 

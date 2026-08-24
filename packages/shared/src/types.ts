@@ -18,7 +18,13 @@ export type DispositionEnum =
   | 'Recycle'
   | 'Other';
 
-export type WorkflowStatus = 'NotStarted' | 'Processing' | 'Completed';
+/**
+ * Where a part sits on the board. The third state is "on eBay" rather than "every
+ * checkpoint ticked": most listings go up before their condition or transfer is logged,
+ * so keying the column on checkpoints left 35 of 40 live listings sitting in Processing.
+ * Whether the five checkpoints are done is still tracked, and still shown on the card.
+ */
+export type WorkflowStatus = 'NotStarted' | 'Processing' | 'Listed';
 
 export type GrossMarginStatus = 'Positive Gross Margin' | 'Negative Gross Margin';
 

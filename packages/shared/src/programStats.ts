@@ -10,7 +10,7 @@ import {
   type SaleTotals,
 } from './sales.js';
 import { type PartGroup } from './grouping.js';
-import { getCheckpoints } from './status.js';
+import { checkpointCount, getCheckpoints } from './status.js';
 import { chicagoDateString, mondayOf } from './submissions.js';
 
 export type StatPeriod = 'day' | 'week' | 'month' | 'all';
@@ -121,7 +121,9 @@ export function computeProgramTotals(
         listed++;
         recoveryValue += extendedValue(g);
       }
-      if (g.workflowStatus === 'Completed') completed++;
+      // Still all five checkpoints. The board's third column moved to meaning "on eBay",
+      // but this figure is about work finished, which is a different question.
+      if (checkpointCount(g) === 5) completed++;
     }
     return { added: groups.length, photographed, listed, completed, recoveryValue };
   }
@@ -138,7 +140,7 @@ export function computeProgramTotals(
     if (isInPeriod(listedAt(g), period, now, calendarDay)) {
       listed++;
       recoveryValue += extendedValue(g);
-      if (g.workflowStatus === 'Completed') completed++;
+      if (checkpointCount(g) === 5) completed++;
     }
   }
 

@@ -46,7 +46,26 @@ describe('deriveStatus', () => {
     expect(deriveStatus({ ...emptyChecks, photographed: true, photos: [] })).toBe('Processing');
   });
 
-  it('is Completed when all 5 checkpoints are set', () => {
-    expect(deriveStatus({ ...fullChecks, photos: [] })).toBe('Completed');
+  it('is Listed as soon as it reaches eBay, before the other steps are done', () => {
+    // The board's third column means "on eBay", not "everything ticked" — most listings go
+    // up before condition or transfer is recorded, and they belong with the listings.
+    expect(deriveStatus({ ...emptyChecks, itemListed: true, photos: [] })).toBe('Listed');
+  });
+
+  it('is Listed when every checkpoint is set, since listing is one of them', () => {
+    expect(deriveStatus({ ...fullChecks, photos: [] })).toBe('Listed');
+  });
+
+  it('stays Processing while work is under way but nothing is listed', () => {
+    expect(
+      deriveStatus({
+        ...emptyChecks,
+        photographed: true,
+        confirmedQoh: 3,
+        boxCondition: 'Good',
+        transferredToMarketRecovery: true,
+        photos: [],
+      })
+    ).toBe('Processing');
   });
 });

@@ -1,13 +1,13 @@
-import { useState, type ReactElement } from 'react';
-import { CheckCircle2, ChevronDown, ClipboardList, Wrench } from 'lucide-react';
-import type { Listing, PartGroup, SalesIndex, WorkflowStatus } from '@warehouse/shared';
+import { useMemo, useState, type ReactElement } from 'react';
+import { ChevronDown, ClipboardList, ShoppingCart, Tag, Wrench } from 'lucide-react';
+import { salesForGroup, type Listing, type PartGroup, type SalesIndex, type WorkflowStatus } from '@warehouse/shared';
 import { cn } from '../lib/cn';
 import { PartCard } from './PartCard';
 
 const BUCKET_META: Record<WorkflowStatus, { label: string; icon: ReactElement; badgeBg: string; iconColor: string }> = {
   NotStarted: { label: 'Not Started', icon: <ClipboardList size={18} />, badgeBg: 'bg-blue-500', iconColor: 'text-white' },
   Processing: { label: 'Processing', icon: <Wrench size={18} />, badgeBg: 'bg-amber-500', iconColor: 'text-white' },
-  Completed: { label: 'Completed', icon: <CheckCircle2 size={18} />, badgeBg: 'bg-primary', iconColor: 'text-white' },
+  Listed: { label: 'Listed / Sold', icon: <Tag size={18} />, badgeBg: 'bg-primary', iconColor: 'text-white' },
 };
 
 export function BucketColumn({
@@ -22,6 +22,21 @@ export function BucketColumn({
   listingsIndex: Map<string, Listing>;
 }) {
   const meta = BUCKET_META[status];
+  // Within the eBay column, split what is still for sale from what has gone. Local state:
+  // it is a way of reading one column, not a filter over the whole board.
+  const [ebayView, setEbayView] = useState<'all' | 'listed' | 'sold'>('all');
+
+  const split = useMemo(() => {
+    if (status !== 'Listed') return null;
+    const sold: PartGroup[] = [];
+    const listed: PartGroup[] = [];
+    for (const p of parts) {
+      (salesForGroup(p, salesIndex).length > 0 ? sold : listed).push(p);
+    }
+    return { sold, listed };
+  }, [status, parts, salesIndex]);
+
+  const shown = split && ebayView !== 'all' ? (ebayView === 'sold' ? split.sold : split.listed) : parts;
   // Mobile stacks all three buckets vertically, so an expanded one buries the others under
   // hundreds of cards. Collapsed by default there; on desktop the columns sit side by side
   // and are always open, so this state is simply ignored from `lg:` up.
@@ -40,25 +55,57 @@ export function BucketColumn({
         </div>
         <span className="text-sm font-semibold text-textPri">{meta.label}</span>
         <span className="ml-auto rounded-pill border border-border bg-surface px-2.5 py-1 text-xs font-semibold text-textMuted">
-          {parts.length}
+          {shown.length}
         </span>
         <ChevronDown
           size={18}
           className={cn('shrink-0 text-textMuted transition-transform lg:hidden', expanded && 'rotate-180')}
         />
       </button>
+      {split && (
+        <div
+          className={cn(
+            'shrink-0 gap-2 border-b border-border bg-columnHeaderBg px-4 py-2 lg:flex',
+            expanded ? 'flex' : 'hidden'
+          )}
+        >
+          {([
+            ['all', 'All', parts.length, null],
+            ['listed', 'Listed', split.listed.length, <Tag key="t" size={11} />],
+            ['sold', 'Sold', split.sold.length, <ShoppingCart key="s" size={11} />],
+          ] as const).map(([key, label, count, icon]) => (
+            <button
+              key={key}
+              type="button"
+              onClick={() => setEbayView(key)}
+              aria-pressed={ebayView === key}
+              className={cn(
+                'flex min-h-0 items-center gap-1.5 rounded-pill px-2.5 py-1 text-[11px] font-semibold',
+                ebayView === key ? 'bg-primary text-white' : 'text-textMuted hover:bg-surface'
+              )}
+            >
+              {icon}
+              {label}
+              <span className={cn('tabular-nums', ebayView === key ? 'text-white/80' : 'text-textMuted')}>
+                {count}
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
+
       <div
         className={cn(
           'column-scroll min-h-0 max-h-[640px] flex-1 flex-col gap-3 overflow-y-auto overscroll-contain p-4 lg:flex lg:max-h-none',
           expanded ? 'flex' : 'hidden'
         )}
       >
-        {parts.length === 0 ? (
+        {shown.length === 0 ? (
           <div className="flex flex-1 items-center justify-center rounded-card border border-dashed border-border p-8 text-center text-xs text-textMuted">
             No parts match the selected filters in this bucket.
           </div>
         ) : (
-          parts.map((p) => (
+          shown.map((p) => (
             <PartCard key={p.id} part={p} salesIndex={salesIndex} listingsIndex={listingsIndex} />
           ))
         )}
