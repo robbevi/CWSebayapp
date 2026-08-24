@@ -2,13 +2,13 @@ import {
   AlertTriangle,
   ArrowRight,
   DollarSign,
+  ExternalLink,
   Factory,
   Flag,
   Layers,
   MapPin,
   Package,
   ShoppingCart,
-  Tag,
   Wrench,
 } from 'lucide-react';
 import {
@@ -53,10 +53,18 @@ export function PartCard({
   // so — otherwise the quantity looks wrong against any one shelf.
   const multiLocation = part.locations.length > 1;
 
+  // eBay's canonical item URL. Built from the id the part already stores rather than
+  // synced, since it never changes for a given listing.
+  const listingUrl = part.records.find((r) => r.ebayListingId)?.ebayListingId
+    ? `https://www.ebay.com/itm/${part.records.find((r) => r.ebayListingId)!.ebayListingId}`
+    : null;
+  const showEbayRow = sold.soldQty > 0 || part.itemListed;
+
   return (
+    <div className="shrink-0 overflow-hidden rounded-[10px] border border-border bg-surface transition-shadow hover:shadow-md">
     <button
       onClick={() => set({ selectedId: part.id, modalOpen: true })}
-      className="shrink-0 rounded-[10px] border border-border bg-surface p-3 text-left transition-shadow hover:shadow-md"
+      className="w-full p-3 text-left"
     >
       <div className="flex items-start gap-1.5">
         <span className="min-w-0 flex-1 text-sm font-semibold text-textPri">{part.sku}</span>
@@ -148,42 +156,6 @@ export function PartCard({
             </span>
           </Pill>
         )}
-        {/* Sold progress rather than a plain "sold" flag: most listings carry several
-            units, so what matters on the card is how many are still on the shelf. */}
-        {sold.soldQty > 0 ? (
-          <Pill
-            className={cn(
-              'w-full font-semibold',
-              sold.soldOut
-                ? 'border-emerald-200 bg-emerald-100 text-emerald-700'
-                : 'border-emerald-200 bg-emerald-50 text-emerald-700'
-            )}
-          >
-            <ShoppingCart size={12} className="shrink-0" />
-            <span
-              className="truncate"
-              title={`${sold.soldQty} sold for ${money(sold.totals.gross)} gross, ${sold.remainingQty} remaining`}
-            >
-              Sold &times;{sold.soldQty} · {money(sold.totals.gross)}
-            </span>
-          </Pill>
-        ) : (
-          // Nothing sold yet, but it's up for sale — show what it's asking for. Not gated
-          // on the part being finished: most listings are still mid-workflow.
-          part.itemListed && (
-            /* Full width: "Listed on eBay - $1,260.00" does not fit a half-width pill. */
-            <Pill className="col-span-2 w-full border-sky-200 bg-sky-50 font-semibold text-sky-700">
-              <Tag size={12} className="shrink-0" />
-              {/* Imported rows without any price would otherwise advertise $0.00. */}
-              <span
-                className="truncate"
-                title={askingPrice > 0 ? `Listed on eBay at ${money(askingPrice)}` : 'Listed on eBay'}
-              >
-                {askingPrice > 0 ? `Listed on eBay - ${money(askingPrice)}` : 'Listed on eBay'}
-              </span>
-            </Pill>
-          )
-        )}
         {/* A counted-but-mismatched quantity is the one thing on a card that needs chasing,
             so it gets a hard colour rather than the neutral chip treatment. */}
         {discrepancy && discrepancy.kind !== 'none' && (
@@ -213,5 +185,45 @@ export function PartCard({
         </div>
       )}
     </button>
+
+    {/* eBay status gets its own row rather than a chip. It is a different kind of fact
+        from a bin or a quantity, and as a pill it ran the full width of the card and
+        broke the two-column rhythm of everything above it. */}
+    {showEbayRow && (
+      <div className="flex items-center gap-2 border-t border-border px-3 py-2 text-xs">
+        <span
+          aria-hidden="true"
+          className={cn(
+            'h-2 w-2 shrink-0 rounded-full',
+            sold.soldOut ? 'bg-emerald-600' : sold.soldQty > 0 ? 'bg-amber-500' : 'bg-primary'
+          )}
+        />
+        <span className="truncate font-medium text-textPri">
+          {/* The money sits on the right already, so the label only has to say the state. */}
+          {sold.soldOut
+            ? 'Sold out'
+            : sold.soldQty > 0
+              ? `${sold.soldQty} sold · ${sold.remainingQty} left`
+              : 'Active on eBay'}
+        </span>
+        <span className="ml-auto shrink-0 font-semibold tabular-nums text-textPri">
+          {sold.soldQty > 0 ? money(sold.totals.gross) : askingPrice > 0 ? money(askingPrice) : '—'}
+        </span>
+        {listingUrl && (
+          <a
+            href={listingUrl}
+            target="_blank"
+            rel="noreferrer"
+            // The card behind this opens the detail modal; the link must not do both.
+            onClick={(e) => e.stopPropagation()}
+            className="shrink-0 font-medium text-primary hover:underline"
+            title="Open this listing on eBay"
+          >
+            View <ExternalLink size={10} className="inline align-[-1px]" />
+          </a>
+        )}
+      </div>
+    )}
+    </div>
   );
 }
