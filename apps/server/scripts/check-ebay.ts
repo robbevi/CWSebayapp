@@ -73,6 +73,42 @@ async function main() {
     console.log(`  --   ${(err as Error).message}`);
   }
 
+  // Which listings can this token actually see? An order history that reads as empty is
+  // far more often a grant made on the wrong eBay account than a seller with no sales, and
+  // the listing-id block is the quickest way to tell those two apart.
+  console.log('\nListings this token can see (60 days of traffic)...');
+  try {
+    const token = await getAccessToken();
+    const yyyymmdd = (n: number) =>
+      new Date(Date.now() - n * 86_400_000).toISOString().slice(0, 10).replace(/-/g, '');
+    const res = await fetch(
+      `${ebayBaseUrl()}/sell/analytics/v1/traffic_report` +
+        '?dimension=LISTING&metric=LISTING_IMPRESSION_TOTAL,LISTING_VIEWS_TOTAL' +
+        `&filter=marketplace_ids:{${env.ebayMarketplaceId}},date_range:[${yyyymmdd(60)}..${yyyymmdd(1)}]`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: 'application/json',
+          'X-EBAY-C-MARKETPLACE-ID': env.ebayMarketplaceId,
+        },
+      }
+    );
+    if (res.ok) {
+      const json = (await res.json()) as { records?: { dimensionValues: { value: string }[] }[] };
+      const ids = (json.records ?? []).map((r) => r.dimensionValues[0]?.value ?? '');
+      const blocks: Record<string, number> = {};
+      for (const id of ids) blocks[id.slice(0, 4)] = (blocks[id.slice(0, 4)] ?? 0) + 1;
+      console.log(`  ok   ${ids.length} listing(s), id blocks: ${JSON.stringify(blocks)}`);
+      if (ids.length > 0) console.log(`       e.g. ${ids.slice(0, 4).join(', ')}`);
+      console.log('       If those are not your listings, the consent was granted while');
+      console.log('       signed in as a different eBay account.');
+    } else {
+      console.log(`  --   traffic unavailable (${res.status})`);
+    }
+  } catch (err) {
+    console.log(`  --   ${(err as Error).message}`);
+  }
+
   console.log('\nReading the last 30 days of orders...');
   const since = new Date(Date.now() - 30 * 86_400_000);
   try {
