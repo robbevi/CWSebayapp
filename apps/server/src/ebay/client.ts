@@ -63,11 +63,15 @@ export async function getAccessToken(): Promise<string> {
 
   const text = await res.text();
   if (!res.ok) {
-    // eBay refresh tokens expire after about 18 months, and the failure is otherwise
-    // silent — say plainly what has to happen rather than surfacing a bare 400.
-    throw new Error(
-      `eBay token refresh failed (${res.status}). If this says invalid_grant, the refresh token has expired or been revoked — re-run scripts/ebay-oauth-setup.ts. Response: ${text.slice(0, 300)}`
-    );
+    // invalid_grant covers three different mistakes and the raw response does not
+    // separate them, so name all three rather than sending someone down one path.
+    const hint = text.includes('invalid_grant')
+      ? ' This means one of: the refresh token was minted under a different App ID than ' +
+        'EBAY_CLIENT_ID; it was minted in the other environment (sandbox vs production, ' +
+        'see EBAY_ENV); or it has expired or been revoked. Check /api/health/ebay, then ' +
+        're-run scripts/ebay-oauth-setup.ts against the keyset you are actually using.'
+      : '';
+    throw new Error(`eBay token refresh failed (${res.status}).${hint} Response: ${text.slice(0, 300)}`);
   }
 
   const json = JSON.parse(text) as { access_token: string; expires_in: number };

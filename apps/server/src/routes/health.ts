@@ -30,6 +30,16 @@ healthRouter.get('/health/ebay', (_req, res) => {
   const clientSecret = seen(env.ebayClientSecret);
   const refreshToken = seen(env.ebayRefreshToken);
 
+  // An eBay App ID carries its environment in the middle segment (…-SBX-… or …-PRD-…).
+  // That marker is not a secret, and it catches the commonest wiring mistake: a token
+  // minted under one keyset paired with the other keyset's credentials.
+  const keyset = /-SBX-/i.test(env.ebayClientId ?? '')
+    ? 'sandbox'
+    : /-PRD-/i.test(env.ebayClientId ?? '')
+      ? 'production'
+      : 'unknown';
+  const mismatch = keyset !== 'unknown' && keyset !== env.ebayEnv;
+
   const missing = [
     !clientId.set && 'EBAY_CLIENT_ID',
     !clientSecret.set && 'EBAY_CLIENT_SECRET',
@@ -40,6 +50,8 @@ healthRouter.get('/health/ebay', (_req, res) => {
     environment: env.ebayEnv,
     marketplace: env.ebayMarketplaceId,
     configured: missing.length === 0,
+    keyset,
+    keysetMatchesEnvironment: !mismatch,
     missing,
     vars: {
       EBAY_CLIENT_ID: clientId,
@@ -51,7 +63,9 @@ healthRouter.get('/health/ebay', (_req, res) => {
     note:
       missing.length > 0
         ? `Set ${missing.join(', ')} in the environment, then restart.`
-        : 'All three present. If sync still fails, the token itself may be expired or wrong-typed.',
+        : mismatch
+          ? `The App ID is a ${keyset} key but EBAY_ENV is ${env.ebayEnv}. All three values must come from the same keyset, and the refresh token must have been minted against it.`
+          : 'All three present and consistent. If sync still fails, the refresh token was issued under a different App ID, or has expired.',
   });
 });
 
