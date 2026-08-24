@@ -20,6 +20,41 @@ healthRouter.get('/health/users', (_req, res) => {
   });
 });
 
+/**
+ * Which eBay settings arrived, so "not configured" can be acted on instead of guessed at.
+ * Reports presence and length only — never a value, since two of these are secrets.
+ */
+healthRouter.get('/health/ebay', (_req, res) => {
+  const seen = (v: string | undefined) => ({ set: !!v && v.trim().length > 0, length: v?.trim().length ?? 0 });
+  const clientId = seen(env.ebayClientId);
+  const clientSecret = seen(env.ebayClientSecret);
+  const refreshToken = seen(env.ebayRefreshToken);
+
+  const missing = [
+    !clientId.set && 'EBAY_CLIENT_ID',
+    !clientSecret.set && 'EBAY_CLIENT_SECRET',
+    !refreshToken.set && 'EBAY_REFRESH_TOKEN',
+  ].filter(Boolean);
+
+  res.json({
+    environment: env.ebayEnv,
+    marketplace: env.ebayMarketplaceId,
+    configured: missing.length === 0,
+    missing,
+    vars: {
+      EBAY_CLIENT_ID: clientId,
+      EBAY_CLIENT_SECRET: clientSecret,
+      EBAY_REFRESH_TOKEN: refreshToken,
+      EBAY_RU_NAME: seen(env.ebayRuName),
+    },
+    // A refresh token is long; a truncated paste is a common cause of a silent failure.
+    note:
+      missing.length > 0
+        ? `Set ${missing.join(', ')} in the environment, then restart.`
+        : 'All three present. If sync still fails, the token itself may be expired or wrong-typed.',
+  });
+});
+
 healthRouter.get('/health', async (_req, res) => {
   if (isGoogleConfigured()) {
     try {
