@@ -42,14 +42,70 @@ const raw = rawSchema.parse(process.env);
 
 // The real employee roster (names + roles) is kept out of source entirely — this repo
 // is public — and injected at runtime instead, as a JSON array in .env/Render's env vars.
+
+/** Why the roster is empty, so a bad paste can be diagnosed without guessing. */
+export let appUsersProblem: string | undefined;
+
+/**
+ * Repairs the damage a value routinely picks up on its way through a dashboard text field
+ * before parsing: surrounding stray quotes, and curly quotes substituted for straight ones
+ * by an editor somewhere upstream. Neither is valid JSON, and both are invisible to read.
+ */
+function repairJson(raw: string): string {
+  let out = raw.trim();
+  if ((out.startsWith("'") && out.endsWith("'")) || (out.startsWith('`') && out.endsWith('`'))) {
+    out = out.slice(1, -1).trim();
+  }
+  // A whole JSON array wrapped in double quotes — only unwrap when it really is wrapping,
+  // never when the value legitimately begins and ends with a quoted string.
+  if (out.startsWith('"[') && out.endsWith(']"')) out = out.slice(1, -1).trim();
+  return out.replace(/[‘’]/g, "'").replace(/[“”]/g, '"');
+}
+
 function parseAppUsers(json: string | undefined): AppUser[] {
-  if (!json) return [];
-  try {
-    return JSON.parse(json) as AppUser[];
-  } catch {
-    console.error('APP_USERS_JSON is not valid JSON; no users will be available.');
+  appUsersProblem = undefined;
+  if (!json || !json.trim()) {
+    appUsersProblem = 'APP_USERS_JSON is not set.';
+    console.error(appUsersProblem);
     return [];
   }
+
+  const repaired = repairJson(json);
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(repaired);
+  } catch (err) {
+    // The message carries the character offset, which is what actually locates a bad
+    // paste. Never log the value itself — it is a list of real employees.
+    appUsersProblem =
+      `APP_USERS_JSON is not valid JSON (${(err as Error).message}). ` +
+      `Length ${json.length}, starts "${repaired.slice(0, 2)}", ends "${repaired.slice(-2)}".`;
+    console.error(appUsersProblem);
+    return [];
+  }
+
+  if (!Array.isArray(parsed)) {
+    appUsersProblem = `APP_USERS_JSON parsed as ${typeof parsed}, expected an array.`;
+    console.error(appUsersProblem);
+    return [];
+  }
+
+  const users = parsed.filter(
+    (u): u is AppUser =>
+      !!u && typeof u === 'object' && typeof (u as AppUser).name === 'string' && !!(u as AppUser).name
+  );
+  if (users.length !== parsed.length) {
+    appUsersProblem = `APP_USERS_JSON had ${parsed.length} entries but only ${users.length} usable ones.`;
+    console.error(appUsersProblem);
+  }
+  // A role that isn't one of the two known values would silently mis-score submissions.
+  for (const u of users) {
+    if (u.role !== 'warehouse' && u.role !== 'lister') {
+      console.error(`APP_USERS_JSON: "${u.name}" has role "${u.role}"; expected warehouse or lister.`);
+      u.role = 'warehouse';
+    }
+  }
+  return users;
 }
 
 export const env = {
