@@ -798,9 +798,16 @@ export function PartDetailModal() {
   );
 }
 
+// To the cent: these are actual prices and proceeds, and rounding $44.99 to $45 states
+// something the listing does not say.
 function formatMoney(value: number | null | undefined): string {
   if (value == null) return '—';
-  return value.toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
+  return value.toLocaleString('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
 }
 
 function EditField({ label, className, children }: { label: string; className?: string; children: React.ReactNode }) {

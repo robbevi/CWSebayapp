@@ -1,6 +1,6 @@
 import { useState, type ReactElement } from 'react';
 import { CheckCircle2, ChevronDown, ClipboardList, Wrench } from 'lucide-react';
-import type { PartGroup, SalesIndex, WorkflowStatus } from '@warehouse/shared';
+import type { Listing, PartGroup, SalesIndex, WorkflowStatus } from '@warehouse/shared';
 import { cn } from '../lib/cn';
 import { PartCard } from './PartCard';
 
@@ -14,10 +14,12 @@ export function BucketColumn({
   status,
   parts,
   salesIndex,
+  listingsIndex,
 }: {
   status: WorkflowStatus;
   parts: PartGroup[];
   salesIndex: SalesIndex;
+  listingsIndex: Map<string, Listing>;
 }) {
   const meta = BUCKET_META[status];
   // Mobile stacks all three buckets vertically, so an expanded one buries the others under
@@ -56,7 +58,9 @@ export function BucketColumn({
             No parts match the selected filters in this bucket.
           </div>
         ) : (
-          parts.map((p) => <PartCard key={p.id} part={p} salesIndex={salesIndex} />)
+          parts.map((p) => (
+            <PartCard key={p.id} part={p} salesIndex={salesIndex} listingsIndex={listingsIndex} />
+          ))
         )}
       </div>
     </div>

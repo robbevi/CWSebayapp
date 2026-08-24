@@ -1,10 +1,11 @@
 import { useState } from 'react';
-import { Download, Info, Moon, Sun, Target, Trophy, X } from 'lucide-react';
+import { Download, Info, Moon, RefreshCw, Sun, Target, Trophy, X } from 'lucide-react';
 import calfracLogo from '../assets/calfrac-logo.png';
 import spareWordmark from '../assets/spare-wordmark-light.png';
 
 import { useDarkMode } from '../hooks/useDarkMode';
 import { useGoalsPopupStore } from '../state/useGoalsPopupStore';
+import { useSalesStatus, useSyncSales } from '../hooks/useSales';
 import { useUserStore } from '../state/useUserStore';
 import { Scoreboard } from './Scoreboard';
 import { SpareMark } from './ui/SpareMark';
@@ -15,6 +16,8 @@ export function Header() {
   const [dark, setDark] = useDarkMode();
   const currentUser = useUserStore((s) => s.currentUser);
   const setGoalsOpen = useGoalsPopupStore((s) => s.setOpen);
+  const { data: salesStatus } = useSalesStatus();
+  const syncSales = useSyncSales();
 
   return (
     <header className="flex shrink-0 items-center gap-3 bg-primaryDeep px-6 py-4">
@@ -52,6 +55,21 @@ export function Header() {
       >
         <Trophy size={20} />
       </button>
+      {/* Only shown once eBay is connected — a button that can only fail is worse than no
+          button. Sales also refresh on their own; this is for wanting them now. */}
+      {salesStatus?.ebayConfigured && (
+        <button
+          type="button"
+          onClick={() => syncSales.mutate(undefined)}
+          disabled={syncSales.isPending}
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-white hover:bg-white/10 disabled:opacity-50"
+          aria-label={syncSales.isPending ? 'Syncing with eBay' : 'Sync with eBay'}
+          title={syncSales.isPending ? 'Syncing with eBay…' : 'Sync sales and listings from eBay'}
+        >
+          <RefreshCw size={20} className={syncSales.isPending ? 'animate-spin' : undefined} />
+        </button>
+      )}
+
       {/* A plain link, not a fetch: the endpoint sends Content-Disposition: attachment, so
           the browser saves it directly and never has to hold the whole file in memory. */}
       <a

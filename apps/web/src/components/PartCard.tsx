@@ -16,8 +16,10 @@ import {
   getGroupDiscrepancy,
   isHighPriority,
   isPositiveMargin,
+  listingFor,
   salesForGroup,
   soldPosition,
+  type Listing,
   type PartGroup,
   type SalesIndex,
 } from '@warehouse/shared';
@@ -30,10 +32,22 @@ function money(value: number): string {
   return value.toLocaleString('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2 });
 }
 
-export function PartCard({ part, salesIndex }: { part: PartGroup; salesIndex: SalesIndex }) {
+export function PartCard({
+  part,
+  salesIndex,
+  listingsIndex,
+}: {
+  part: PartGroup;
+  salesIndex: SalesIndex;
+  listingsIndex: Map<string, Listing>;
+}) {
   const set = useUIStore((s) => s.set);
   const sold = soldPosition(part, salesForGroup(part, salesIndex));
-  const askingPrice = part.activeRecoveryPriceBasis ?? 0;
+  // What eBay says it is asking, not what the spreadsheet hoped for. The two differ —
+  // one belt is listed at $60 against a $44.99 basis — and the live figure is the one
+  // that matches the listing.
+  const listing = listingFor(part.records, listingsIndex);
+  const askingPrice = listing?.price ?? part.activeRecoveryPriceBasis ?? 0;
   const discrepancy = getGroupDiscrepancy(part);
   // A SKU stocked in more than one bin collapses to a single card, so the card has to say
   // so — otherwise the quantity looks wrong against any one shelf.
@@ -157,14 +171,15 @@ export function PartCard({ part, salesIndex }: { part: PartGroup; salesIndex: Sa
           // Nothing sold yet, but it's up for sale — show what it's asking for. Not gated
           // on the part being finished: most listings are still mid-workflow.
           part.itemListed && (
-            <Pill className="w-full border-sky-200 bg-sky-50 font-semibold text-sky-700">
+            /* Full width: "Listed on eBay - $1,260.00" does not fit a half-width pill. */
+            <Pill className="col-span-2 w-full border-sky-200 bg-sky-50 font-semibold text-sky-700">
               <Tag size={12} className="shrink-0" />
-              {/* Imported rows without a price basis would otherwise advertise $0.00. */}
+              {/* Imported rows without any price would otherwise advertise $0.00. */}
               <span
                 className="truncate"
                 title={askingPrice > 0 ? `Listed on eBay at ${money(askingPrice)}` : 'Listed on eBay'}
               >
-                {askingPrice > 0 ? `On eBay · ${money(askingPrice)}` : 'On eBay'}
+                {askingPrice > 0 ? `Listed on eBay - ${money(askingPrice)}` : 'Listed on eBay'}
               </span>
             </Pill>
           )
