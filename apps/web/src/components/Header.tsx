@@ -21,7 +21,7 @@ export function Header() {
       <span aria-hidden="true" className="h-8 w-px shrink-0 bg-white/20" />
       {/* Drawn in white and orange straight onto the green — no light chip needed, which
           is the whole point of it being vector rather than a flat navy image. */}
-      <SpareMark className="h-9 w-9 shrink-0" gear="#ffffff" title="SPARE" />
+      <SpareMark className="h-9 w-9 shrink-0" frame="#ffffff" title="SPARE" />
       <div className="min-w-0">
         <h1 className="text-xl font-bold leading-none tracking-[0.22em] text-white">SPARE</h1>
         <p className="mt-1 hidden text-[10px] font-medium uppercase leading-tight tracking-[0.12em] text-white/55 sm:block">

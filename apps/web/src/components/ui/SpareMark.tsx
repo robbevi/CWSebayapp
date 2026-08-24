@@ -1,46 +1,67 @@
 /**
- * The SPARE mark, drawn rather than imported.
+ * The SPARE mark.
  *
- * A gear for the parts, and two arrows circling inside it for the recovery loop — stock
- * comes off a machine, gets catalogued, and goes back out to another buyer. Vector so it
- * stays crisp at any size and takes its colours from props, which is what lets it sit
- * straight on the green header instead of needing a light chip behind it.
+ * A gear ring holding an S built from warehouse racking — three shelves and two risers,
+ * with the middle shelf picked out in the accent. Parts, on a shelf, inside the machinery
+ * they came off.
+ *
+ * The S is drawn in straight lines at a single weight, which is what lets it survive being
+ * shrunk: the earlier curved letterform thickened into a blur before favicon size.
+ *
+ * Colours come from props rather than being baked in, so the mark sits straight on the
+ * green header, on white, and in dark mode without a light chip propping it up.
  */
+
+// Three shelves at 27 / 44.5 / 62, risers closing the S on alternating sides.
+const SHELF = { x: 28, w: 44, h: 11, r: 2.5 };
+const RISER_H = 28.5;
+
+const GEAR =
+  'M 95.80 45.67 L 95.80 54.33 L 89.66 55.19 L 87.99 62.53 L 93.14 65.97 L 89.38 73.77 L 83.48 71.89 ' +
+  'L 78.79 77.77 L 81.94 83.11 L 75.17 88.50 L 70.67 84.25 L 63.89 87.51 L 64.41 93.68 L 55.97 95.61 ' +
+  'L 53.76 89.82 L 46.24 89.82 L 44.03 95.61 L 35.59 93.68 L 36.11 87.51 L 29.33 84.25 L 24.83 88.50 ' +
+  'L 18.06 83.11 L 21.21 77.77 L 16.52 71.89 L 10.62 73.77 L 6.86 65.97 L 12.01 62.53 L 10.34 55.19 ' +
+  'L 4.20 54.33 L 4.20 45.67 L 10.34 44.81 L 12.01 37.47 L 6.86 34.03 L 10.62 26.23 L 16.52 28.11 ' +
+  'L 21.21 22.23 L 18.06 16.89 L 24.83 11.50 L 29.33 15.75 L 36.11 12.49 L 35.59 6.32 L 44.03 4.39 ' +
+  'L 46.24 10.18 L 53.76 10.18 L 55.97 4.39 L 64.41 6.32 L 63.89 12.49 L 70.67 15.75 L 75.17 11.50 ' +
+  'L 81.94 16.89 L 78.79 22.23 L 83.48 28.11 L 89.38 26.23 L 93.14 34.03 L 87.99 37.47 L 89.66 44.81 Z ' +
+  // Second circle wound the same way, punched out by evenodd to leave a ring.
+  'M 84.00 50.00 A 34.00 34.00 0 1 0 16.00 50.00 A 34.00 34.00 0 1 0 84.00 50.00 Z';
+
 export function SpareMark({
   className,
-  gear = 'currentColor',
+  frame = 'currentColor',
   accent = '#f5851f',
   title,
 }: {
   className?: string;
-  gear?: string;
+  /** The gear and the shelves. */
+  frame?: string;
+  /** The middle shelf. */
   accent?: string;
   title?: string;
 }) {
   return (
-    <svg viewBox="0 0 100 100" className={className} role={title ? 'img' : undefined} aria-hidden={title ? undefined : true}>
+    <svg
+      viewBox="0 0 100 100"
+      className={className}
+      role={title ? 'img' : undefined}
+      aria-hidden={title ? undefined : true}
+    >
       {title && <title>{title}</title>}
 
-      {/* Twelve teeth: enough to read as machinery, few enough to survive at 20px. */}
-      <path
-        fill={gear}
-        fillRule="evenodd"
-        d="M 95.72 44.95 L 95.72 55.05 L 88.55 55.90 L 86.34 64.17 L 92.12 68.49 L 87.07 77.23 L 80.44 74.38 L 74.38 80.44 L 77.23 87.07 L 68.49 92.12 L 64.17 86.34 L 55.90 88.55 L 55.05 95.72 L 44.95 95.72 L 44.10 88.55 L 35.83 86.34 L 31.51 92.12 L 22.77 87.07 L 25.62 80.44 L 19.56 74.38 L 12.93 77.23 L 7.88 68.49 L 13.66 64.17 L 11.45 55.90 L 4.28 55.05 L 4.28 44.95 L 11.45 44.10 L 13.66 35.83 L 7.88 31.51 L 12.93 22.77 L 19.56 25.62 L 25.62 19.56 L 22.77 12.93 L 31.51 7.88 L 35.83 13.66 L 44.10 11.45 L 44.95 4.28 L 55.05 4.28 L 55.90 11.45 L 64.17 13.66 L 68.49 7.88 L 77.23 12.93 L 74.38 19.56 L 80.44 25.62 L 87.07 22.77 L 92.12 31.51 L 86.34 35.83 L 88.55 44.10 Z M 80.00 50.00 A 30.00 30.00 0 1 0 20.00 50.00 A 30.00 30.00 0 1 0 80.00 50.00 Z"
-      />
+      <path fill={frame} fillRule="evenodd" d={GEAR} />
 
-      {/* One S, drawn as two halves that meet at the centre on a shared tangent, so it
-          reads as a continuous letter rather than as two loose arrows. The S is both the
-          initial and the way a recycling mark is drawn — a part goes out, value comes
-          back. Stroked so the weight stays even through the curves. */}
-      <g strokeWidth="11" strokeLinecap="butt" fill="none">
-        {/* Upper bowl, heading out to a buyer. */}
-        <path stroke={accent} d="M 50 50 C 43 48 34 45 34 38 C 34 29 47 25 58 30" />
-        {/* Lower bowl, bringing the value back. */}
-        <path stroke={gear} d="M 50 50 C 57 52 66 55 66 62 C 66 71 53 75 42 70" />
+      <g fill={frame}>
+        <rect x={SHELF.x} y={27} width={SHELF.w} height={SHELF.h} rx={SHELF.r} />
+        <rect x={SHELF.x} y={62} width={SHELF.w} height={SHELF.h} rx={SHELF.r} />
+        {/* Risers are what turn three parallel shelves into a letter. */}
+        <rect x={SHELF.x} y={27} width={SHELF.h} height={RISER_H} rx={SHELF.r} />
+        <rect x={SHELF.x + SHELF.w - SHELF.h} y={44.5} width={SHELF.h} height={RISER_H} rx={SHELF.r} />
       </g>
-      {/* Terminals, each aimed along its own curve's tangent. */}
-      <path fill={accent} d="M 58 30 L 40.6 32 L 48.1 15.6 Z" />
-      <path fill={gear} d="M 42 70 L 59.4 68 L 51.9 84.4 Z" />
+
+      {/* Middle shelf last, so it reads as the one carrying stock. */}
+      <rect x={SHELF.x} y={44.5} width={SHELF.w} height={SHELF.h} rx={SHELF.r} fill={accent} />
     </svg>
   );
 }
