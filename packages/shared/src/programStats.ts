@@ -1,5 +1,14 @@
 import { type DiscrepancyLogEntry } from './discrepancy.js';
-import { indexSales, salesForGroup, soldPosition, totalsFor, type Sale, type SaleTotals } from './sales.js';
+import {
+  indexSales,
+  isSaleTracked,
+  salesForGroup,
+  soldPosition,
+  totalsFor,
+  trackedKeys,
+  type Sale,
+  type SaleTotals,
+} from './sales.js';
 import { type PartGroup } from './grouping.js';
 import { getCheckpoints } from './status.js';
 import { chicagoDateString, mondayOf } from './submissions.js';
@@ -244,4 +253,33 @@ export function computeStandingCounts(groups: PartGroup[]): StandingCounts {
   }
 
   return { qtyConfirmed, shelved, needsReview };
+}
+
+
+export interface SplitSaleTotals {
+  /** Sales tied to a part on the board — what this programme itself has returned. */
+  tracked: SaleTotals;
+  /** Real revenue with no part behind it, usually sold before the app existed. */
+  untracked: SaleTotals;
+  all: SaleTotals;
+}
+
+/**
+ * Revenue split by whether the sale can be attributed to a part. Both halves are counted:
+ * hiding the untracked half would understate what the eBay account actually earned, and
+ * merging them would overstate what the programme can take credit for.
+ */
+export function computeSalesTotalsSplit(
+  sales: Sale[],
+  groups: PartGroup[],
+  period: StatPeriod = 'all',
+  now: Date = new Date()
+): SplitSaleTotals {
+  const inWindow =
+    period === 'all' ? sales : sales.filter((s) => isInPeriod(s.soldAt, period, now, instantDay));
+  const keys = trackedKeys(groups);
+  const tracked: Sale[] = [];
+  const untracked: Sale[] = [];
+  for (const s of inWindow) (isSaleTracked(s, keys) ? tracked : untracked).push(s);
+  return { tracked: totalsFor(tracked), untracked: totalsFor(untracked), all: totalsFor(inWindow) };
 }

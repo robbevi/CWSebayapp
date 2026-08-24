@@ -4,6 +4,7 @@ import {
   catalogueValue,
   computeDiscrepancyTotals,
   computeProgramTotals,
+  computeSalesTotalsSplit,
   computeStandingValue,
   extendedValue,
   percentOf,
@@ -284,6 +285,51 @@ describe('computeDiscrepancyTotals', () => {
 
   it('is empty when nothing has been counted', () => {
     expect(computeDiscrepancyTotals([], 'all', NOW)).toEqual({ skus: 0, netUnits: 0 });
+  });
+});
+
+describe('computeSalesTotalsSplit', () => {
+  const s = (over: Partial<Sale> & { lineItemId: string }): Sale => ({
+    orderId: 'o', soldAt: '2026-08-20T12:00:00Z', ebayListingId: '', sku: '', qtySold: 1,
+    grossSale: 100, shipping: 0, tax: 0, fees: 10, netProceeds: 90, currency: 'USD',
+    feesEstimated: false, syncedAt: '', ...over,
+  });
+
+  const groups = groupPartsBySku([part({ id: 'a', sku: 'X1', ebayListingId: '3982' })]);
+
+  it('separates revenue with a part behind it from revenue without', () => {
+    const split = computeSalesTotalsSplit(
+      [
+        s({ lineItemId: '1', ebayListingId: '3982', grossSale: 1260, netProceeds: 1102 }),
+        s({ lineItemId: '2', ebayListingId: '3977', grossSale: 400, netProceeds: 355 }),
+      ],
+      groups,
+      'all'
+    );
+    expect(split.tracked.net).toBe(1102);
+    expect(split.untracked.net).toBe(355);
+  });
+
+  it('always reconciles: tracked plus untracked equals the whole', () => {
+    const sales = [
+      s({ lineItemId: '1', ebayListingId: '3982', netProceeds: 1102, qtySold: 1 }),
+      s({ lineItemId: '2', ebayListingId: '3977', netProceeds: 355, qtySold: 2 }),
+      s({ lineItemId: '3', sku: 'X1', netProceeds: 40, qtySold: 3 }),
+    ];
+    const split = computeSalesTotalsSplit(sales, groups, 'all');
+    expect(split.tracked.net + split.untracked.net).toBe(split.all.net);
+    expect(split.tracked.qty + split.untracked.qty).toBe(split.all.qty);
+  });
+
+  it('applies the period to both halves', () => {
+    const NOW = new Date('2026-08-20T18:00:00Z');
+    const sales = [
+      s({ lineItemId: '1', ebayListingId: '3982', soldAt: '2026-08-20T10:00:00Z' }),
+      s({ lineItemId: '2', ebayListingId: '3977', soldAt: '2026-03-12T10:00:00Z' }),
+    ];
+    const today = computeSalesTotalsSplit(sales, groups, 'day', NOW);
+    expect(today.tracked.orders).toBe(1);
+    expect(today.untracked.orders).toBe(0);
   });
 });
 

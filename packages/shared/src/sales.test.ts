@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { groupPartsBySku } from './grouping.js';
-import { indexSales, salesForGroup, soldPosition, totalsFor, type Sale } from './sales.js';
+import {
+  indexSales,
+  isSaleTracked,
+  salesForGroup,
+  soldPosition,
+  totalsFor,
+  trackedKeys,
+  type Sale,
+} from './sales.js';
 import type { InventoryPart } from './types.js';
 
 function part(over: Partial<InventoryPart> & { sku: string; id: string }): InventoryPart {
@@ -125,5 +133,27 @@ describe('soldPosition', () => {
   it('is not sold out when nothing has sold', () => {
     const [g] = groupPartsBySku([part({ id: 'a', sku: 'X1', qoh: 0 })]);
     expect(soldPosition(g, []).soldOut).toBe(false);
+  });
+});
+
+
+describe('isSaleTracked', () => {
+  const groups = groupPartsBySku([
+    part({ id: 'a', sku: 'X1', ebayListingId: '398221087694' }),
+    part({ id: 'b', sku: 'X2' }),
+  ]);
+  const keys = trackedKeys(groups);
+
+  it('tracks a sale whose listing id is on a part', () => {
+    expect(isSaleTracked(sale({ lineItemId: 's', ebayListingId: '398221087694', sku: '' }), keys)).toBe(true);
+  });
+
+  it('tracks a sale by SKU when the listing id is unknown', () => {
+    expect(isSaleTracked(sale({ lineItemId: 's', ebayListingId: '999', sku: 'x2' }), keys)).toBe(true);
+  });
+
+  it('does not track a sale for something never catalogued', () => {
+    // The pre-app sales look exactly like this: an older listing id and no custom label.
+    expect(isSaleTracked(sale({ lineItemId: 's', ebayListingId: '397706303060', sku: '' }), keys)).toBe(false);
   });
 });

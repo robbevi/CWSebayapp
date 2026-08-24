@@ -19,7 +19,7 @@ import {
   catalogueValue,
   computeDiscrepancyTotals,
   computeProgramTotals,
-  computeSalesTotals,
+  computeSalesTotalsSplit,
   computeStandingCounts,
   computeStandingValue,
   GOALS,
@@ -149,7 +149,10 @@ export function Scoreboard({ onClose }: { onClose: () => void }) {
   // that reads as throughput: "we got through 4% of the catalogue this week".
   const catalogueSize = groups.length;
   const catalogueWorth = useMemo(() => catalogueValue(groups), [groups]);
-  const revenue = useMemo(() => computeSalesTotals(sales ?? [], period), [sales, period]);
+  const revenue = useMemo(
+    () => computeSalesTotalsSplit(sales ?? [], groups, period),
+    [sales, groups, period]
+  );
   // Standing figures describe the pile as it is now, so they don't move with the period.
   const standing = useMemo(() => computeStandingValue(groups, sales ?? []), [groups, sales]);
   const checkpoints = useMemo(() => computeStandingCounts(groups), [groups]);
@@ -263,11 +266,20 @@ export function Scoreboard({ onClose }: { onClose: () => void }) {
               sub={`${percentOf(totals.recoveryValue, catalogueWorth)} of catalogue`}
               icon={<DollarSign size={13} />}
             />
+            {/* Only the tracked half is credited to the programme. The untracked rest is
+                real money, so it is named rather than dropped and the figures still
+                reconcile against eBay's own report. */}
             <HeadlineStat
               label="Revenue Recovered"
-              value={revenue.net}
+              value={revenue.tracked.net}
               format="money"
-              sub={revenue.gross > 0 ? `${formatMoneyShort(revenue.gross)} gross` : 'net of eBay fees'}
+              sub={
+                revenue.untracked.net > 0
+                  ? `+${formatMoneyShort(revenue.untracked.net)} untracked`
+                  : revenue.tracked.gross > 0
+                    ? `${formatMoneyShort(revenue.tracked.gross)} gross`
+                    : 'net of eBay fees'
+              }
               icon={<Wallet size={13} />}
             />
             <HeadlineStat
@@ -298,8 +310,14 @@ export function Scoreboard({ onClose }: { onClose: () => void }) {
             />
             <HeadlineStat
               label="Units Sold"
-              value={revenue.qty}
-              sub={revenue.orders > 0 ? `${revenue.orders} orders` : 'none yet'}
+              value={revenue.tracked.qty}
+              sub={
+                revenue.untracked.qty > 0
+                  ? `+${revenue.untracked.qty} untracked`
+                  : revenue.tracked.orders > 0
+                    ? `${revenue.tracked.orders} orders`
+                    : 'none yet'
+              }
               icon={<ShoppingCart size={13} />}
             />
             <HeadlineStat

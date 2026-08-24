@@ -105,3 +105,29 @@ export function soldPosition(group: PartGroup, sales: Sale[]): SoldPosition {
     totals,
   };
 }
+
+
+/**
+ * The listing ids and SKUs the app knows about. A sale is "tracked" when it can be tied
+ * to a part on the board; anything else is real revenue the app has no record behind —
+ * typically an item sold before it was ever catalogued here.
+ */
+export interface TrackedKeys {
+  listingIds: Set<string>;
+  skus: Set<string>;
+}
+
+export function trackedKeys(groups: PartGroup[]): TrackedKeys {
+  const listingIds = new Set<string>();
+  const skus = new Set<string>();
+  for (const g of groups) {
+    skus.add(g.sku.toUpperCase());
+    for (const r of g.records) if (r.ebayListingId) listingIds.add(r.ebayListingId);
+  }
+  return { listingIds, skus };
+}
+
+export function isSaleTracked(sale: Sale, keys: TrackedKeys): boolean {
+  if (sale.ebayListingId && keys.listingIds.has(sale.ebayListingId)) return true;
+  return !!sale.sku && keys.skus.has(sale.sku.toUpperCase());
+}
