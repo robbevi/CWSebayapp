@@ -3,6 +3,7 @@ import { ChevronDown, ClipboardList, Tag, Wrench } from 'lucide-react';
 import { salesForGroup, type Listing, type PartGroup, type SalesIndex, type WorkflowStatus } from '@warehouse/shared';
 import { cn } from '../lib/cn';
 import { PartCard } from './PartCard';
+import { SelectDropdown } from './ui/SelectDropdown';
 
 const BUCKET_META: Record<WorkflowStatus, { label: string; icon: ReactElement; badgeBg: string; iconColor: string }> = {
   NotStarted: { label: 'Not Started', icon: <ClipboardList size={18} />, badgeBg: 'bg-blue-500', iconColor: 'text-white' },
@@ -44,65 +45,80 @@ export function BucketColumn({
 
   return (
     <div className="flex flex-col rounded-card border border-border bg-surfaceMuted lg:h-full lg:min-h-0">
-      <button
-        type="button"
-        onClick={() => setExpanded((e) => !e)}
-        aria-expanded={expanded}
-        className="flex w-full items-center gap-3 rounded-t-card border-b border-border bg-columnHeaderBg p-4 text-left lg:pointer-events-none"
-      >
-        <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${meta.badgeBg} ${meta.iconColor}`}>
-          {meta.icon}
-        </div>
-        <span className="text-sm font-semibold text-textPri">{meta.label}</span>
-        <span className="ml-auto rounded-pill border border-border bg-surface px-2.5 py-1 text-xs font-semibold text-textMuted">
-          {shown.length}
-        </span>
-        <ChevronDown
-          size={18}
-          className={cn('shrink-0 text-textMuted transition-transform lg:hidden', expanded && 'rotate-180')}
-        />
-      </button>
-      {/* Tabs rather than a segmented control: this changes what you are looking at, not a
-          mode you are setting, and in a 396px column the lighter object is the right one —
-          the cards below are the content, and the control should not outweigh them. */}
-      {split && (
-        <div
-          role="tablist"
-          aria-label="Filter by eBay state"
-          className={cn(
-            'shrink-0 gap-4 border-b border-border px-4 lg:flex',
-            expanded ? 'flex' : 'hidden'
-          )}
+      <div className="flex w-full items-center gap-3 rounded-t-card border-b border-border bg-columnHeaderBg p-4">
+        {/* Only the left of the header toggles the column, so the count beside it can be a
+            control of its own. Inert from lg up, where columns are always open. */}
+        <button
+          type="button"
+          onClick={() => setExpanded((e) => !e)}
+          aria-expanded={expanded}
+          className="flex flex-1 items-center gap-3 text-left lg:pointer-events-none"
         >
-          {(
-            [
-              ['all', 'All', parts.length],
-              ['listed', 'Listed', split.listed.length],
-              ['sold', 'Sold', split.sold.length],
-            ] as const
-          ).map(([key, label, count]) => {
-            const active = ebayView === key;
-            return (
-              <button
-                key={key}
-                type="button"
-                role="tab"
-                aria-selected={active}
-                onClick={() => setEbayView(key)}
+          <div
+            className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${meta.badgeBg} ${meta.iconColor}`}
+          >
+            {meta.icon}
+          </div>
+          <span className="text-sm font-semibold text-textPri">{meta.label}</span>
+        </button>
+
+        {split ? (
+          /* The count is the control. Clicking it offers All / Listed / Sold, so nothing
+             takes up room until it is asked for. */
+          <SelectDropdown
+            options={[
+              `All ${parts.length}`,
+              `Listed ${split.listed.length}`,
+              `Sold ${split.sold.length}`,
+            ]}
+            value={
+              ebayView === 'listed'
+                ? `Listed ${split.listed.length}`
+                : ebayView === 'sold'
+                  ? `Sold ${split.sold.length}`
+                  : `All ${parts.length}`
+            }
+            // Matched on the leading word, since the counts move as things sell.
+            onChange={(v) =>
+              setEbayView(v.startsWith('Listed') ? 'listed' : v.startsWith('Sold') ? 'sold' : 'all')
+            }
+            renderTrigger={({ open }) => (
+              <span
                 className={cn(
-                  'flex min-h-0 items-center gap-1.5 border-b-2 py-2.5 text-xs font-semibold transition-colors',
-                  active
-                    ? 'border-primary text-primary'
-                    : 'border-transparent text-textMuted hover:text-textPri'
+                  'flex items-center gap-1 rounded-pill border bg-surface px-2.5 py-1 text-xs font-semibold',
+                  ebayView === 'all'
+                    ? 'border-border text-textMuted'
+                    : 'border-primary/40 text-primary',
+                  open && 'border-primary/50 ring-2 ring-primary/40'
                 )}
+                title="Show all, only listed, or only sold"
               >
-                {label}
-                <span className="font-medium tabular-nums text-textMuted">{count}</span>
-              </button>
-            );
-          })}
-        </div>
-      )}
+                {ebayView !== 'all' && (
+                  <span className="font-medium">{ebayView === 'sold' ? 'Sold' : 'Listed'}</span>
+                )}
+                {shown.length}
+                <ChevronDown size={12} className={cn('transition-transform', open && 'rotate-180')} />
+              </span>
+            )}
+          />
+        ) : (
+          <span className="rounded-pill border border-border bg-surface px-2.5 py-1 text-xs font-semibold text-textMuted">
+            {shown.length}
+          </span>
+        )}
+
+        <button
+          type="button"
+          onClick={() => setExpanded((e) => !e)}
+          aria-label={expanded ? 'Collapse' : 'Expand'}
+          className="min-h-0 shrink-0 lg:hidden"
+        >
+          <ChevronDown
+            size={18}
+            className={cn('text-textMuted transition-transform', expanded && 'rotate-180')}
+          />
+        </button>
+      </div>
 
       <div
         className={cn(

@@ -27,6 +27,11 @@ interface SelectDropdownProps {
   /** Extra classes for the value text span (e.g. text-center). */
   valueClassName?: string;
   onChange: (value: string) => void;
+  /**
+   * Replaces the default bordered trigger. Used where the control has to look like
+   * something already on the page — a count badge, say — rather than a form field.
+   */
+  renderTrigger?: (state: { open: boolean; value: string }) => ReactNode;
 }
 
 // Fully custom single-select popover instead of a native <select> — the browser's own
@@ -43,6 +48,7 @@ export function SelectDropdown({
   valuePrefix,
   valueClassName,
   onChange,
+  renderTrigger,
 }: SelectDropdownProps) {
   const isMuted = !value || value === mutedValue;
   const [open, setOpen] = useState(false);
@@ -89,22 +95,32 @@ export function SelectDropdown({
           openedAt.current = Date.now();
           setOpen((o) => !o);
         }}
-        className={cn(
-          'flex w-full items-center gap-2 rounded-btn border border-border bg-surface px-3 py-2 text-left text-xs',
-          isMuted ? 'text-textMuted' : 'text-textPri',
-          'hover:border-primary/50',
-          open && 'border-primary/50 ring-2 ring-primary/40',
-          triggerClassName
-        )}
+        className={
+          renderTrigger
+            ? 'min-h-0'
+            : cn(
+                'flex w-full items-center gap-2 rounded-btn border border-border bg-surface px-3 py-2 text-left text-xs',
+                isMuted ? 'text-textMuted' : 'text-textPri',
+                'hover:border-primary/50',
+                open && 'border-primary/50 ring-2 ring-primary/40',
+                triggerClassName
+              )
+        }
       >
-        {icon && <span className="shrink-0 text-textMuted">{icon}</span>}
-        <span className={cn('flex-1 truncate', valueClassName)}>
-          {value ? `${valuePrefix ?? ''}${value}` : placeholder}
-        </span>
-        <ChevronDown
-          size={14}
-          className={cn('shrink-0 text-textMuted transition-transform', open && 'rotate-180')}
-        />
+        {renderTrigger ? (
+          renderTrigger({ open, value })
+        ) : (
+          <>
+            {icon && <span className="shrink-0 text-textMuted">{icon}</span>}
+            <span className={cn('flex-1 truncate', valueClassName)}>
+              {value ? `${valuePrefix ?? ''}${value}` : placeholder}
+            </span>
+            <ChevronDown
+              size={14}
+              className={cn('shrink-0 text-textMuted transition-transform', open && 'rotate-180')}
+            />
+          </>
+        )}
       </button>
 
       {open && (
