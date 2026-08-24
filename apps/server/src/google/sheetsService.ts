@@ -4,6 +4,7 @@ import type {
   DiscrepancyLogEntry,
   InventoryPart,
   InventoryPartPatch,
+  Listing,
   Photo,
   Sale,
   Submission,
@@ -31,6 +32,18 @@ const SALES_HEADERS = [
   'netProceeds',
   'currency',
   'feesEstimated',
+  'syncedAt',
+];
+const LISTINGS_SHEET = 'Listings';
+const LISTINGS_HEADERS = [
+  'ebayListingId',
+  'title',
+  'price',
+  'currency',
+  'quantityAvailable',
+  'watchers',
+  'impressions',
+  'views',
   'syncedAt',
 ];
 const DISCREPANCIES_SHEET = 'Discrepancies';
@@ -739,4 +752,71 @@ export async function upsertSales(sales: Sale[]): Promise<SaleWriteResult> {
   }
 
   return { added: appends.length, updated: updates.length, unchanged };
+}
+
+
+async function ensureListingsSheet(): Promise<void> {
+  await ensureLogSheet(LISTINGS_SHEET, LISTINGS_HEADERS);
+}
+
+export async function getListings(): Promise<Listing[]> {
+  await ensureListingsSheet();
+  const sheets = getSheetsClient();
+  const res = await sheets.spreadsheets.values.get({ spreadsheetId: env.googleSheetId, range: LISTINGS_SHEET });
+  const [, ...rows] = res.data.values ?? [];
+  return rows
+    .filter((row) => row.length > 0 && row[0])
+    .map((row) => ({
+      ebayListingId: String(row[0] ?? ''),
+      title: String(row[1] ?? ''),
+      price: Number(row[2] ?? 0),
+      currency: String(row[3] ?? 'USD'),
+      quantityAvailable: Number(row[4] ?? 0),
+      watchers: Number(row[5] ?? 0),
+      // Blank means eBay reported nothing, which is not the same as zero views.
+      impressions: row[6] === '' || row[6] === undefined ? null : Number(row[6]),
+      views: row[7] === '' || row[7] === undefined ? null : Number(row[7]),
+      syncedAt: String(row[8] ?? ''),
+    }));
+}
+
+function listingToRow(l: Listing): unknown[] {
+  return [
+    l.ebayListingId,
+    l.title,
+    l.price,
+    l.currency,
+    l.quantityAvailable,
+    l.watchers,
+    l.impressions ?? '',
+    l.views ?? '',
+    l.syncedAt,
+  ];
+}
+
+/**
+ * Replaces the listings snapshot wholesale.
+ *
+ * Unlike sales, this is current state rather than history: watchers move daily and a
+ * listing that has ended should disappear rather than linger with a stale count. Rewriting
+ * the tab is also cheaper than diffing several hundred rows that all changed anyway.
+ */
+export async function replaceListings(listings: Listing[]): Promise<number> {
+  await ensureListingsSheet();
+  const sheets = getSheetsClient();
+  const lastCol = colLetter(LISTINGS_HEADERS.length - 1);
+
+  await sheets.spreadsheets.values.clear({
+    spreadsheetId: env.googleSheetId,
+    range: `${LISTINGS_SHEET}!A2:${lastCol}`,
+  });
+  if (listings.length === 0) return 0;
+
+  await sheets.spreadsheets.values.update({
+    spreadsheetId: env.googleSheetId,
+    range: `${LISTINGS_SHEET}!A2:${lastCol}${listings.length + 1}`,
+    valueInputOption: 'USER_ENTERED',
+    requestBody: { values: listings.map(listingToRow) },
+  });
+  return listings.length;
 }

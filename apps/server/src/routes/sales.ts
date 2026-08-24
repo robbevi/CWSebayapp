@@ -1,7 +1,8 @@
 import { Router } from 'express';
 import { isGoogleConfigured } from '../config/env.js';
+import { fetchListings } from '../ebay/listingsService.js';
 import { fetchSales, isEbayConfigured } from '../ebay/ordersService.js';
-import { getSales, upsertSales } from '../google/sheetsService.js';
+import { getListings, getSales, replaceListings, upsertSales } from '../google/sheetsService.js';
 
 export const salesRouter = Router();
 
@@ -18,6 +19,18 @@ salesRouter.get('/sales', async (_req, res, next) => {
       return;
     }
     res.json(await getSales());
+  } catch (err) {
+    next(err);
+  }
+});
+
+salesRouter.get('/listings', async (_req, res, next) => {
+  try {
+    if (!isGoogleConfigured()) {
+      res.json([]);
+      return;
+    }
+    res.json(await getListings());
   } catch (err) {
     next(err);
   }
@@ -51,10 +64,24 @@ salesRouter.post('/sales/sync', async (req, res, next) => {
 
     const sales = await fetchSales(since);
     const result = await upsertSales(sales);
+
+    // Listings ride along with the same button. A failure here must not lose the sales
+    // that were just written, so it is reported rather than thrown.
+    let listings = 0;
+    let listingsError: string | undefined;
+    try {
+      listings = await replaceListings(await fetchListings());
+    } catch (err) {
+      listingsError = err instanceof Error ? err.message : String(err);
+      console.warn('[ebay] Listing sync failed:', listingsError);
+    }
+
     res.json({
       ...result,
       fetched: sales.length,
       estimatedFees: sales.filter((s) => s.feesEstimated).length,
+      listings,
+      listingsError,
       since: since.toISOString(),
     });
   } catch (err) {

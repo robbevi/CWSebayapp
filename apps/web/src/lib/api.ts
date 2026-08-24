@@ -5,6 +5,7 @@ import type {
   HealthStatus,
   InventoryPart,
   InventoryPartPatch,
+  Listing,
   Photo,
   Sale,
   Submission,
@@ -97,11 +98,18 @@ export interface SalesSyncResult {
   unchanged: number;
   fetched: number;
   estimatedFees: number;
+  listings: number;
+  listingsError?: string;
   since: string;
 }
 
 export async function fetchSales(): Promise<Sale[]> {
   const res = await fetch('/api/sales');
+  return parseJson(res);
+}
+
+export async function fetchListings(): Promise<Listing[]> {
+  const res = await fetch('/api/listings');
   return parseJson(res);
 }
 

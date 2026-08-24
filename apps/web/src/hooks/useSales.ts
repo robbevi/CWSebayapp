@@ -24,10 +24,16 @@ export function useSyncSales() {
     mutationFn: (days?: number) => syncSales(days),
     onSuccess: (result) => {
       qc.invalidateQueries({ queryKey: SALES_QUERY_KEY });
+      qc.invalidateQueries({ queryKey: ['listings'] });
       const parts = [`${result.added} new`, `${result.updated} updated`];
       // Worth saying out loud: those figures will move once eBay posts the fee records.
       if (result.estimatedFees > 0) parts.push(`${result.estimatedFees} with estimated fees`);
-      toast(`Synced ${result.fetched} sales — ${parts.join(', ')}`);
+      const listings = result.listingsError
+        ? '; listings failed'
+        : result.listings > 0
+          ? `; ${result.listings} listings refreshed`
+          : '';
+      toast(`Synced ${result.fetched} sales — ${parts.join(', ')}${listings}`);
     },
     onError: (err) => toast(err instanceof Error ? err.message : 'Sales sync failed', 'error'),
   });

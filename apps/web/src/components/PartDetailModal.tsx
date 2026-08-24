@@ -8,7 +8,9 @@ import {
   formatVariance,
   getDiscrepancy,
   groupPartsBySku,
+  indexListings,
   indexSales,
+  listingFor,
   IRON_BARN_BINS,
   salesForGroup,
   soldPosition,
@@ -17,6 +19,7 @@ import {
 import { useBodyScrollLock } from '../hooks/useBodyScrollLock';
 import { useDeletePart } from '../hooks/useDeletePart';
 import { useInventoryParts } from '../hooks/useInventoryParts';
+import { useListings } from '../hooks/useListings';
 import { useSales } from '../hooks/useSales';
 import { useSavePart } from '../hooks/useSavePart';
 import { useUIStore } from '../state/useUIStore';
@@ -83,6 +86,7 @@ export function PartDetailModal() {
   const { selectedId, modalOpen, set } = useUIStore();
   const { data: parts } = useInventoryParts();
   const { data: sales } = useSales();
+  const { data: listings } = useListings();
   const savePart = useSavePart();
   const deletePart = useDeletePart();
   const currentUser = useUserStore((s) => s.currentUser);
@@ -166,6 +170,7 @@ export function PartDetailModal() {
 
   const multiLocation = group.locations.length > 1;
   const partSales = salesForGroup(group, indexSales(sales ?? []));
+  const listing = listingFor(group.records, indexListings(listings ?? []));
   const sold = soldPosition(group, partSales);
   const itemListed = watch('itemListed');
   const needsReview = watch('needsReview');
@@ -424,32 +429,51 @@ export function PartDetailModal() {
                   <span className="font-mono text-[11px] text-textMuted">{part.ebayListingId}</span>
                 )}
               </div>
-              <div className="grid grid-cols-3 gap-2 text-xs">
-                <div>
-                  <div className="text-textMuted">Days Listed</div>
-                  <div className="font-semibold text-textPri">
-                    {daysListed(part.itemListedDate) ?? '—'}
-                  </div>
-                </div>
+
+              <div className="grid grid-cols-3 gap-2 text-xs sm:grid-cols-6">
                 <div>
                   <div className="text-textMuted">Asking</div>
+                  {/* eBay's own price where we have it, since the recovery basis is what we
+                      hoped to get rather than what the listing actually says. */}
                   <div className="font-semibold text-textPri">
-                    {formatMoney(group.activeRecoveryPriceBasis)}
+                    {listing ? formatMoney(listing.price) : formatMoney(group.activeRecoveryPriceBasis)}
                   </div>
                 </div>
                 <div>
-                  <div className="text-textMuted">Listed</div>
-                  <div className="font-semibold text-textPri">
-                    {part.itemListedDate ? part.itemListedDate.slice(0, 10) : '—'}
+                  <div className="text-textMuted">Watchers</div>
+                  <div className={cn('font-semibold', listing && listing.watchers > 0 ? 'text-primary' : 'text-textPri')}>
+                    {listing ? listing.watchers : '—'}
                   </div>
                 </div>
+                <div>
+                  <div className="text-textMuted">Views</div>
+                  <div className="font-semibold text-textPri">{listing?.views ?? '—'}</div>
+                </div>
+                <div>
+                  <div className="text-textMuted">Impressions</div>
+                  <div className="font-semibold text-textPri">{listing?.impressions ?? '—'}</div>
+                </div>
+                <div>
+                  <div className="text-textMuted">Available</div>
+                  <div className="font-semibold text-textPri">{listing ? listing.quantityAvailable : '—'}</div>
+                </div>
+                <div>
+                  <div className="text-textMuted">Days Listed</div>
+                  <div className="font-semibold text-textPri">{daysListed(part.itemListedDate) ?? '—'}</div>
+                </div>
               </div>
-              {/* Orders and fees are synced; watchers, views and offers come from separate
-                  eBay APIs that are not wired up yet. The panel is shaped for them so
-                  adding them is a fill-in rather than a redesign. */}
-              <p className="mt-2 border-t border-border pt-2 text-[11px] text-textMuted">
-                Watchers, views and offers are not synced yet.
-              </p>
+
+              {listing ? (
+                <p className="mt-2 border-t border-border pt-2 text-[11px] text-textMuted">
+                  Views and impressions cover the last 30 days. Refreshed {listing.syncedAt.slice(0, 10)}.
+                </p>
+              ) : (
+                /* The part is flagged as listed here but eBay has no active listing under
+                   that id — usually it ended or sold, or the id was mistyped. */
+                <p className="mt-2 border-t border-border pt-2 text-[11px] text-amber-700">
+                  No active eBay listing found for this id — it may have ended.
+                </p>
+              )}
             </div>
           )}
 
