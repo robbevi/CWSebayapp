@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Download, Info, Moon, Sun, Target, Trophy, X } from 'lucide-react';
 import calfracLogo from '../assets/calfrac-logo.png';
+import spareWordmark from '../assets/spare-wordmark-light.png';
 
 import { useDarkMode } from '../hooks/useDarkMode';
 import { useGoalsPopupStore } from '../state/useGoalsPopupStore';
@@ -23,7 +24,10 @@ export function Header() {
           is the whole point of it being vector rather than a flat navy image. */}
       <SpareMark className="h-9 w-9 shrink-0" frame="#ffffff" title="SPARE" />
       <div className="min-w-0">
-        <h1 className="text-xl font-bold leading-none tracking-[0.22em] text-white">SPARE</h1>
+        {/* The wordmark is the lettering from the supplied logo, lifted out and recoloured
+            white so it reads on the green — the navy original would disappear. The orange
+            A is kept as drawn. An image rather than type, because the face is bespoke. */}
+        <img src={spareWordmark} alt="SPARE" className="h-5 w-auto object-contain sm:h-6" />
         <p className="mt-1 hidden text-[10px] font-medium uppercase leading-tight tracking-[0.12em] text-white/55 sm:block">
           Surplus Parts &amp; Asset Recovery Exchange
         </p>

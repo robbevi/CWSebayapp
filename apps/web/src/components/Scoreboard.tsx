@@ -24,6 +24,7 @@ import {
   computeStandingValue,
   GOALS,
   groupPartsBySku,
+  formatDate,
   percentOf,
 } from '@warehouse/shared';
 import { useAllSubmissions } from '../hooks/useAllSubmissions';
@@ -121,7 +122,7 @@ function History({ history }: { history: { date: string; count: number }[] }) {
         {history.map((h) => (
           <div
             key={h.date}
-            title={`${h.date}: ${h.count}`}
+            title={`${formatDate(h.date)}: ${h.count}`}
             className={`flex-1 rounded-sm ${h.count > 0 ? 'bg-primary' : 'bg-border'}`}
             style={{ height: `${Math.max(6, (h.count / max) * 100)}%` }}
           />

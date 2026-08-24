@@ -99,3 +99,20 @@ export function daysListed(itemListedDate: string | null | undefined, now: Date 
   const today = new Date(`${chicagoDateString(now.toISOString())}T00:00:00Z`).getTime();
   return Math.max(0, Math.round((today - listed) / 86_400_000));
 }
+
+/**
+ * A date for reading, as MM-DD-YYYY.
+ *
+ * Formatted off the string rather than through a Date, because several of these values are
+ * calendar dates stored at UTC midnight — an eBay listing date, an imported sale — and
+ * putting those through a timezone moves them to the previous day.
+ *
+ * Internal keys stay ISO: bucket keys and Monday-of-week are compared and sorted as
+ * strings, which only works while they read year-first.
+ */
+export function formatDate(value: string | null | undefined): string {
+  if (!value) return '—';
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(value.trim());
+  if (!m) return '—';
+  return `${m[2]}-${m[3]}-${m[1]}`;
+}

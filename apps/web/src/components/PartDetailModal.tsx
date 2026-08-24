@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { AlertTriangle, Check, Flag, Pencil, ShoppingCart, Tag, Trash2, X } from 'lucide-react';
 import {
   daysListed,
+  formatDate,
   formatVariance,
   getDiscrepancy,
   groupPartsBySku,
@@ -465,7 +466,7 @@ export function PartDetailModal() {
 
               {listing ? (
                 <p className="mt-2 border-t border-border pt-2 text-[11px] text-textMuted">
-                  Views and impressions cover the last 30 days. Refreshed {listing.syncedAt.slice(0, 10)}.
+                  Views and impressions cover the last 30 days. Refreshed {formatDate(listing.syncedAt)}.
                 </p>
               ) : (
                 /* The part is flagged as listed here but eBay has no active listing under
@@ -508,7 +509,7 @@ export function PartDetailModal() {
                 {partSales.map((sale) => (
                   <div key={sale.lineItemId} className="flex items-center justify-between gap-2 text-[11px]">
                     <span className="text-textMuted">
-                      {sale.soldAt.slice(0, 10)} · {sale.qtySold} @ {formatMoney(sale.grossSale)}
+                      {formatDate(sale.soldAt)} · {sale.qtySold} @ {formatMoney(sale.grossSale)}
                     </span>
                     <span className="font-medium text-textPri">
                       {formatMoney(sale.netProceeds)}

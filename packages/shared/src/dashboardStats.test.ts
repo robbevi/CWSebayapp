@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { computeDashboardStats, daysListed } from './dashboardStats.js';
+import { computeDashboardStats, daysListed, formatDate } from './dashboardStats.js';
 import { groupPartsBySku } from './grouping.js';
 import type { InventoryPart } from './types.js';
 
@@ -116,5 +116,30 @@ describe('daysListed', () => {
   it('is null when the part was never listed', () => {
     expect(daysListed(null, NOW)).toBeNull();
     expect(daysListed(undefined, NOW)).toBeNull();
+  });
+});
+
+describe('formatDate', () => {
+  it('reads MM-DD-YYYY off an ISO date', () => {
+    expect(formatDate('2026-08-20')).toBe('08-20-2026');
+  });
+
+  it('ignores any time portion', () => {
+    expect(formatDate('2026-08-20T22:43:02.000Z')).toBe('08-20-2026');
+  });
+
+  it('does not shift a date stored at UTC midnight', () => {
+    // Through a US timezone this would land on the 19th, which is the bug this avoids.
+    expect(formatDate('2026-08-20T00:00:00.000Z')).toBe('08-20-2026');
+  });
+
+  it('shows a dash for nothing', () => {
+    expect(formatDate(null)).toBe('—');
+    expect(formatDate(undefined)).toBe('—');
+    expect(formatDate('')).toBe('—');
+  });
+
+  it('shows a dash rather than mangling an unrecognised value', () => {
+    expect(formatDate('20 August 2026')).toBe('—');
   });
 });

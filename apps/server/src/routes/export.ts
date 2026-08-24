@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { getDiscrepancy, type InventoryPart } from '@warehouse/shared';
+import { formatDate, getDiscrepancy, type InventoryPart } from '@warehouse/shared';
 import { isGoogleConfigured, isGraphConfigured } from '../config/env.js';
 import { getAllParts as getAllPartsGraph } from '../graph/partsService.js';
 import { getAllParts as getAllPartsGoogle } from '../google/sheetsService.js';
@@ -39,14 +39,14 @@ const COLUMNS: { header: string; value: (p: InventoryPart) => unknown }[] = [
   { header: 'Transferred To Market Recovery', value: (p) => p.transferredToMarketRecovery },
   { header: 'Transfer ID', value: (p) => p.transferId },
   { header: 'Item Listed', value: (p) => p.itemListed },
-  { header: 'Item Listed Date', value: (p) => p.itemListedDate },
+  { header: 'Item Listed Date', value: (p) => formatDate(p.itemListedDate) },
   { header: 'eBay Listing ID', value: (p) => p.ebayListingId },
   { header: 'Revenue Priority Rank', value: (p) => p.revenuePriorityRank },
   { header: 'Field Review Priority', value: (p) => p.fieldReviewPriority },
   { header: 'Active Recovery Price Basis', value: (p) => p.activeRecoveryPriceBasis },
   { header: 'Expected Gross Recovery Margin', value: (p) => p.expectedGrossRecoveryMargin },
   { header: 'Gross Margin Status', value: (p) => p.grossMarginStatus },
-  { header: 'Updated At', value: (p) => p.updatedAt },
+  { header: 'Updated At', value: (p) => formatDate(p.updatedAt) },
   { header: 'Part ID', value: (p) => p.id },
 ];
 
