@@ -1,10 +1,12 @@
 import { useState } from 'react';
 import { Download, Info, Moon, Sun, Target, Trophy, X } from 'lucide-react';
 import calfracLogo from '../assets/calfrac-logo.png';
+
 import { useDarkMode } from '../hooks/useDarkMode';
 import { useGoalsPopupStore } from '../state/useGoalsPopupStore';
 import { useUserStore } from '../state/useUserStore';
 import { Scoreboard } from './Scoreboard';
+import { SpareMark } from './ui/SpareMark';
 
 export function Header() {
   const [infoOpen, setInfoOpen] = useState(false);
@@ -15,15 +17,14 @@ export function Header() {
 
   return (
     <header className="flex shrink-0 items-center gap-3 bg-primaryDeep px-6 py-4">
-      <img src={calfracLogo} alt="Calfrac" className="h-12 w-12 shrink-0 object-contain" />
-      {/* The product name, with the accent falling on the same letter the logo marks in
-          orange. Rendered as type rather than the artwork so it holds on the green header
-          — the logo's navy would disappear against it. */}
+      <img src={calfracLogo} alt="Calfrac" className="h-10 w-10 shrink-0 object-contain" />
+      <span aria-hidden="true" className="h-8 w-px shrink-0 bg-white/20" />
+      {/* Drawn in white and orange straight onto the green — no light chip needed, which
+          is the whole point of it being vector rather than a flat navy image. */}
+      <SpareMark className="h-9 w-9 shrink-0" gear="#ffffff" title="SPARE" />
       <div className="min-w-0">
-        <h1 className="text-xl font-bold leading-none tracking-[0.18em] text-white">
-          SP<span className="text-[#f5851f]">A</span>RE
-        </h1>
-        <p className="mt-1 hidden text-[10px] font-medium uppercase tracking-[0.14em] text-white/60 sm:block">
+        <h1 className="text-xl font-bold leading-none tracking-[0.22em] text-white">SPARE</h1>
+        <p className="mt-1 hidden text-[10px] font-medium uppercase leading-tight tracking-[0.12em] text-white/55 sm:block">
           Surplus Parts &amp; Asset Recovery Exchange
         </p>
       </div>
