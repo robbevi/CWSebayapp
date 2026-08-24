@@ -57,7 +57,10 @@ function writeToEnvFile(value: string): void {
   } catch {
     fail(`Could not read ${ENV_FILE}.`);
   }
-  const line = `${KEY}=${value}`;
+  // Quoted, because an eBay token contains '#' and dotenv treats an unquoted '#' as the
+  // start of a comment — an unquoted token silently truncates to "v^1.1", which parses
+  // fine and then fails at the API with an unhelpful invalid_grant.
+  const line = `${KEY}="${value}"`;
   const pattern = new RegExp(`^${KEY}=.*$`, 'm');
   const next = pattern.test(contents)
     ? contents.replace(pattern, line)
