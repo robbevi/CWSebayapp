@@ -27,6 +27,14 @@ healthRouter.get('/health/users', (_req, res) => {
 healthRouter.get('/health/ebay', (_req, res) => {
   const seen = (v: string | undefined) => ({ set: !!v && v.trim().length > 0, length: v?.trim().length ?? 0 });
   const clientId = seen(env.ebayClientId);
+  // The App ID is an OAuth *client identifier*, not a secret — the Cert ID is the secret
+  // half. Showing enough of it to compare against the developer portal is what settles
+  // "was the token minted against this keyset or a different one".
+  const clientIdHint = (() => {
+    const id = (env.ebayClientId ?? '').trim();
+    if (id.length < 12) return null;
+    return `${id.slice(0, 22)}…${id.slice(-8)}`;
+  })();
   const clientSecret = seen(env.ebayClientSecret);
   const refreshToken = seen(env.ebayRefreshToken);
 
@@ -52,6 +60,7 @@ healthRouter.get('/health/ebay', (_req, res) => {
     configured: missing.length === 0,
     keyset,
     keysetMatchesEnvironment: !mismatch,
+    clientIdHint,
     missing,
     vars: {
       EBAY_CLIENT_ID: clientId,
@@ -65,7 +74,7 @@ healthRouter.get('/health/ebay', (_req, res) => {
         ? `Set ${missing.join(', ')} in the environment, then restart.`
         : mismatch
           ? `The App ID is a ${keyset} key but EBAY_ENV is ${env.ebayEnv}. All three values must come from the same keyset, and the refresh token must have been minted against it.`
-          : 'All three present and consistent. If sync still fails, the refresh token was issued under a different App ID, or has expired.',
+          : 'All three present and consistent. If sync still fails, compare clientIdHint against the App ID on the keyset you generated the refresh token from — a token minted against a different keyset is rejected as "issued to another client".',
   });
 });
 
