@@ -27,7 +27,7 @@ export function Header() {
         {/* The wordmark is the lettering from the supplied logo, lifted out and recoloured
             white so it reads on the green — the navy original would disappear. The orange
             A is kept as drawn. An image rather than type, because the face is bespoke. */}
-        <img src={spareWordmark} alt="SPARE" className="h-5 w-auto object-contain sm:h-6" />
+        <img src={spareWordmark} alt="SPARE" className="h-4 w-auto object-contain sm:h-5" />
         <p className="mt-1 hidden text-[10px] font-medium uppercase leading-tight tracking-[0.12em] text-white/55 sm:block">
           Surplus Parts &amp; Asset Recovery Exchange
         </p>
