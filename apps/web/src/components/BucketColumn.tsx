@@ -1,5 +1,5 @@
 import { useMemo, useState, type ReactElement } from 'react';
-import { ChevronDown, ClipboardList, ShoppingCart, Tag, Wrench } from 'lucide-react';
+import { ChevronDown, ClipboardList, Tag, Wrench } from 'lucide-react';
 import { salesForGroup, type Listing, type PartGroup, type SalesIndex, type WorkflowStatus } from '@warehouse/shared';
 import { cn } from '../lib/cn';
 import { PartCard } from './PartCard';
@@ -62,35 +62,45 @@ export function BucketColumn({
           className={cn('shrink-0 text-textMuted transition-transform lg:hidden', expanded && 'rotate-180')}
         />
       </button>
+      {/* Tabs rather than a segmented control: this changes what you are looking at, not a
+          mode you are setting, and in a 396px column the lighter object is the right one —
+          the cards below are the content, and the control should not outweigh them. */}
       {split && (
         <div
+          role="tablist"
+          aria-label="Filter by eBay state"
           className={cn(
-            'shrink-0 gap-2 border-b border-border bg-columnHeaderBg px-4 py-2 lg:flex',
+            'shrink-0 gap-4 border-b border-border px-4 lg:flex',
             expanded ? 'flex' : 'hidden'
           )}
         >
-          {([
-            ['all', 'All', parts.length, null],
-            ['listed', 'Listed', split.listed.length, <Tag key="t" size={11} />],
-            ['sold', 'Sold', split.sold.length, <ShoppingCart key="s" size={11} />],
-          ] as const).map(([key, label, count, icon]) => (
-            <button
-              key={key}
-              type="button"
-              onClick={() => setEbayView(key)}
-              aria-pressed={ebayView === key}
-              className={cn(
-                'flex min-h-0 items-center gap-1.5 rounded-pill px-2.5 py-1 text-[11px] font-semibold',
-                ebayView === key ? 'bg-primary text-white' : 'text-textMuted hover:bg-surface'
-              )}
-            >
-              {icon}
-              {label}
-              <span className={cn('tabular-nums', ebayView === key ? 'text-white/80' : 'text-textMuted')}>
-                {count}
-              </span>
-            </button>
-          ))}
+          {(
+            [
+              ['all', 'All', parts.length],
+              ['listed', 'Listed', split.listed.length],
+              ['sold', 'Sold', split.sold.length],
+            ] as const
+          ).map(([key, label, count]) => {
+            const active = ebayView === key;
+            return (
+              <button
+                key={key}
+                type="button"
+                role="tab"
+                aria-selected={active}
+                onClick={() => setEbayView(key)}
+                className={cn(
+                  'flex min-h-0 items-center gap-1.5 border-b-2 py-2.5 text-xs font-semibold transition-colors',
+                  active
+                    ? 'border-primary text-primary'
+                    : 'border-transparent text-textMuted hover:text-textPri'
+                )}
+              >
+                {label}
+                <span className="font-medium tabular-nums text-textMuted">{count}</span>
+              </button>
+            );
+          })}
         </div>
       )}
 
