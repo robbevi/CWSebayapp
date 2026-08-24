@@ -37,6 +37,12 @@ export interface PartGroup {
   newBinLocation?: string;
   /** System quantity summed across every location. */
   qoh: number;
+  /**
+   * What we believe is actually on the shelf: each location's counted quantity where it
+   * has one, its system quantity where it doesn't. Resolved per location rather than for
+   * the group as a whole, so counting one bin of three doesn't discard the other two.
+   */
+  stockQty: number;
   confirmedQoh: number | null;
   /**
    * System quantity of only the locations that have been counted. This, not `qoh`, is the
@@ -128,6 +134,7 @@ export function groupPartsBySku(parts: InventoryPart[]): PartGroup[] {
     const counted = records.filter((r) => r.confirmedQoh !== null && r.confirmedQoh !== undefined);
     const confirmedQoh = counted.length === 0 ? null : counted.reduce((sum, r) => sum + (r.confirmedQoh ?? 0), 0);
     const qoh = records.reduce((sum, r) => sum + (r.qoh ?? 0), 0);
+    const stockQty = records.reduce((sum, r) => sum + (r.confirmedQoh ?? r.qoh ?? 0), 0);
     const expectedForCounted = counted.reduce((sum, r) => sum + (r.qoh ?? 0), 0);
 
     groups.push({
@@ -142,6 +149,7 @@ export function groupPartsBySku(parts: InventoryPart[]): PartGroup[] {
       binLocation: primary.binLocation,
       newBinLocation: records.find((r) => !!r.newBinLocation)?.newBinLocation,
       qoh,
+      stockQty,
       confirmedQoh,
       expectedForCounted,
       photos,

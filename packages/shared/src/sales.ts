@@ -97,7 +97,7 @@ export interface SoldPosition {
 
 export function soldPosition(group: PartGroup, sales: Sale[]): SoldPosition {
   const totals = totalsFor(sales);
-  const stock = group.confirmedQoh ?? group.qoh;
+  const stock = group.stockQty;
   return {
     soldQty: totals.qty,
     remainingQty: Math.max(0, stock - totals.qty),

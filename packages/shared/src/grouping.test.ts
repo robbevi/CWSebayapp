@@ -102,6 +102,22 @@ describe('groupPartsBySku', () => {
     expect(getGroupDiscrepancy(g)).toEqual({ variance: -2, kind: 'shortage' });
   });
 
+  it('believes the counted quantity for counted bins and the system for the rest', () => {
+    // Six counted as five, plus an uncounted bin of two: five on that shelf and two
+    // presumed on the other, not five in total and not eight.
+    const [g] = groupPartsBySku([
+      part({ id: 'a', sku: 'X1', qoh: 6, confirmedQoh: 5 }),
+      part({ id: 'b', sku: 'X1', qoh: 2 }),
+    ]);
+    expect(g.qoh).toBe(8);
+    expect(g.stockQty).toBe(7);
+  });
+
+  it('matches the system quantity when nothing has been counted', () => {
+    const [g] = groupPartsBySku([part({ id: 'a', sku: 'X1', qoh: 4 })]);
+    expect(g.stockQty).toBe(4);
+  });
+
   it('flags the group when any location needs review', () => {
     const [g] = groupPartsBySku([
       part({ id: 'a', sku: 'X1' }),

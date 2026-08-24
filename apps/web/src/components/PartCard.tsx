@@ -8,6 +8,7 @@ import {
   MapPin,
   Package,
   ShoppingCart,
+  Tag,
   Wrench,
 } from 'lucide-react';
 import {
@@ -25,9 +26,14 @@ import { useUIStore } from '../state/useUIStore';
 import { Pill } from './ui/Pill';
 import { ProcessingStatusChips } from './ProcessingStatusChips';
 
+function money(value: number): string {
+  return value.toLocaleString('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2 });
+}
+
 export function PartCard({ part, salesIndex }: { part: PartGroup; salesIndex: SalesIndex }) {
   const set = useUIStore((s) => s.set);
   const sold = soldPosition(part, salesForGroup(part, salesIndex));
+  const askingPrice = part.activeRecoveryPriceBasis ?? 0;
   const discrepancy = getGroupDiscrepancy(part);
   // A SKU stocked in more than one bin collapses to a single card, so the card has to say
   // so — otherwise the quantity looks wrong against any one shelf.
@@ -130,7 +136,7 @@ export function PartCard({ part, salesIndex }: { part: PartGroup; salesIndex: Sa
         )}
         {/* Sold progress rather than a plain "sold" flag: most listings carry several
             units, so what matters on the card is how many are still on the shelf. */}
-        {sold.soldQty > 0 && (
+        {sold.soldQty > 0 ? (
           <Pill
             className={cn(
               'w-full font-semibold',
@@ -142,11 +148,26 @@ export function PartCard({ part, salesIndex }: { part: PartGroup; salesIndex: Sa
             <ShoppingCart size={12} className="shrink-0" />
             <span
               className="truncate"
-              title={`${sold.soldQty} sold, ${sold.remainingQty} remaining`}
+              title={`${sold.soldQty} sold for ${money(sold.totals.gross)} gross, ${sold.remainingQty} remaining`}
             >
-              {sold.soldOut ? `Sold out (${sold.soldQty})` : `${sold.soldQty} sold · ${sold.remainingQty} left`}
+              Sold &times;{sold.soldQty} · {money(sold.totals.gross)}
             </span>
           </Pill>
+        ) : (
+          // Nothing sold yet, but it's up for sale — show what it's asking for. Not gated
+          // on the part being finished: most listings are still mid-workflow.
+          part.itemListed && (
+            <Pill className="w-full border-sky-200 bg-sky-50 font-semibold text-sky-700">
+              <Tag size={12} className="shrink-0" />
+              {/* Imported rows without a price basis would otherwise advertise $0.00. */}
+              <span
+                className="truncate"
+                title={askingPrice > 0 ? `Listed on eBay at ${money(askingPrice)}` : 'Listed on eBay'}
+              >
+                {askingPrice > 0 ? `On eBay · ${money(askingPrice)}` : 'On eBay'}
+              </span>
+            </Pill>
+          )
         )}
         {/* A counted-but-mismatched quantity is the one thing on a card that needs chasing,
             so it gets a hard colour rather than the neutral chip treatment. */}

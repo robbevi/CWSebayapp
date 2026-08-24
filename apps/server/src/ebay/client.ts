@@ -7,9 +7,21 @@ import { env } from '../config/env.js';
  * is not sufficient.
  */
 
+/**
+ * Requested at consent time, so they must cover everything the app will ever read — eBay
+ * grants exactly what was asked for, and widening the list later means going through the
+ * consent flow again for a fresh refresh token.
+ *
+ *  fulfillment  what sold, with line items and buyer payments
+ *  finances     the fees that turn a gross sale into real proceeds
+ *  inventory    active listings and their current asking price
+ *  analytics    listing traffic — views and impressions
+ */
 export const EBAY_SCOPES = [
   'https://api.ebay.com/oauth/api_scope/sell.fulfillment.readonly',
   'https://api.ebay.com/oauth/api_scope/sell.finances',
+  'https://api.ebay.com/oauth/api_scope/sell.inventory.readonly',
+  'https://api.ebay.com/oauth/api_scope/sell.analytics.readonly',
 ];
 
 export function ebayBaseUrl(): string {

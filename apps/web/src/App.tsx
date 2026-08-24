@@ -5,6 +5,7 @@ import { FilterPanel } from './components/FilterPanel';
 import { GoalsPopup } from './components/GoalsPopup';
 import { Header } from './components/Header';
 import { KanbanBoard } from './components/KanbanBoard';
+import { StatStrip } from './components/StatStrip';
 import { PartDetailModal } from './components/PartDetailModal';
 import { UserPicker } from './components/UserPicker';
 import { Toast } from './components/ui/Toast';
@@ -34,6 +35,7 @@ function Dashboard() {
       <div className="flex flex-col bg-surfaceMuted lg:h-screen lg:overflow-hidden">
         <Header />
         <div className="mx-auto flex w-full max-w-[1400px] flex-1 flex-col gap-4 px-6 py-4 lg:min-h-0 lg:overflow-hidden">
+          <StatStrip />
           <FilterPanel />
           <ConfigBanner />
           <div className="lg:min-h-0 lg:flex-1">

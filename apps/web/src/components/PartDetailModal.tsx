@@ -2,8 +2,9 @@ import { useEffect, useMemo, useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { AlertTriangle, Check, Flag, Pencil, ShoppingCart, Trash2, X } from 'lucide-react';
+import { AlertTriangle, Check, Flag, Pencil, ShoppingCart, Tag, Trash2, X } from 'lucide-react';
 import {
+  daysListed,
   formatVariance,
   getDiscrepancy,
   groupPartsBySku,
@@ -409,6 +410,48 @@ export function PartDetailModal() {
           onScroll={handleFormScroll}
           className="min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain p-4"
         >
+          {/* Listing performance, shown for anything on eBay rather than only finished
+              parts: 36 of the 40 listed are still mid-workflow, so gating this on
+              Completed would hide it from almost every active listing. */}
+          {part.itemListed && (
+            <div className="rounded-card border border-border bg-surfaceMuted p-3">
+              <div className="mb-2 flex items-center justify-between">
+                <span className="flex items-center gap-1.5 text-xs font-semibold text-textPri">
+                  <Tag size={13} />
+                  Active on eBay
+                </span>
+                {part.ebayListingId && (
+                  <span className="font-mono text-[11px] text-textMuted">{part.ebayListingId}</span>
+                )}
+              </div>
+              <div className="grid grid-cols-3 gap-2 text-xs">
+                <div>
+                  <div className="text-textMuted">Days Listed</div>
+                  <div className="font-semibold text-textPri">
+                    {daysListed(part.itemListedDate) ?? '—'}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-textMuted">Asking</div>
+                  <div className="font-semibold text-textPri">
+                    {formatMoney(group.activeRecoveryPriceBasis)}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-textMuted">Listed</div>
+                  <div className="font-semibold text-textPri">
+                    {part.itemListedDate ? part.itemListedDate.slice(0, 10) : '—'}
+                  </div>
+                </div>
+              </div>
+              {/* Watchers, views and offers need eBay's listing APIs; the panel is shaped
+                  for them so connecting the account fills it in rather than redesigning it. */}
+              <p className="mt-2 border-t border-border pt-2 text-[11px] text-textMuted">
+                Watchers, views and offers appear here once the eBay account is connected.
+              </p>
+            </div>
+          )}
+
           {/* Only present once something has actually sold — an empty sales panel on
               two thousand unsold parts would be pure noise. */}
           {partSales.length > 0 && (

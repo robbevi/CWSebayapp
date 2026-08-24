@@ -65,7 +65,7 @@ function isInPeriod(
  */
 export function extendedValue(group: PartGroup): number {
   const basis = Math.max(0, ...group.records.map((r) => r.activeRecoveryPriceBasis ?? 0));
-  return basis * group.qoh;
+  return basis * group.stockQty;
 }
 
 /** Expected value of every part, listed or not — the denominator for recovery value. */
@@ -202,8 +202,7 @@ export function computeStandingValue(groups: PartGroup[], sales: Sale[]): Standi
   let underwaterSkus = 0;
 
   for (const g of groups) {
-    const stock = g.confirmedQoh ?? g.qoh;
-    const unitPrice = stock > 0 ? extendedValue(g) / stock : 0;
+    const unitPrice = g.stockQty > 0 ? extendedValue(g) / g.stockQty : 0;
     const { remainingQty } = soldPosition(g, salesForGroup(g, index));
     potential += unitPrice * remainingQty;
 
