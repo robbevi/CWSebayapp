@@ -33,7 +33,7 @@ healthRouter.get('/health/ebay', (_req, res) => {
   const clientIdHint = (() => {
     const id = (env.ebayClientId ?? '').trim();
     if (id.length < 12) return null;
-    return `${id.slice(0, 22)}…${id.slice(-8)}`;
+    return `${id.slice(0, 22)}...${id.slice(-8)}`;
   })();
   const clientSecret = seen(env.ebayClientSecret);
   const refreshToken = seen(env.ebayRefreshToken);
