@@ -55,6 +55,24 @@ async function main() {
   console.log('\nScopes requested at consent time:');
   for (const s of EBAY_SCOPES) console.log(`  · ${s.replace('https://api.ebay.com/oauth/api_scope/', '')}`);
 
+  // Which account is this actually? An order history that looks empty is far more often a
+  // grant made while signed in as the wrong eBay user than a seller with no sales.
+  console.log('\nChecking which eBay account granted the token...');
+  try {
+    const token = await getAccessToken();
+    const res = await fetch(`${ebayBaseUrl()}/commerce/identity/v1/user/`, {
+      headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
+    });
+    if (res.ok) {
+      const who = (await res.json()) as { username?: string; accountType?: string; registrationMarketplaceId?: string };
+      console.log(`  ok   ${who.username ?? '(username withheld)'}  ${who.accountType ?? ''} ${who.registrationMarketplaceId ?? ''}`);
+    } else {
+      console.log(`  --   unavailable (${res.status}) — re-run the consent flow to pick up the identity scope`);
+    }
+  } catch (err) {
+    console.log(`  --   ${(err as Error).message}`);
+  }
+
   console.log('\nReading the last 30 days of orders...');
   const since = new Date(Date.now() - 30 * 86_400_000);
   try {

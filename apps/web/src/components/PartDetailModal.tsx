@@ -444,10 +444,11 @@ export function PartDetailModal() {
                   </div>
                 </div>
               </div>
-              {/* Watchers, views and offers need eBay's listing APIs; the panel is shaped
-                  for them so connecting the account fills it in rather than redesigning it. */}
+              {/* Orders and fees are synced; watchers, views and offers come from separate
+                  eBay APIs that are not wired up yet. The panel is shaped for them so
+                  adding them is a fill-in rather than a redesign. */}
               <p className="mt-2 border-t border-border pt-2 text-[11px] text-textMuted">
-                Watchers, views and offers appear here once the eBay account is connected.
+                Watchers, views and offers are not synced yet.
               </p>
             </div>
           )}

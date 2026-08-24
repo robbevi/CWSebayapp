@@ -16,12 +16,16 @@ import { env } from '../config/env.js';
  *  finances     the fees that turn a gross sale into real proceeds
  *  inventory    active listings and their current asking price
  *  analytics    listing traffic — views and impressions
+ *  identity     which eBay account granted the token, so a grant made while signed in
+ *               as the wrong user is caught immediately rather than looking like an
+ *               empty order history
  */
 export const EBAY_SCOPES = [
   'https://api.ebay.com/oauth/api_scope/sell.fulfillment.readonly',
   'https://api.ebay.com/oauth/api_scope/sell.finances',
   'https://api.ebay.com/oauth/api_scope/sell.inventory.readonly',
   'https://api.ebay.com/oauth/api_scope/sell.analytics.readonly',
+  'https://api.ebay.com/oauth/api_scope/commerce.identity.readonly',
 ];
 
 export function ebayBaseUrl(): string {
@@ -46,10 +50,13 @@ export async function getAccessToken(): Promise<string> {
   // A minute of headroom, so a token never expires mid-request.
   if (cached && cached.expiresAt > Date.now() + 60_000) return cached.token;
 
+  // No scope on the refresh. eBay then issues a token carrying whatever the original
+  // consent granted. Sending the list would mean that adding a scope here instantly
+  // breaks every existing token with invalid_scope, before anyone has re-consented —
+  // a new scope should only take effect when someone actually grants it.
   const body = new URLSearchParams({
     grant_type: 'refresh_token',
     refresh_token: ebayRefreshToken,
-    scope: EBAY_SCOPES.join(' '),
   });
 
   const res = await fetch(`${ebayBaseUrl()}/identity/v1/oauth2/token`, {
