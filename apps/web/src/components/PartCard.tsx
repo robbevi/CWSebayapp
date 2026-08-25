@@ -8,14 +8,15 @@ import {
   Layers,
   MapPin,
   Boxes,
+  CalendarDays,
   Eye,
   Package,
   ShoppingCart,
   Signal,
-  Star,
   Wrench,
 } from 'lucide-react';
 import {
+  daysListed,
   formatVariance,
   getGroupDiscrepancy,
   isHighPriority,
@@ -64,6 +65,14 @@ export function PartCard({
     : null;
   const showEbayRow = sold.soldQty > 0 || part.itemListed;
   const onEbay = part.itemListed || sold.soldQty > 0;
+  // Earliest listing date across the SKU's rows, matching how the rest of the app dates a
+  // listing — a relist on one row shouldn't reset the clock.
+  const listedDays = daysListed(
+    part.records
+      .map((r) => r.itemListedDate)
+      .filter((d): d is string => !!d)
+      .sort()[0]
+  );
 
   return (
     <div className="shrink-0 overflow-hidden rounded-[10px] border border-border bg-surface transition-shadow hover:shadow-md">
@@ -120,9 +129,9 @@ export function PartCard({
              Detail, and remain sortable and filterable from the toolbar. */
           <>
             <Pill tone="chip" className="w-full">
-              <Star size={12} className="shrink-0" />
-              <span className="truncate" title="People watching this listing">
-                {listing ? `${listing.watchers} watching` : 'Watchers —'}
+              <CalendarDays size={12} className="shrink-0" />
+              <span className="truncate" title="Days since it was listed on eBay">
+                {listedDays != null ? `${listedDays} days` : 'Days —'}
               </span>
             </Pill>
             <Pill tone="chip" className="w-full">
@@ -134,7 +143,7 @@ export function PartCard({
             <Pill tone="chip" className="w-full">
               <Signal size={12} className="shrink-0" />
               <span className="truncate" title="Times shown in search or the store, last 30 days">
-                {listing?.impressions != null ? `${listing.impressions.toLocaleString()} impr` : 'Impr —'}
+                {listing?.impressions != null ? `${listing.impressions.toLocaleString()} Impr` : 'Impr —'}
               </span>
             </Pill>
             <Pill tone="chip" className="w-full">

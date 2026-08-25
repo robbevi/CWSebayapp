@@ -3,6 +3,7 @@ import {
   AlertTriangle,
   ArrowRight,
   Boxes,
+  CalendarDays,
   Camera,
   ClipboardList,
   DollarSign,
@@ -19,7 +20,6 @@ import {
   ShieldCheck,
   ShoppingCart,
   Signal,
-  Star,
   Sun,
   Tag,
   Target,
@@ -177,10 +177,12 @@ export function Header() {
             </Section>
 
             <Section title="On a card that is on eBay">
-              <Row icon={<Star size={14} />} term="watching">People watching the listing.</Row>
-              <Row icon={<Eye size={14} />} term="views">Times the listing was opened, last 30 days.</Row>
-              <Row icon={<Signal size={14} />} term="impr">
-                Impressions — times it appeared in search or the store, last 30 days.
+              <Row icon={<CalendarDays size={14} />} term="Days Listed">
+                Shown as "5 days" — how long it has been on eBay.
+              </Row>
+              <Row icon={<Eye size={14} />} term="Views">Times the listing was opened, last 30 days.</Row>
+              <Row icon={<Signal size={14} />} term="Impressions">
+                Shown as "Impr" — times it appeared in search or the store, last 30 days.
               </Row>
               <Row icon={<Boxes size={14} />} term="Qty">Quantity still available on the listing.</Row>
               <Row icon={<span className="block h-2 w-2 rounded-full bg-primary" />} term="Active on eBay">
@@ -192,7 +194,7 @@ export function Header() {
             <Section title="On every other card">
               <Row icon={<Wrench size={14} />} term="Manufacturer">Who made the part.</Row>
               <Row icon={<Factory size={14} />} term="Site">Inventory site it belongs to.</Row>
-              <Row icon={<Layers size={14} />} term="N locations">
+              <Row icon={<Layers size={14} />} term="# Locations">
                 One SKU stocked in more than one bin. Quantities are added together.
               </Row>
               <Row icon={<MapPin size={14} />} term="Bin">Where it sits in the warehouse.</Row>
@@ -226,9 +228,6 @@ export function Header() {
               <Row icon={<ShieldCheck size={14} />} term="Condition">Box condition recorded.</Row>
               <Row icon={<Truck size={14} />} term="Transferred">Moved in Cetaris to market recovery.</Row>
               <Row icon={<Tag size={14} />} term="Listed">Live on eBay.</Row>
-              <p className="mt-2 text-[11px] text-textMuted">
-                A filled chip is done. "3/5 complete" counts them.
-              </p>
             </Section>
           </div>
         </div>
