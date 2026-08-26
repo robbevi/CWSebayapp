@@ -294,24 +294,41 @@ function findRow(headers: string[], rows: unknown[][], id: string): { rowNumber:
 // Legacy (pre-partId) photos only carry a SKU, so they cannot say *which* row of a
 // multi-site SKU they belong to. Attach them to the first row for that SKU — for the
 // existing data that is always the original Williston row the photo was taken against.
-function photosFor(part: InventoryPart, grouped: GroupedPhotos, claimedLegacySkus: Set<string>): Photo[] {
+function photosFor(
+  part: InventoryPart,
+  grouped: GroupedPhotos,
+  claimedLegacySkus: Set<string>,
+  knownPartIds: Set<string>
+): Photo[] {
   const own = grouped.byPartId.get(part.id) ?? [];
   const skuKey = part.sku.toUpperCase();
-  const legacy = grouped.legacyBySku.get(skuKey);
-  if (!legacy || claimedLegacySkus.has(skuKey)) return own;
+
+  // Photos stamped with a partId no row carries any more. This happens to anything
+  // photographed while its row had no id of its own: the id used was the SKU, and the
+  // later backfill replaced it with a UUID. They still know their SKU, so they are not
+  // lost — but only if we look, which the partId branch used to skip.
+  const orphaned = (grouped.bySku.get(skuKey) ?? []).filter(
+    (p) => p.partId && !knownPartIds.has(p.partId)
+  );
+  const legacy = grouped.legacyBySku.get(skuKey) ?? [];
+  const inherited = [...legacy, ...orphaned];
+
+  if (inherited.length === 0 || claimedLegacySkus.has(skuKey)) return own;
   claimedLegacySkus.add(skuKey);
-  return [...own, ...legacy];
+  return [...own, ...inherited];
 }
 
 export async function getAllParts(): Promise<InventoryPart[]> {
   const { headers, rows } = await readSheet();
   const grouped = await listPhotosGrouped();
   const claimed = new Set<string>();
-  return rows
-    .filter((row) => row.some((cell) => cellToString(cell) !== undefined))
+  const live = rows.filter((row) => row.some((cell) => cellToString(cell) !== undefined));
+  // Every id the sheet actually holds, so a photo can be told whether its partId is stale.
+  const knownPartIds = new Set(live.map((row) => mapRowToPart(headers, row, []).id));
+  return live
     .map((row) => {
       const bare = mapRowToPart(headers, row, []);
-      return { ...bare, photos: photosFor(bare, grouped, claimed) };
+      return { ...bare, photos: photosFor(bare, grouped, claimed, knownPartIds) };
     })
     .map((p) => ({ ...p, photographed: p.photographed || p.photos.length > 0 }));
 }
@@ -322,7 +339,10 @@ export async function getPartById(id: string): Promise<InventoryPart> {
   if (!found) throw new Error(`Part "${id}" was not found in the Google Sheet.`);
   const grouped = await listPhotosGrouped();
   const bare = mapRowToPart(headers, found.row, []);
-  const photos = [...(grouped.byPartId.get(bare.id) ?? []), ...(grouped.legacyBySku.get(bare.sku.toUpperCase()) ?? [])];
+  const knownPartIds = new Set(
+    rows.filter((r) => r.some((c) => cellToString(c) !== undefined)).map((r) => mapRowToPart(headers, r, []).id)
+  );
+  const photos = photosFor(bare, grouped, new Set<string>(), knownPartIds);
   return { ...bare, photos, photographed: bare.photographed || photos.length > 0 };
 }
 

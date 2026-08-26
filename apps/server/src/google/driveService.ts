@@ -25,12 +25,20 @@ export interface GroupedPhotos {
   byPartId: Map<string, Photo[]>;
   /** Photos predating partId, keyed by SKU — attached to that SKU's oldest row as a fallback. */
   legacyBySku: Map<string, Photo[]>;
+  /**
+   * Every photo that carries a SKU, indexed by it, including ones that also carry a
+   * partId. A partId can go stale — photos taken while a row had no id of its own were
+   * stamped with the SKU as the id, and the later backfill gave those rows real ones —
+   * which strands the photo unless it can be found another way.
+   */
+  bySku: Map<string, Photo[]>;
 }
 
 export async function listPhotosGrouped(): Promise<GroupedPhotos> {
   const drive = getDriveClient();
   const byPartId = new Map<string, Photo[]>();
   const legacyBySku = new Map<string, Photo[]>();
+  const bySku = new Map<string, Photo[]>();
 
   let pageToken: string | undefined;
   do {
@@ -54,6 +62,13 @@ export async function listPhotosGrouped(): Promise<GroupedPhotos> {
       // partId is authoritative: the same SKU can now be stocked at several sites, so SKU
       // alone no longer identifies which row a photo belongs to. It also survives a site
       // being renamed, which plain SKU+site would not.
+      // Indexed by SKU whatever else is known about it, so the fallback stays available.
+      const declaredSku = file.properties?.sku ?? extractSkuFromFileName(file.name);
+      if (declaredSku) {
+        const k = declaredSku.toUpperCase();
+        bySku.set(k, [...(bySku.get(k) ?? []), photo]);
+      }
+
       const partId = file.properties?.partId;
       if (partId) {
         byPartId.set(partId, [...(byPartId.get(partId) ?? []), photo]);
@@ -71,7 +86,7 @@ export async function listPhotosGrouped(): Promise<GroupedPhotos> {
     pageToken = res.data.nextPageToken ?? undefined;
   } while (pageToken);
 
-  return { byPartId, legacyBySku };
+  return { byPartId, legacyBySku, bySku };
 }
 
 // Streams the raw file bytes for the photo content proxy route. Uses the service
