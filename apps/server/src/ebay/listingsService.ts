@@ -119,6 +119,7 @@ export async function fetchListings(trafficDays = 30): Promise<Listing[]> {
       listings.push({
         ebayListingId: id,
         title: tag(item, 'Title') ?? '',
+        sku: tag(item, 'SKU') ?? '',
         price: num(tag(item, 'CurrentPrice')),
         currency: /<CurrentPrice[^>]*currencyID="([^"]+)"/.exec(item)?.[1] ?? 'USD',
         quantityAvailable: num(tag(item, 'Quantity')),

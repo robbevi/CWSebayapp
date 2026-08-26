@@ -38,6 +38,7 @@ const LISTINGS_SHEET = 'Listings';
 const LISTINGS_HEADERS = [
   'ebayListingId',
   'title',
+  'sku',
   'price',
   'currency',
   'quantityAvailable',
@@ -789,14 +790,15 @@ export async function getListings(): Promise<Listing[]> {
     .map((row) => ({
       ebayListingId: String(row[0] ?? ''),
       title: String(row[1] ?? ''),
-      price: Number(row[2] ?? 0),
-      currency: String(row[3] ?? 'USD'),
-      quantityAvailable: Number(row[4] ?? 0),
-      watchers: Number(row[5] ?? 0),
+      sku: String(row[2] ?? ''),
+      price: Number(row[3] ?? 0),
+      currency: String(row[4] ?? 'USD'),
+      quantityAvailable: Number(row[5] ?? 0),
+      watchers: Number(row[6] ?? 0),
       // Blank means eBay reported nothing, which is not the same as zero views.
-      impressions: row[6] === '' || row[6] === undefined ? null : Number(row[6]),
-      views: row[7] === '' || row[7] === undefined ? null : Number(row[7]),
-      syncedAt: String(row[8] ?? ''),
+      impressions: row[7] === '' || row[7] === undefined ? null : Number(row[7]),
+      views: row[8] === '' || row[8] === undefined ? null : Number(row[8]),
+      syncedAt: String(row[9] ?? ''),
     }));
 }
 
@@ -804,6 +806,7 @@ function listingToRow(l: Listing): unknown[] {
   return [
     l.ebayListingId,
     l.title,
+    l.sku,
     l.price,
     l.currency,
     l.quantityAvailable,

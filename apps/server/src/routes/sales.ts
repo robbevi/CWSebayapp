@@ -2,7 +2,14 @@ import { Router } from 'express';
 import { isGoogleConfigured } from '../config/env.js';
 import { fetchListings } from '../ebay/listingsService.js';
 import { fetchSales, isEbayConfigured } from '../ebay/ordersService.js';
-import { getListings, getSales, replaceListings, upsertSales } from '../google/sheetsService.js';
+import {
+  getAllParts,
+  getListings,
+  getSales,
+  replaceListings,
+  updatePart,
+  upsertSales,
+} from '../google/sheetsService.js';
 
 export const salesRouter = Router();
 
@@ -11,6 +18,39 @@ export const salesRouter = Router();
 const DEFAULT_LOOKBACK_DAYS = 30;
 // eBay's order search won't accept an unbounded window.
 const MAX_LOOKBACK_DAYS = 365;
+
+/**
+ * Fills in the eBay listing id on any part whose SKU matches a live listing's Custom
+ * Label, so listing something does not also mean copying an id into the app by hand.
+ *
+ * Only ever fills a blank: a part that already carries a listing id is left alone, so a
+ * relisted item keeps whatever it was deliberately pointed at.
+ */
+async function linkListingsToParts(active: { ebayListingId: string; sku: string }[]): Promise<number> {
+  const withLabel = active.filter((l) => l.sku);
+  if (withLabel.length === 0) return 0;
+
+  const parts = await getAllParts();
+  const taken = new Set(parts.map((p) => p.ebayListingId).filter((v): v is string => !!v));
+  const bySku = new Map<string, typeof parts>();
+  for (const p of parts) {
+    const key = p.sku.toUpperCase();
+    const bucket = bySku.get(key);
+    if (bucket) bucket.push(p);
+    else bySku.set(key, [p]);
+  }
+
+  let linked = 0;
+  for (const l of withLabel) {
+    if (taken.has(l.ebayListingId)) continue;
+    const target = bySku.get(l.sku.toUpperCase())?.find((p) => !p.ebayListingId);
+    if (!target) continue;
+    await updatePart(target.id, { ebayListingId: l.ebayListingId, itemListed: true });
+    taken.add(l.ebayListingId);
+    linked++;
+  }
+  return linked;
+}
 
 salesRouter.get('/sales', async (_req, res, next) => {
   try {
@@ -68,9 +108,12 @@ salesRouter.post('/sales/sync', async (req, res, next) => {
     // Listings ride along with the same button. A failure here must not lose the sales
     // that were just written, so it is reported rather than thrown.
     let listings = 0;
+    let linked = 0;
     let listingsError: string | undefined;
     try {
-      listings = await replaceListings(await fetchListings());
+      const active = await fetchListings();
+      listings = await replaceListings(active);
+      linked = await linkListingsToParts(active);
     } catch (err) {
       listingsError = err instanceof Error ? err.message : String(err);
       console.warn('[ebay] Listing sync failed:', listingsError);
@@ -81,6 +124,7 @@ salesRouter.post('/sales/sync', async (req, res, next) => {
       fetched: sales.length,
       estimatedFees: sales.filter((s) => s.feesEstimated).length,
       listings,
+      linked,
       listingsError,
       since: since.toISOString(),
     });

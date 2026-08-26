@@ -70,10 +70,16 @@ function round2(n: number): number {
   return Math.round(n * 100) / 100;
 }
 
+// eBay rejects a window whose end is at or after its own idea of now, and our clock is
+// not its clock. Ending a minute back costs nothing — an order created in the last sixty
+// seconds arrives on the next sync — and stops the call failing on skew alone.
+const CLOCK_SKEW_MARGIN_MS = 60_000;
+
 /** eBay's date filters want `[start..end]` with no milliseconds. */
 function filterRange(since: Date, until: Date): string {
   const fmt = (d: Date) => `${d.toISOString().slice(0, 19)}.000Z`;
-  return `[${fmt(since)}..${fmt(until)}]`;
+  const safeEnd = new Date(Math.min(until.getTime(), Date.now() - CLOCK_SKEW_MARGIN_MS));
+  return `[${fmt(since)}..${fmt(safeEnd)}]`;
 }
 
 async function fetchOrders(since: Date, until: Date): Promise<EbayOrder[]> {

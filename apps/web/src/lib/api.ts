@@ -99,6 +99,7 @@ export interface SalesSyncResult {
   fetched: number;
   estimatedFees: number;
   listings: number;
+  linked: number;
   listingsError?: string;
   since: string;
 }

@@ -8,6 +8,9 @@
 export interface Listing {
   ebayListingId: string;
   title: string;
+  /** eBay's Custom Label. Set to the part SKU, it links a listing back without anyone
+   *  copying an id by hand. Empty when the listing was created without one. */
+  sku: string;
   /** What the listing is currently asking, which is not the same as the recovery basis. */
   price: number;
   currency: string;

@@ -31,7 +31,8 @@ export function useSyncSales() {
       const listings = result.listingsError
         ? '; listings failed'
         : result.listings > 0
-          ? `; ${result.listings} listings refreshed`
+          ? `; ${result.listings} listings refreshed` +
+            (result.linked > 0 ? `, ${result.linked} newly linked` : '')
           : '';
       toast(`Synced ${result.fetched} sales — ${parts.join(', ')}${listings}`);
     },
