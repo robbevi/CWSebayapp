@@ -4,6 +4,7 @@ import cors from 'cors';
 import express from 'express';
 import { env } from './config/env.js';
 import { errorHandler } from './middleware/errorHandler.js';
+import { draftsRouter } from './routes/drafts.js';
 import { exportRouter } from './routes/export.js';
 import { healthRouter } from './routes/health.js';
 import { importRouter } from './routes/import.js';
@@ -29,6 +30,7 @@ app.use('/api', discrepanciesRouter);
 app.use('/api', usersRouter);
 app.use('/api', exportRouter);
 app.use('/api', salesRouter);
+app.use('/api', draftsRouter);
 
 if (process.env.NODE_ENV === 'production') {
   const webDist = path.resolve(__dirname, '../../web/dist');

@@ -109,6 +109,18 @@ export async function fetchSales(): Promise<Sale[]> {
   return parseJson(res);
 }
 
+export interface DraftResult {
+  draftId: string;
+  url: string | null;
+  title: string;
+  priceMissing: boolean;
+}
+
+export async function createDraft(partId: string): Promise<DraftResult> {
+  const res = await fetch(`/api/parts/${encodeURIComponent(partId)}/draft`, { method: 'POST' });
+  return parseJson(res);
+}
+
 export async function fetchListings(): Promise<Listing[]> {
   const res = await fetch('/api/listings');
   return parseJson(res);

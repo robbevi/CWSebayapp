@@ -74,6 +74,9 @@ export interface InventoryPart {
   itemListed: boolean;
   itemListedDate?: string | null;
   ebayListingId?: string | null;
+  /** Set once a draft exists on eBay, so a part is not drafted twice. */
+  ebayDraftId?: string | null;
+  ebayDraftUrl?: string | null;
   transferredToMarketRecovery: boolean;
   transferId?: string | null;
   catalogingStartDate?: string | null;
@@ -124,6 +127,8 @@ export type InventoryPartPatch = Partial<
     | 'itemListed'
     | 'itemListedDate'
     | 'ebayListingId'
+    | 'ebayDraftId'
+    | 'ebayDraftUrl'
     | 'transferredToMarketRecovery'
     | 'transferId'
     | 'catalogingStartDate'

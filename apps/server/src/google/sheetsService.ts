@@ -81,6 +81,8 @@ const KNOWN_FIELDS = [
   'itemListed',
   'itemListedDate',
   'ebayListingId',
+  'ebayDraftId',
+  'ebayDraftUrl',
   'transferredToMarketRecovery',
   'transferId',
   'catalogingStartDate',
@@ -116,6 +118,8 @@ export interface CreatePartFields {
   itemListed?: boolean;
   itemListedDate?: string | null;
   ebayListingId?: string | null;
+  ebayDraftId?: string | null;
+  ebayDraftUrl?: string | null;
   transferredToMarketRecovery?: boolean;
   transferId?: string | null;
   catalogingStartDate?: string | null;
@@ -176,6 +180,8 @@ export function mapRowToPart(headers: string[], row: unknown[], photos: Photo[])
     itemListed: parseBoolean(get('itemListed')),
     itemListedDate: parseDateOrNull(get('itemListedDate')),
     ebayListingId: get('ebayListingId') ?? null,
+    ebayDraftId: get('ebayDraftId') ?? null,
+    ebayDraftUrl: get('ebayDraftUrl') ?? null,
     transferredToMarketRecovery: parseBoolean(get('transferredToMarketRecovery')),
     transferId: get('transferId') ?? null,
     catalogingStartDate: parseDateOrNull(get('catalogingStartDate')),
@@ -258,6 +264,8 @@ function buildCreateRecord(data: CreatePartFields, updatedAt: string): Partial<R
     itemListed: data.itemListed ?? false,
     itemListedDate: data.itemListedDate,
     ebayListingId: data.ebayListingId,
+    ebayDraftId: data.ebayDraftId,
+    ebayDraftUrl: data.ebayDraftUrl,
     transferredToMarketRecovery: data.transferredToMarketRecovery ?? false,
     transferId: data.transferId,
     catalogingStartDate: data.catalogingStartDate,
@@ -527,6 +535,8 @@ export async function updatePart(id: string, patch: InventoryPartPatch, submitte
   if (patch.itemListed !== undefined) record.itemListed = patch.itemListed;
   if (patch.itemListedDate !== undefined) record.itemListedDate = patch.itemListedDate;
   if (patch.ebayListingId !== undefined) record.ebayListingId = patch.ebayListingId;
+  if (patch.ebayDraftId !== undefined) record.ebayDraftId = patch.ebayDraftId;
+  if (patch.ebayDraftUrl !== undefined) record.ebayDraftUrl = patch.ebayDraftUrl;
   if (patch.transferredToMarketRecovery !== undefined) record.transferredToMarketRecovery = patch.transferredToMarketRecovery;
   if (patch.transferId !== undefined) record.transferId = patch.transferId;
   if (patch.catalogingStartDate !== undefined) record.catalogingStartDate = patch.catalogingStartDate;

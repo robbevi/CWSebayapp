@@ -19,6 +19,8 @@ import { env } from '../config/env.js';
  *  identity     which eBay account granted the token, so a grant made while signed in
  *               as the wrong user is caught immediately rather than looking like an
  *               empty order history
+ *  item.draft   creates draft listings. The only scope here that writes anything; drafts
+ *               are not live listings and still need publishing on eBay by a person.
  */
 export const EBAY_SCOPES = [
   'https://api.ebay.com/oauth/api_scope/sell.fulfillment.readonly',
@@ -26,6 +28,7 @@ export const EBAY_SCOPES = [
   'https://api.ebay.com/oauth/api_scope/sell.inventory.readonly',
   'https://api.ebay.com/oauth/api_scope/sell.analytics.readonly',
   'https://api.ebay.com/oauth/api_scope/commerce.identity.readonly',
+  'https://api.ebay.com/oauth/api_scope/sell.item.draft',
 ];
 
 export function ebayBaseUrl(): string {

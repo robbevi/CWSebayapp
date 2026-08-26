@@ -35,6 +35,7 @@ const rawSchema = z.object({
   EBAY_RU_NAME: z.string().optional(),
   EBAY_ENV: z.enum(['production', 'sandbox']).optional(),
   EBAY_MARKETPLACE_ID: z.string().optional(),
+  PUBLIC_BASE_URL: z.string().optional(),
   PORT: z.string().optional(),
 });
 
@@ -133,6 +134,8 @@ export const env = {
   ebayRuName: raw.EBAY_RU_NAME,
   ebayEnv: raw.EBAY_ENV ?? 'production',
   ebayMarketplaceId: raw.EBAY_MARKETPLACE_ID ?? 'EBAY_US',
+  // Where eBay can reach this app from the open internet, to fetch listing photographs.
+  publicBaseUrl: raw.PUBLIC_BASE_URL?.replace(/\/$/, ''),
   port: Number(raw.PORT ?? 4000),
 };
 
