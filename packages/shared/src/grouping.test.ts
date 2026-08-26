@@ -41,6 +41,20 @@ describe('groupPartsBySku', () => {
     expect(g.photos).toHaveLength(2);
   });
 
+  it('gathers photos from a row that is not the primary', () => {
+    // The regression: the row with the most checkpoints becomes primary, and it is often
+    // not the row somebody photographed. Reading photos off the primary alone showed a
+    // part as photographed with nothing to see.
+    const photo = { fileId: 'f', fileName: 'n', url: 'u', uploadedAt: '' };
+    const [g] = groupPartsBySku([
+      part({ id: 'photographed-row', sku: 'X1', photographed: true, photos: [photo] }),
+      part({ id: 'busier-row', sku: 'X1', boxCondition: 'Good', transferredToMarketRecovery: true }),
+    ]);
+    expect(g.primary.id).toBe('busier-row');
+    expect(g.primary.photos).toHaveLength(0);
+    expect(g.photos).toHaveLength(1);
+  });
+
   it('counts a checkpoint as done when any location has it', () => {
     const [g] = groupPartsBySku([
       part({ id: 'a', sku: 'X1', photographed: true }),

@@ -41,6 +41,11 @@ export function isPositiveMargin(grossMarginStatus: string | undefined | null): 
 
 export interface Photo {
   fileId: string;
+  /**
+   * The record this photo was taken against. A SKU can span several rows, and the row that
+   * owns a photo is not necessarily the one whose card you opened.
+   */
+  partId?: string;
   fileName: string;
   url: string;
   uploadedAt: string;

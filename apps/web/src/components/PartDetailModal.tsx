@@ -525,7 +525,11 @@ export function PartDetailModal() {
             </div>
           )}
 
-          <PhotoUploader sku={part.sku} itemId={part.id} photos={part.photos} site={part.inventorySite} />
+          {/* Every photo for this SKU, not just the primary row's. A SKU can span rows and
+              the row that happens to be primary — the one with the most checkpoints — is
+              often not the row somebody photographed, which showed as "Photographed" with
+              nothing to see. Uploads still attach to the primary row. */}
+          <PhotoUploader sku={part.sku} itemId={part.id} photos={group.photos} site={part.inventorySite} />
 
           <div>
             <label className="mb-1 block text-xs font-semibold text-textMuted">

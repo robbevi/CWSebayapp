@@ -66,7 +66,9 @@ export function PhotoUploader({ sku, itemId, photos, site }: PhotoUploaderProps)
 
   const handleDelete = (photo: Photo) => {
     if (!window.confirm('Remove this photo?')) return;
-    deletePhoto.mutate({ fileId: photo.fileId, sku, itemId });
+    // The photo's own row, where it has one: photos on a multi-row SKU can belong to a
+    // different row than the one being viewed, and the flag has to be cleared on the owner.
+    deletePhoto.mutate({ fileId: photo.fileId, sku, itemId: photo.partId ?? itemId });
   };
 
   return (

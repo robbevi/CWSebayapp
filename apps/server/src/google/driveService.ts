@@ -45,6 +45,7 @@ export async function listPhotosGrouped(): Promise<GroupedPhotos> {
       if (!file.name || !file.id) continue;
       const photo: Photo = {
         fileId: file.id,
+        partId: file.properties?.partId ?? undefined,
         fileName: file.name,
         url: buildImageUrl(file.id),
         uploadedAt: file.createdTime ?? new Date().toISOString(),
