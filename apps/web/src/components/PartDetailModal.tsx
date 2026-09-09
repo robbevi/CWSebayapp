@@ -4,6 +4,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { AlertTriangle, Check, Flag, Pencil, ShoppingCart, Tag, Trash2, X } from 'lucide-react';
 import {
+  chicagoDateString,
   daysListed,
   formatDate,
   formatVariance,
@@ -161,7 +162,13 @@ export function PartDetailModal() {
         // but a native <input type="date"> only accepts exactly "YYYY-MM-DD" as its
         // value — anything else is silently treated as invalid and rendered blank, even
         // though the data was saved correctly. Slicing to the date portion fixes display.
-        itemListedDate: part.itemListedDate ? part.itemListedDate.slice(0, 10) : '',
+        //
+        // With no date on file it prefills to today, since a part is nearly always listed
+        // the day someone marks it listed. Chicago rather than the device's own clock, so
+        // the date agrees with the day the Scoreboard will count it in.
+        itemListedDate: part.itemListedDate
+          ? part.itemListedDate.slice(0, 10)
+          : chicagoDateString(new Date().toISOString()),
         ebayListingId: part.ebayListingId ?? '',
       });
       setEditingHeader(false);
@@ -745,11 +752,7 @@ export function PartDetailModal() {
             {itemListed && (
               <div>
                 <label className="mb-1 block text-xs font-semibold text-textMuted">Item Listed Date</label>
-                <input
-                  type="date"
-                  className="w-full rounded-btn border border-border bg-surface px-3 py-2 text-xs"
-                  {...register('itemListedDate')}
-                />
+                <Input type="date" {...register('itemListedDate')} />
               </div>
             )}
           </div>

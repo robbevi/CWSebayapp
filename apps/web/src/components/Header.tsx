@@ -58,23 +58,37 @@ function Row({ icon, term, children }: { icon: React.ReactNode; term: string; ch
   );
 }
 
+/** "Richard Radway" becomes RR — enough to recognise yourself at a glance on a phone. */
+function initials(name: string): string {
+  return name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((w) => w[0]?.toUpperCase() ?? '')
+    .join('');
+}
+
 export function Header() {
   const [infoOpen, setInfoOpen] = useState(false);
   const [scoreboardOpen, setScoreboardOpen] = useState(false);
   const [dark, setDark] = useDarkMode();
   const currentUser = useUserStore((s) => s.currentUser);
+  const startSwitch = useUserStore((s) => s.startSwitch);
   const setGoalsOpen = useGoalsPopupStore((s) => s.setOpen);
   const { data: salesStatus } = useSalesStatus();
   const syncSales = useSyncSales();
 
   return (
-    <header className="flex shrink-0 items-center gap-3 bg-primaryDeep px-6 py-4">
-      <img src={calfracLogo} alt="Calfrac" className="h-10 w-10 shrink-0 object-contain" />
-      <span aria-hidden="true" className="h-8 w-px shrink-0 bg-white/20" />
+    <header className="flex shrink-0 items-center gap-1.5 bg-primaryDeep px-3 py-4 sm:gap-3 sm:px-6">
+      <img src={calfracLogo} alt="Calfrac" className="h-8 w-8 shrink-0 object-contain sm:h-10 sm:w-10" />
+      <span aria-hidden="true" className="hidden h-8 w-px shrink-0 bg-white/20 sm:block" />
       {/* Drawn in white and orange straight onto the green — no light chip needed, which
           is the whole point of it being vector rather than a flat navy image. */}
-      <SpareMark className="h-9 w-9 shrink-0" frame="#ffffff" title="SPARE" />
-      <div className="min-w-0">
+      <SpareMark className="h-8 w-8 shrink-0 sm:h-9 sm:w-9" frame="#ffffff" title="SPARE" />
+      {/* Hidden on phones rather than left to shrink: there is no room for it beside the
+          controls, and a flex-squashed wordmark renders as a stray few pixels. The gear
+          mark carries the branding at that width. */}
+      <div className="hidden min-w-0 sm:block">
         {/* The wordmark is the lettering from the supplied logo, lifted out and recoloured
             white so it reads on the green — the navy original would disappear. The orange
             A is kept as drawn. An image rather than type, because the face is bespoke. */}
@@ -83,11 +97,31 @@ export function Header() {
           Surplus Parts &amp; Asset Recovery Exchange
         </p>
       </div>
+      {/* Who the work is being credited to, and the way to change it. These are shared
+          warehouse tablets — whoever picked a name last is not necessarily who is holding
+          it now, so the name has to be visible rather than buried in a menu. */}
+      {currentUser && (
+        <button
+          type="button"
+          onClick={startSwitch}
+          className="ml-auto flex shrink-0 items-center gap-2 rounded-full p-0.5 text-white hover:bg-white/10 sm:p-1 sm:pr-3"
+          title={`Logged in as ${currentUser} — tap to change user`}
+          aria-label={`Logged in as ${currentUser}. Change user.`}
+        >
+          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white/15 text-[11px] font-bold">
+            {initials(currentUser)}
+          </span>
+          <span className="hidden max-w-[9rem] text-left sm:block">
+            <span className="block text-[10px] leading-tight text-white/60">Logged in as</span>
+            <span className="block truncate text-xs font-semibold leading-tight">{currentUser}</span>
+          </span>
+        </button>
+      )}
       {currentUser && (
         <button
           type="button"
           onClick={() => setGoalsOpen(true)}
-          className="ml-auto flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-white hover:bg-white/10"
+          className="flex h-9 w-8 shrink-0 items-center justify-center rounded-full text-white sm:w-9 hover:bg-white/10"
           aria-label="Goals"
           title="Goals"
         >
@@ -97,7 +131,7 @@ export function Header() {
       <button
         type="button"
         onClick={() => setScoreboardOpen(true)}
-        className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-white hover:bg-white/10 ${currentUser ? '' : 'ml-auto'}`}
+        className={`flex h-9 w-8 shrink-0 items-center justify-center rounded-full text-white sm:w-9 hover:bg-white/10 ${currentUser ? '' : 'ml-auto'}`}
         aria-label="Scoreboard"
         title="Scoreboard"
       >
@@ -110,7 +144,7 @@ export function Header() {
           type="button"
           onClick={() => syncSales.mutate(undefined)}
           disabled={syncSales.isPending}
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-white hover:bg-white/10 disabled:opacity-50"
+          className="flex h-9 w-8 shrink-0 items-center justify-center rounded-full text-white sm:w-9 hover:bg-white/10 disabled:opacity-50"
           aria-label={syncSales.isPending ? 'Syncing with eBay' : 'Sync with eBay'}
           title={syncSales.isPending ? 'Syncing with eBay…' : 'Sync sales and listings from eBay'}
         >
@@ -122,7 +156,7 @@ export function Header() {
           the browser saves it directly and never has to hold the whole file in memory. */}
       <a
         href="/api/export"
-        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-white hover:bg-white/10"
+        className="flex h-9 w-8 shrink-0 items-center justify-center rounded-full text-white sm:w-9 hover:bg-white/10"
         aria-label="Export all data to a spreadsheet"
         title="Export all data to a spreadsheet"
       >
@@ -131,7 +165,7 @@ export function Header() {
       <button
         type="button"
         onClick={() => setDark((d) => !d)}
-        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-white hover:bg-white/10"
+        className="flex h-9 w-8 shrink-0 items-center justify-center rounded-full text-white sm:w-9 hover:bg-white/10"
         aria-label={dark ? 'Switch to light mode' : 'Switch to dark mode'}
         title={dark ? 'Switch to light mode' : 'Switch to dark mode'}
       >
@@ -140,7 +174,7 @@ export function Header() {
       <button
         type="button"
         onClick={() => setInfoOpen(true)}
-        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-white hover:bg-white/10"
+        className="flex h-9 w-8 shrink-0 items-center justify-center rounded-full text-white sm:w-9 hover:bg-white/10"
         aria-label="Info"
       >
         <Info size={20} />
