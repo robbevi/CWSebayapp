@@ -36,7 +36,6 @@ import { useGoalsPopupStore } from '../state/useGoalsPopupStore';
 import { useSalesStatus, useSyncSales } from '../hooks/useSales';
 import { useUserStore } from '../state/useUserStore';
 import { Scoreboard } from './Scoreboard';
-import { SpareMark } from './ui/SpareMark';
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -79,20 +78,16 @@ export function Header() {
   const syncSales = useSyncSales();
 
   return (
-    <header className="flex shrink-0 items-center gap-1.5 bg-primaryDeep px-3 py-4 sm:gap-3 sm:px-6">
+    <header className="flex shrink-0 items-center gap-1 bg-primaryDeep px-3 py-4 sm:gap-3 sm:px-6">
       <img src={calfracLogo} alt="Calfrac" className="h-8 w-8 shrink-0 object-contain sm:h-10 sm:w-10" />
       <span aria-hidden="true" className="hidden h-8 w-px shrink-0 bg-white/20 sm:block" />
-      {/* Drawn in white and orange straight onto the green — no light chip needed, which
-          is the whole point of it being vector rather than a flat navy image. */}
-      <SpareMark className="h-8 w-8 shrink-0 sm:h-9 sm:w-9" frame="#ffffff" title="SPARE" />
-      {/* Hidden on phones rather than left to shrink: there is no room for it beside the
-          controls, and a flex-squashed wordmark renders as a stray few pixels. The gear
-          mark carries the branding at that width. */}
-      <div className="hidden min-w-0 sm:block">
+      {/* shrink-0 rather than min-w-0: a flex-squashed wordmark renders as a stray few
+          pixels rather than getting smaller. */}
+      <div className="shrink-0">
         {/* The wordmark is the lettering from the supplied logo, lifted out and recoloured
             white so it reads on the green — the navy original would disappear. The orange
             A is kept as drawn. An image rather than type, because the face is bespoke. */}
-        <img src={spareWordmark} alt="SPARE" className="h-4 w-auto object-contain sm:h-5" />
+        <img src={spareWordmark} alt="SPARE" className="h-3 w-auto object-contain sm:h-5" />
         <p className="mt-1 hidden text-[11px] font-medium leading-tight tracking-wide text-white/60 sm:block">
           Surplus Parts &amp; Asset Recovery Exchange
         </p>

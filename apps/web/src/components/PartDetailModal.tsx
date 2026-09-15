@@ -50,6 +50,18 @@ const EXCEPTION_GROUPS = [
 const EXCEPTION_PLACEHOLDER = 'No Exception';
 const YES_NO = ['No', 'Yes'];
 
+/**
+ * Takes what someone pastes into the listing ID box and returns the item number. Accepts
+ * the bare number, or the listing's link copied from the address bar in either of eBay's
+ * shapes — /itm/398212345678 or /itm/Some-Title/398212345678 — since copying the link is
+ * easier than picking the number out of it.
+ */
+function normalizeListingId(raw: string | undefined): string {
+  const value = (raw ?? '').trim();
+  const fromUrl = value.match(/\/itm\/(?:[^/?#]+\/)?(\d{9,15})/);
+  return fromUrl ? fromUrl[1] : value;
+}
+
 const schema = z.object({
   // Identity fields shared by every row of this SKU.
   description: z.string().optional(),
@@ -79,7 +91,6 @@ const schema = z.object({
   transferredToMarketRecovery: z.boolean(),
   transferId: z.string().optional(),
   newBinLocation: z.string().optional(),
-  itemListed: z.boolean(),
   itemListedDate: z.string().optional(),
   ebayListingId: z.string().optional(),
 });
@@ -128,7 +139,6 @@ export function PartDetailModal() {
       transferredToMarketRecovery: false,
       transferId: '',
       newBinLocation: '',
-      itemListed: false,
       itemListedDate: '',
       ebayListingId: '',
     },
@@ -157,7 +167,6 @@ export function PartDetailModal() {
         transferredToMarketRecovery: part.transferredToMarketRecovery,
         transferId: part.transferId ?? '',
         newBinLocation: part.newBinLocation ?? '',
-        itemListed: part.itemListed,
         // itemListedDate is stored as a full ISO datetime ("2026-07-16T00:00:00.000Z"),
         // but a native <input type="date"> only accepts exactly "YYYY-MM-DD" as its
         // value — anything else is silently treated as invalid and rendered blank, even
@@ -181,7 +190,7 @@ export function PartDetailModal() {
   const partSales = salesForGroup(group, indexSales(sales ?? []));
   const listing = listingFor(group.records, indexListings(listings ?? []));
   const sold = soldPosition(group, partSales);
-  const itemListed = watch('itemListed');
+  const listingIdInput = (watch('ebayListingId') ?? '').trim();
   const needsReview = watch('needsReview');
   const transferred = watch('transferredToMarketRecovery');
   const disposition = watch('disposition');
@@ -238,6 +247,13 @@ export function PartDetailModal() {
       });
     }
 
+    // Entering a listing ID is what marks a part listed; there is no separate switch.
+    // Clearing the ID of a listed part unlists it. A part listed before IDs were recorded
+    // keeps its status when saved with the box empty — otherwise opening and saving it for
+    // any unrelated edit would silently take it off the Listed column.
+    const listingId = normalizeListingId(values.ebayListingId);
+    const listed = listingId ? true : part.ebayListingId ? false : part.itemListed;
+
     addPatch(part.id, {
       confirmedQoh: values.qohConfirmed ? values.confirmedQoh : null,
       notes: values.notes,
@@ -248,9 +264,9 @@ export function PartDetailModal() {
       transferredToMarketRecovery: values.transferredToMarketRecovery,
       transferId: values.transferredToMarketRecovery ? values.transferId || undefined : null,
       newBinLocation: values.newBinLocation?.trim() || undefined,
-      itemListed: values.itemListed,
-      itemListedDate: values.itemListed ? values.itemListedDate || new Date().toISOString() : null,
-      ebayListingId: values.itemListed ? values.ebayListingId || undefined : null,
+      itemListed: listed,
+      itemListedDate: listed ? values.itemListedDate || new Date().toISOString() : null,
+      ebayListingId: listed ? listingId || undefined : null,
     });
 
     // Sequential rather than parallel: each write is a read-modify-write of the same sheet,
@@ -728,28 +744,15 @@ export function PartDetailModal() {
             </div>
 
             <div>
-              <label className="mb-1 block text-xs font-semibold text-textMuted">Item Listed</label>
-              <Controller
-                control={control}
-                name="itemListed"
-                render={({ field }) => (
-                  <SelectDropdown
-                    options={YES_NO}
-                    mutedValue="No"
-                    value={field.value ? 'Yes' : 'No'}
-                    onChange={(v) => field.onChange(v === 'Yes')}
-                  />
-                )}
+              <label className="mb-1 block text-xs font-semibold text-textMuted">eBay Listing ID</label>
+              <Input
+                placeholder="Listing ID or link — marks it listed"
+                inputMode="text"
+                {...register('ebayListingId')}
               />
             </div>
-            {itemListed && (
-              <div>
-                <label className="mb-1 block text-xs font-semibold text-textMuted">eBay Listing ID</label>
-                <Input placeholder="eBay Listing ID" {...register('ebayListingId')} />
-              </div>
-            )}
 
-            {itemListed && (
+            {(listingIdInput || (part.itemListed && !part.ebayListingId)) && (
               <div>
                 <label className="mb-1 block text-xs font-semibold text-textMuted">Item Listed Date</label>
                 <Input type="date" {...register('itemListedDate')} />
