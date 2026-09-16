@@ -131,7 +131,7 @@ export async function fetchListings(): Promise<Listing[]> {
   return parseJson(res);
 }
 
-export async function fetchSalesStatus(): Promise<{ ebayConfigured: boolean }> {
+export async function fetchSalesStatus(): Promise<{ ebayConfigured: boolean; ebayPublishing?: boolean }> {
   const res = await fetch('/api/sales/status');
   return parseJson(res);
 }

@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { isGoogleConfigured } from '../config/env.js';
+import { env, isGoogleConfigured } from '../config/env.js';
 import { fetchListings } from '../ebay/listingsService.js';
 import { fetchSales, isEbayConfigured } from '../ebay/ordersService.js';
 import {
@@ -77,7 +77,7 @@ salesRouter.get('/listings', async (_req, res, next) => {
 });
 
 salesRouter.get('/sales/status', (_req, res) => {
-  res.json({ ebayConfigured: isEbayConfigured() });
+  res.json({ ebayConfigured: isEbayConfigured(), ebayPublishing: isEbayConfigured() && env.ebayPublishing });
 });
 
 /**

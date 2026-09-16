@@ -16,6 +16,7 @@ import {
 import { AlertTriangle, Check, ChevronDown, ClipboardCopy, Eye, Info, Plus, RotateCcw, ShieldCheck, Tag, X } from 'lucide-react';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useCheckListing, usePublishListing, useSellerSetup } from '../hooks/useEbayListing';
+import { useSalesStatus } from '../hooks/useSales';
 import { ListingRequestError } from '../lib/api';
 import { useUserStore } from '../state/useUserStore';
 import { Button } from './ui/Button';
@@ -141,6 +142,7 @@ export function ListingPublisher({ group, onPublished }: { group: PartGroup; onP
   const [policies, setPolicies] = useState<PolicyChoice | null>(() => load<PolicyChoice>(POLICY_KEY));
   const [check, setCheck] = useState<{ key: string; result: ListingCheck } | null>(null);
   const currentUser = useUserStore((s) => s.currentUser);
+  const { data: status } = useSalesStatus();
 
   const setup = useSellerSetup(open);
   const checkListing = useCheckListing();
@@ -171,6 +173,7 @@ export function ListingPublisher({ group, onPublished }: { group: PartGroup; onP
   }, [policies]);
 
   const readiness = draftReadiness(group);
+  if (!status?.ebayPublishing) return null;
   if (readiness.blockers.includes('already listed on eBay')) return null;
 
   if (readiness.blockers.length) {

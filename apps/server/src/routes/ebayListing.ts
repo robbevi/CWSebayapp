@@ -24,6 +24,13 @@ import { getAllParts, updatePart } from '../google/sheetsService.js';
 
 export const ebayListingRouter = Router();
 
+// Switched off, these routes don't exist: nothing reachable can list, or even look up the
+// account's policies.
+ebayListingRouter.use(['/ebay/seller-setup', '/parts/:id/listing'], (_req, res, next) => {
+  if (env.ebayPublishing) next();
+  else res.status(404).json({ error: 'eBay publishing is not enabled here.' });
+});
+
 // eBay fetches the photographs itself. They are served by the deployed app whichever
 // server builds the listing, so a local run still hands eBay addresses it can reach.
 const PHOTO_BASE = env.publicBaseUrl ?? 'https://calfracusebayinventoryapp.onrender.com';

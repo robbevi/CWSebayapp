@@ -36,6 +36,7 @@ const rawSchema = z.object({
   EBAY_ENV: z.enum(['production', 'sandbox']).optional(),
   EBAY_MARKETPLACE_ID: z.string().optional(),
   PUBLIC_BASE_URL: z.string().optional(),
+  EBAY_PUBLISHING: z.string().optional(),
   PORT: z.string().optional(),
 });
 
@@ -136,6 +137,9 @@ export const env = {
   ebayMarketplaceId: raw.EBAY_MARKETPLACE_ID ?? 'EBAY_US',
   // Where eBay can reach this app from the open internet, to fetch listing photographs.
   publicBaseUrl: raw.PUBLIC_BASE_URL?.replace(/\/$/, ''),
+  // Publishing puts real listings on eBay, so it is off unless switched on outright —
+  // an environment that has never heard of it (production, until it's ready) can't list.
+  ebayPublishing: raw.EBAY_PUBLISHING?.trim().toLowerCase() === 'on',
   port: Number(raw.PORT ?? 4000),
 };
 
