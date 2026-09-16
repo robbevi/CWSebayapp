@@ -89,6 +89,34 @@ export async function getAccessToken(): Promise<string> {
   return cached.token;
 }
 
+let appCached: { token: string; expiresAt: number } | undefined;
+
+/**
+ * An application token, for eBay's public catalogue (Taxonomy). The user token can't be
+ * used there: it carries only the sell scopes granted at consent, not the general one.
+ */
+export async function getAppAccessToken(): Promise<string> {
+  const { ebayClientId, ebayClientSecret } = env;
+  if (!ebayClientId || !ebayClientSecret) {
+    throw new Error('eBay is not configured. Set EBAY_CLIENT_ID and EBAY_CLIENT_SECRET.');
+  }
+  if (appCached && appCached.expiresAt > Date.now() + 60_000) return appCached.token;
+
+  const res = await fetch(`${ebayBaseUrl()}/identity/v1/oauth2/token`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Basic ${basicAuth(ebayClientId, ebayClientSecret)}`,
+      'Content-Type': 'application/x-www-form-urlencoded',
+    },
+    body: new URLSearchParams({ grant_type: 'client_credentials', scope: 'https://api.ebay.com/oauth/api_scope' }),
+  });
+  const text = await res.text();
+  if (!res.ok) throw new Error(`eBay application token failed (${res.status}): ${text.slice(0, 300)}`);
+  const json = JSON.parse(text) as { access_token: string; expires_in: number };
+  appCached = { token: json.access_token, expiresAt: Date.now() + json.expires_in * 1000 };
+  return appCached.token;
+}
+
 export async function ebayGet<T>(path: string): Promise<T> {
   const token = await getAccessToken();
   const res = await fetch(`${ebayBaseUrl()}${path}`, {

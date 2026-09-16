@@ -4,6 +4,7 @@ export * from './submissions.js';
 export * from './binLocations.js';
 export * from './discrepancy.js';
 export * from './draft.js';
+export * from './agentListing.js';
 export * from './grouping.js';
 export * from './listings.js';
 export * from './dashboardStats.js';

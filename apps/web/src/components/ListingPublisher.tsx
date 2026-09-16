@@ -1,0 +1,552 @@
+import {
+  agentPrompt,
+  draftReadiness,
+  fillFromPart,
+  listingProblems,
+  MAX_TITLE,
+  parseAgentOutput,
+  tradingCondition,
+  type AgentListing,
+  type ItemSpecific,
+  type ListingCheck,
+  type PartGroup,
+  type PolicyChoice,
+  type SellerPolicy,
+} from '@warehouse/shared';
+import { AlertTriangle, Check, ChevronDown, ClipboardCopy, Eye, Info, Plus, RotateCcw, ShieldCheck, Tag, X } from 'lucide-react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useCheckListing, usePublishListing, useSellerSetup } from '../hooks/useEbayListing';
+import { ListingRequestError } from '../lib/api';
+import { useUserStore } from '../state/useUserStore';
+import { Button } from './ui/Button';
+import { Input } from './ui/Input';
+import { SelectDropdown } from './ui/SelectDropdown';
+import { Textarea } from './ui/Textarea';
+
+/**
+ * Turns the Copilot agent's research into a live eBay listing.
+ *
+ * Copy a prompt carrying the part's confirmed facts, paste the agent's answer back, check
+ * the result with eBay, publish. SPARE contributes the photographs, the counted quantity
+ * and the inspected condition; everything the agent estimated stays editable, and nothing
+ * can be published until eBay has accepted exactly what is on screen.
+ */
+
+interface Draft {
+  text: string;
+  listing: AgentListing | null;
+  notes: string[];
+}
+
+const draftKey = (sku: string) => `spare.listing.${sku}`;
+const POLICY_KEY = 'spare.listing.policies';
+
+// Browser storage can be missing or refuse writes; a draft that doesn't persist is fine.
+function load<T>(key: string): T | null {
+  try {
+    const raw = localStorage.getItem(key);
+    return raw ? (JSON.parse(raw) as T) : null;
+  } catch {
+    return null;
+  }
+}
+function store(key: string, value: unknown) {
+  try {
+    if (value == null) localStorage.removeItem(key);
+    else localStorage.setItem(key, JSON.stringify(value));
+  } catch {
+    /* not persisted */
+  }
+}
+
+const NEEDS: Record<string, string> = {
+  'no photographs': 'photographs',
+  'quantity not confirmed': 'a counted quantity',
+  'no item condition': 'an item condition',
+  'nothing to build a title from': 'a description',
+};
+
+const numText = (v: number | null) => (v == null ? '' : String(v));
+const toNum = (t: string) => (t.trim() === '' || !Number.isFinite(Number(t)) ? null : Number(t));
+
+function Label({ children }: { children: ReactNode }) {
+  return <label className="mb-1 block text-xs font-semibold text-textMuted">{children}</label>;
+}
+
+function PolicySelect({
+  label,
+  list,
+  value,
+  onChange,
+}: {
+  label: string;
+  list: SellerPolicy[];
+  value: string;
+  onChange: (id: string) => void;
+}) {
+  return (
+    <div>
+      <Label>{label}</Label>
+      <SelectDropdown
+        options={list.map((p) => p.name)}
+        value={list.find((p) => p.id === value)?.name ?? ''}
+        placeholder="Choose a policy"
+        onChange={(name) => onChange(list.find((p) => p.name === name)?.id ?? '')}
+      />
+    </div>
+  );
+}
+
+function Messages({ check }: { check: ListingCheck }) {
+  const lines: { tone: 'error' | 'warning' | 'info'; text: string }[] = [
+    ...check.problems.map((text) => ({ tone: 'error' as const, text })),
+    ...check.missingSpecifics.map((name) => ({
+      tone: 'error' as const,
+      text: `This category requires the item specific "${name}".`,
+    })),
+    ...check.messages.map((m) => ({ tone: m.severity, text: m.message })),
+  ];
+  if (!lines.length) return null;
+  const tone = {
+    error: 'text-red-600',
+    warning: 'text-amber-600',
+    info: 'text-textMuted',
+  };
+  const icon = {
+    error: <X size={12} className="mt-0.5 shrink-0" />,
+    warning: <AlertTriangle size={12} className="mt-0.5 shrink-0" />,
+    info: <Info size={12} className="mt-0.5 shrink-0" />,
+  };
+  return (
+    <ul className="mt-2 space-y-1">
+      {lines.map((l, i) => (
+        <li key={i} className={`flex gap-1.5 ${tone[l.tone]}`}>
+          {icon[l.tone]}
+          <span>{l.text}</span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+export function ListingPublisher({ group, onPublished }: { group: PartGroup; onPublished: (itemId: string) => void }) {
+  const saved = useMemo(() => load<Draft>(draftKey(group.sku)), [group.sku]);
+  const [open, setOpen] = useState(!!saved?.listing);
+  const [text, setText] = useState(saved?.text ?? '');
+  const [listing, setListing] = useState<AgentListing | null>(saved?.listing ?? null);
+  const [notes, setNotes] = useState<string[]>(saved?.notes ?? []);
+  const [parseError, setParseError] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
+  const [policies, setPolicies] = useState<PolicyChoice | null>(() => load<PolicyChoice>(POLICY_KEY));
+  const [check, setCheck] = useState<{ key: string; result: ListingCheck } | null>(null);
+  const currentUser = useUserStore((s) => s.currentUser);
+
+  const setup = useSellerSetup(open);
+  const checkListing = useCheckListing();
+  const publish = usePublishListing();
+
+  // Last-used policies win, as long as they still exist; otherwise the ones on the team's
+  // current listings.
+  useEffect(() => {
+    const s = setup.data;
+    if (!s) return;
+    setPolicies((prev) => {
+      const pickId = (list: SellerPolicy[], mine?: string, theirs?: string) =>
+        [mine, theirs, list[0]?.id].find((id) => id && list.some((p) => p.id === id)) ?? '';
+      return {
+        shipping: pickId(s.shipping, prev?.shipping, s.defaults.shipping),
+        returns: pickId(s.returns, prev?.returns, s.defaults.returns),
+        payment: pickId(s.payment, prev?.payment, s.defaults.payment),
+      };
+    });
+  }, [setup.data]);
+
+  useEffect(() => {
+    store(draftKey(group.sku), text || listing ? { text, listing, notes } : null);
+  }, [group.sku, text, listing, notes]);
+
+  useEffect(() => {
+    if (policies) store(POLICY_KEY, policies);
+  }, [policies]);
+
+  const readiness = draftReadiness(group);
+  if (readiness.blockers.includes('already listed on eBay')) return null;
+
+  if (readiness.blockers.length) {
+    return (
+      <div className="rounded-card border border-border bg-surfaceMuted p-3 text-[11px] text-textMuted">
+        <span className="font-semibold text-textPri">eBay listing</span> — available once the part has{' '}
+        {readiness.blockers.map((b) => NEEDS[b] ?? b).join(', ')}.
+      </div>
+    );
+  }
+
+  const key = JSON.stringify({ listing, policies });
+  const checked = check && check.key === key ? check.result : null;
+  const condition = tradingCondition(group.itemCondition);
+  const quantity = group.confirmedQoh ?? group.stockQty;
+  const localProblems = listing ? listingProblems(listing) : [];
+  const busy = checkListing.isPending || publish.isPending;
+
+  const update = (patch: Partial<AgentListing>) => setListing((l) => (l ? { ...l, ...patch } : l));
+  const updateSpecific = (i: number, patch: Partial<ItemSpecific>) =>
+    update({ specifics: listing!.specifics.map((s, j) => (j === i ? { ...s, ...patch } : s)) });
+
+  const copyPrompt = () => {
+    void navigator.clipboard.writeText(agentPrompt(group)).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    });
+  };
+
+  const readAnswer = () => {
+    const result = parseAgentOutput(text);
+    if (!result.listing) {
+      setParseError(result.error ?? "Couldn't read the agent's answer.");
+      return;
+    }
+    setParseError(null);
+    setListing(fillFromPart(result.listing, group));
+    setNotes(result.notes);
+    setCheck(null);
+  };
+
+  const startOver = () => {
+    setText('');
+    setListing(null);
+    setNotes([]);
+    setCheck(null);
+    setParseError(null);
+    checkListing.reset();
+    publish.reset();
+  };
+
+  const runCheck = () => {
+    if (!listing || !policies) return;
+    const checkedKey = key;
+    checkListing.mutate(
+      { partId: group.primary.id, listing, policies },
+      { onSuccess: (result) => setCheck({ key: checkedKey, result }) }
+    );
+  };
+
+  const runPublish = () => {
+    if (!listing || !policies || !checked?.ok) return;
+    const confirmed = window.confirm(
+      `Publish "${listing.title}" to eBay at $${listing.price?.toFixed(2)} (qty ${quantity})?\n\nIt goes live immediately.`
+    );
+    if (!confirmed) return;
+    publish.mutate(
+      { partId: group.primary.id, listing, policies, submittedBy: currentUser ?? undefined },
+      {
+        onSuccess: (result) => {
+          store(draftKey(group.sku), null);
+          onPublished(result.itemId);
+        },
+      }
+    );
+  };
+
+  const requestError = checkListing.error ?? publish.error;
+  const rejectedBy = requestError instanceof ListingRequestError ? requestError.messages : [];
+
+  return (
+    <div className="rounded-card border border-primary/30 bg-primary/5 p-3">
+      <button type="button" onClick={() => setOpen((v) => !v)} className="flex w-full items-center justify-between gap-2 text-left">
+        <span className="min-w-0">
+          <span className="flex items-center gap-1.5 text-xs font-semibold text-textPri">
+            <Tag size={13} />
+            {listing ? 'eBay listing in progress' : 'List on eBay'}
+          </span>
+          <span className="mt-0.5 block text-[11px] text-textMuted">
+            {listing
+              ? checked?.ok
+                ? 'Checked with eBay — ready to publish'
+                : 'Review the details, check with eBay, then publish'
+              : `Research with your agent, paste the answer, publish with ${group.photos.length} SPARE ${group.photos.length === 1 ? 'photo' : 'photos'}`}
+          </span>
+        </span>
+        <ChevronDown size={16} className={`shrink-0 text-textMuted transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+
+      {open && !listing && (
+        <div className="mt-3 space-y-3 border-t border-primary/20 pt-3">
+          <div>
+            <Label>1. Give your agent this part</Label>
+            <Button type="button" variant="outline" onClick={copyPrompt} className="w-full">
+              {copied ? <Check size={14} /> : <ClipboardCopy size={14} />}
+              {copied ? 'Copied — paste it into Copilot' : 'Copy prompt for the agent'}
+            </Button>
+          </div>
+          <div>
+            <Label>2. Paste the agent&apos;s answer</Label>
+            <Textarea
+              rows={6}
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              placeholder='{ "title": "…", "categoryId": "…", "price": … }'
+              className="font-mono text-[11px]"
+            />
+            {parseError && <p className="mt-1 text-[11px] text-red-600">{parseError}</p>}
+          </div>
+          <Button type="button" onClick={readAnswer} disabled={!text.trim()} className="w-full">
+            Read answer
+          </Button>
+        </div>
+      )}
+
+      {open && listing && (
+        <div className="mt-3 space-y-3 border-t border-primary/20 pt-3">
+          {notes.map((n) => (
+            <p key={n} className="flex gap-1.5 text-[11px] text-textMuted">
+              <Info size={12} className="mt-0.5 shrink-0" />
+              {n}
+            </p>
+          ))}
+
+          <div>
+            <Label>
+              Title{' '}
+              <span className={listing.title.length > MAX_TITLE ? 'text-red-600' : ''}>
+                ({listing.title.length}/{MAX_TITLE})
+              </span>
+            </Label>
+            <Input value={listing.title} onChange={(e) => update({ title: e.target.value })} />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label>Category ID</Label>
+              <Input inputMode="numeric" value={listing.categoryId} onChange={(e) => update({ categoryId: e.target.value.trim() })} />
+              <p className="mt-1 text-[11px] text-textMuted">
+                {checked?.category?.name ?? listing.categoryName ?? 'Named after the eBay check'}
+              </p>
+            </div>
+            <div>
+              <Label>Price (USD)</Label>
+              <Input
+                type="number"
+                min={0}
+                step="0.01"
+                value={numText(listing.price)}
+                onChange={(e) => update({ price: toNum(e.target.value) })}
+              />
+              <label className="mt-1.5 flex items-center gap-1.5 text-[11px] text-textMuted">
+                <input type="checkbox" checked={listing.bestOffer} onChange={(e) => update({ bestOffer: e.target.checked })} />
+                Accept Best Offers
+              </label>
+            </div>
+          </div>
+
+          <div>
+            <Label>Package (estimated by the agent — check it)</Label>
+            <div className="grid grid-cols-5 gap-2">
+              {(
+                [
+                  ['weightLb', 'lb'],
+                  ['weightOz', 'oz'],
+                  ['lengthIn', 'L in'],
+                  ['widthIn', 'W in'],
+                  ['heightIn', 'H in'],
+                ] as const
+              ).map(([field, unit]) => (
+                <div key={field}>
+                  <Input
+                    type="number"
+                    min={0}
+                    step="any"
+                    aria-label={unit}
+                    value={numText(listing[field])}
+                    onChange={(e) => update({ [field]: toNum(e.target.value) })}
+                  />
+                  <span className="mt-0.5 block text-center text-[10px] text-textMuted">{unit}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <Label>Item specifics</Label>
+            <div className="space-y-1.5">
+              {listing.specifics.map((s, i) => (
+                // Widths sit on wrappers: Input carries its own w-full, and cn() doesn't
+                // resolve conflicting classes, so a width passed to it may not win.
+                <div key={i} className="flex gap-1.5">
+                  <div className="w-2/5 shrink-0">
+                    <Input value={s.name} aria-label="Specific" onChange={(e) => updateSpecific(i, { name: e.target.value })} />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <Input
+                      value={s.values.join(' | ')}
+                      aria-label={`${s.name} value`}
+                      onChange={(e) => updateSpecific(i, { values: e.target.value.split('|').map((v) => v.trim()) })}
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => update({ specifics: listing.specifics.filter((_, j) => j !== i) })}
+                    className="shrink-0 rounded-btn px-2 text-textMuted hover:bg-surfaceMuted"
+                    aria-label={`Remove ${s.name}`}
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+              ))}
+            </div>
+            <button
+              type="button"
+              onClick={() => update({ specifics: [...listing.specifics, { name: '', values: [''] }] })}
+              className="mt-1.5 flex items-center gap-1 text-[11px] font-semibold text-primary"
+            >
+              <Plus size={12} /> Add specific
+            </button>
+            {checked?.category && checked.category.recommended.length > 0 && (
+              <p className="mt-1 text-[11px] text-textMuted">
+                eBay recommends for this category: {checked.category.recommended.slice(0, 8).join(', ')}
+              </p>
+            )}
+          </div>
+
+          <div>
+            <div className="mb-1 flex items-center justify-between">
+              <span className="text-xs font-semibold text-textMuted">Description (HTML)</span>
+              <button
+                type="button"
+                onClick={() => setShowPreview((v) => !v)}
+                className="flex items-center gap-1 text-[11px] font-semibold text-primary"
+              >
+                <Eye size={12} /> {showPreview ? 'Edit' : 'Preview'}
+              </button>
+            </div>
+            {showPreview ? (
+              // Sandboxed: the HTML came from outside SPARE, so it gets no scripts and no
+              // access to the page.
+              <iframe
+                sandbox=""
+                srcDoc={listing.descriptionHtml}
+                title="Description preview"
+                className="h-64 w-full rounded-btn border border-border bg-white"
+              />
+            ) : (
+              <Textarea
+                rows={6}
+                value={listing.descriptionHtml}
+                onChange={(e) => update({ descriptionHtml: e.target.value })}
+                className="font-mono text-[11px]"
+              />
+            )}
+          </div>
+
+          <div className="rounded-btn border border-border bg-surface p-2.5 text-[11px] text-textMuted">
+            <div className="mb-1.5 font-semibold text-textPri">From SPARE</div>
+            <div>
+              Condition: {condition?.label ?? group.itemCondition} · Quantity: {quantity} · SKU: {group.sku}
+            </div>
+            <div className="mt-1.5 flex gap-1 overflow-x-auto">
+              {group.photos.slice(0, 24).map((p) => (
+                <img key={p.fileId} src={p.url} alt="" loading="lazy" className="h-12 w-12 shrink-0 rounded object-cover" />
+              ))}
+            </div>
+            {setup.data?.shipFrom && (
+              <div className="mt-1.5">
+                Ships from {setup.data.shipFrom.location} {setup.data.shipFrom.postalCode}
+              </div>
+            )}
+          </div>
+
+          {setup.isLoading && <p className="text-[11px] text-textMuted">Loading your eBay policies…</p>}
+          {setup.error && <p className="text-[11px] text-red-600">{setup.error.message}</p>}
+          {setup.data && policies && (
+            <div className="grid gap-3 sm:grid-cols-3">
+              <PolicySelect
+                label="Shipping"
+                list={setup.data.shipping}
+                value={policies.shipping}
+                onChange={(id) => setPolicies({ ...policies, shipping: id })}
+              />
+              <PolicySelect
+                label="Returns"
+                list={setup.data.returns}
+                value={policies.returns}
+                onChange={(id) => setPolicies({ ...policies, returns: id })}
+              />
+              <PolicySelect
+                label="Payment"
+                list={setup.data.payment}
+                value={policies.payment}
+                onChange={(id) => setPolicies({ ...policies, payment: id })}
+              />
+            </div>
+          )}
+
+          {localProblems.length > 0 && (
+            <ul className="space-y-1 text-[11px] text-amber-600">
+              {localProblems.map((p) => (
+                <li key={p} className="flex gap-1.5">
+                  <AlertTriangle size={12} className="mt-0.5 shrink-0" />
+                  {p}
+                </li>
+              ))}
+            </ul>
+          )}
+
+          {checked && (
+            <div
+              className={`rounded-btn border p-2.5 text-[11px] ${
+                checked.ok ? 'border-primary/40 bg-primary/10' : 'border-red-500/40 bg-red-500/10'
+              }`}
+            >
+              <div className={`flex items-center gap-1.5 text-xs font-semibold ${checked.ok ? 'text-primary' : 'text-red-600'}`}>
+                {checked.ok ? <ShieldCheck size={14} /> : <AlertTriangle size={14} />}
+                {checked.ok ? 'eBay accepts this listing' : 'eBay would not accept this yet'}
+              </div>
+              <p className="mt-1 text-textMuted">
+                {checked.fees.length
+                  ? `Upfront fees: ${checked.fees.map((f) => `${f.name} $${f.amount.toFixed(2)}`).join(', ')}.`
+                  : 'No upfront fees.'}{' '}
+                Final value fees apply when it sells.
+              </p>
+              <Messages check={checked} />
+            </div>
+          )}
+          {check && !checked && (
+            <p className="text-[11px] text-textMuted">Changed since the last check — check again before publishing.</p>
+          )}
+
+          {requestError && (
+            <div className="rounded-btn border border-red-500/40 bg-red-500/10 p-2.5 text-[11px] text-red-600">
+              <div className="font-semibold">{requestError.message}</div>
+              {rejectedBy.map((m, i) => (
+                <div key={i} className="mt-1">
+                  {m.message}
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div className="flex flex-wrap gap-2">
+            <Button type="button" variant="ghost" onClick={startOver} disabled={busy}>
+              <RotateCcw size={14} /> Start over
+            </Button>
+            <div className="ml-auto flex gap-2">
+              <Button
+                type="button"
+                variant={checked?.ok ? 'outline' : 'primary'}
+                onClick={runCheck}
+                disabled={busy || !policies || localProblems.length > 0}
+              >
+                <ShieldCheck size={14} />
+                {checkListing.isPending ? 'Checking…' : 'Check with eBay'}
+              </Button>
+              <Button type="button" onClick={runPublish} disabled={busy || !checked?.ok}>
+                <Tag size={14} />
+                {publish.isPending ? 'Publishing…' : 'Publish to eBay'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

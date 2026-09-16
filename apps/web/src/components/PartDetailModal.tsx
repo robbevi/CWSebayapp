@@ -19,7 +19,7 @@ import {
   type InventoryPartPatch,
 } from '@warehouse/shared';
 import { useBodyScrollLock } from '../hooks/useBodyScrollLock';
-import { ListingDraftPanel } from './ListingDraftPanel';
+import { ListingPublisher } from './ListingPublisher';
 import { useDeletePart } from '../hooks/useDeletePart';
 import { useInventoryParts } from '../hooks/useInventoryParts';
 import { useListings } from '../hooks/useListings';
@@ -440,8 +440,14 @@ export function PartDetailModal() {
           onScroll={handleFormScroll}
           className="min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain p-4"
         >
-          {/* What SPARE can assemble for a listing, once the part has been worked. */}
-          {!part.itemListed && <ListingDraftPanel group={group} />}
+          {/* Once published, the new listing ID goes straight into the form, so a Save made
+              before the part refetches can't write the old blank ID back over it. */}
+          {!part.itemListed && (
+            <ListingPublisher
+              group={group}
+              onPublished={(itemId) => setValue('ebayListingId', itemId, { shouldDirty: false })}
+            />
+          )}
 
           {/* Listing performance, shown for anything on eBay rather than only finished
               parts: 36 of the 40 listed are still mid-workflow, so gating this on

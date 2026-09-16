@@ -6,6 +6,11 @@ import type {
   InventoryPart,
   InventoryPartPatch,
   Listing,
+  ListingCheck,
+  ListingRequest,
+  PublishResult,
+  SellerSetup,
+  TradingMessage,
   Photo,
   Sale,
   Submission,
@@ -162,4 +167,42 @@ export async function importCsv(file: File): Promise<ImportResult> {
   form.append('file', file);
   const res = await fetch('/api/import', { method: 'POST', body: form });
   return parseJson(res);
+}
+
+/** A listing request that failed, carrying eBay's reasons when it gave any. */
+export class ListingRequestError extends Error {
+  messages: TradingMessage[];
+  constructor(message: string, messages: TradingMessage[] = []) {
+    super(message);
+    this.messages = messages;
+  }
+}
+
+async function listingJson<T>(res: Response): Promise<T> {
+  if (res.ok) return res.json() as Promise<T>;
+  const body = (await res.json().catch(() => ({}))) as { error?: string; messages?: TradingMessage[] };
+  throw new ListingRequestError(body.error || `Request failed with status ${res.status}`, body.messages ?? []);
+}
+
+export async function fetchSellerSetup(): Promise<SellerSetup> {
+  const res = await fetch('/api/ebay/seller-setup');
+  return parseJson(res);
+}
+
+export async function checkListing(partId: string, body: ListingRequest): Promise<ListingCheck> {
+  const res = await fetch(`/api/parts/${encodeURIComponent(partId)}/listing/verify`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  return listingJson(res);
+}
+
+export async function publishListing(partId: string, body: ListingRequest): Promise<PublishResult> {
+  const res = await fetch(`/api/parts/${encodeURIComponent(partId)}/listing/publish`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  return listingJson(res);
 }
