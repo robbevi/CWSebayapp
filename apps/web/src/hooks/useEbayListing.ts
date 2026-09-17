@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { AgentListing, PolicyChoice } from '@warehouse/shared';
-import { checkListing, fetchSellerSetup, publishListing } from '../lib/api';
+import { checkListing, fetchCategorySuggestions, fetchSellerSetup, publishListing } from '../lib/api';
 import { useToastStore } from '../state/useToastStore';
 import { PARTS_QUERY_KEY } from './useInventoryParts';
 
@@ -18,6 +18,16 @@ export function useSellerSetup(enabled: boolean) {
     queryFn: fetchSellerSetup,
     enabled,
     staleTime: 10 * 60_000,
+  });
+}
+
+/** Keyed on the agent's own title and path, so editing the title doesn't search on every keystroke. */
+export function useCategorySuggestions(title: string, path: string, enabled: boolean) {
+  return useQuery({
+    queryKey: ['ebay-category-suggestions', title, path],
+    queryFn: () => fetchCategorySuggestions(title, path),
+    enabled: enabled && !!(title.trim() || path.trim()),
+    staleTime: Infinity,
   });
 }
 

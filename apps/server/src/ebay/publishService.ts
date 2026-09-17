@@ -1,6 +1,8 @@
+import { categoryMatch } from '@warehouse/shared';
 import type {
   AgentListing,
   CategoryInfo,
+  CategorySuggestion,
   ListingFee,
   PolicyChoice,
   SellerPolicy,
@@ -163,6 +165,52 @@ export async function resolveCategory(categoryId: string): Promise<CategoryInfo 
   }
   categoryCache.set(categoryId, null);
   return null;
+}
+
+interface TaxonomySuggestions {
+  categorySuggestions?: {
+    category: { categoryId: string; categoryName: string };
+    categoryTreeNodeAncestors?: { categoryName: string }[];
+  }[];
+}
+
+const suggestionCache = new Map<string, CategorySuggestion[]>();
+
+/**
+ * eBay's category suggestions, ranked against the path the agent recommended. The agent
+ * names categories rather than numbering them, and its paths can be slightly off — the
+ * sample it gave put Heavy Equipment under eBay Motors — so this finds real categories
+ * near what it meant and leaves the choice visible rather than trusting either side.
+ */
+export async function suggestCategories(title: string, path = ''): Promise<CategorySuggestion[]> {
+  const key = `${title}\u0001${path}`;
+  const cached = suggestionCache.get(key);
+  if (cached) return cached;
+
+  // The title finds what the item is; the path's last two levels find what the agent meant.
+  const lastLevels = path.split('>').slice(-2).join(' ');
+  const queries = [...new Set([title, lastLevels].map((q) => q.trim().slice(0, 300)).filter(Boolean))];
+  const found = new Map<string, CategorySuggestion>();
+
+  for (const { tree, siteId } of TREES) {
+    for (const q of queries) {
+      const res = await taxonomy<TaxonomySuggestions>(
+        `category_tree/${tree}/get_category_suggestions?q=${encodeURIComponent(q)}`
+      );
+      for (const s of res?.categorySuggestions ?? []) {
+        const id = s.category.categoryId;
+        if (found.has(id)) continue;
+        const names = [...(s.categoryTreeNodeAncestors ?? []).map((a) => a.categoryName).reverse(), s.category.categoryName];
+        const candidate = names.join(' > ');
+        found.set(id, { id, name: s.category.categoryName, path: candidate, siteId, ...categoryMatch(path || title, candidate) });
+      }
+    }
+  }
+
+  // Stable: ties keep eBay's own order, Motors first.
+  const ranked = [...found.values()].sort((a, b) => b.score - a.score).slice(0, 8);
+  suggestionCache.set(key, ranked);
+  return ranked;
 }
 
 function itemXml(input: PublishInput): string {

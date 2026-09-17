@@ -1,12 +1,15 @@
 import {
   agentPrompt,
+  descriptionConditionWarning,
   draftReadiness,
   fillFromPart,
   listingProblems,
   MAX_TITLE,
   parseAgentOutput,
+  researchMismatch,
   tradingCondition,
   type AgentListing,
+  type CategorySuggestion,
   type ItemSpecific,
   type ListingCheck,
   type PartGroup,
@@ -15,7 +18,7 @@ import {
 } from '@warehouse/shared';
 import { AlertTriangle, Check, ChevronDown, ClipboardCopy, Eye, Info, Plus, RotateCcw, ShieldCheck, Tag, X } from 'lucide-react';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { useCheckListing, usePublishListing, useSellerSetup } from '../hooks/useEbayListing';
+import { useCategorySuggestions, useCheckListing, usePublishListing, useSellerSetup } from '../hooks/useEbayListing';
 import { useSalesStatus } from '../hooks/useSales';
 import { ListingRequestError } from '../lib/api';
 import { useUserStore } from '../state/useUserStore';
@@ -130,11 +133,97 @@ function Messages({ check }: { check: ListingCheck }) {
   );
 }
 
+const chip = (active: boolean) =>
+  `rounded-full border px-2.5 py-1 text-[11px] font-semibold ${
+    active ? 'border-primary bg-primary/10 text-primary' : 'border-border text-textMuted hover:bg-surfaceMuted'
+  }`;
+
+/**
+ * The agent recommends a category by path; eBay needs its number. Shows eBay's own
+ * suggestions ranked against that path, and picks the top one only when it is a clear
+ * match. The agent's paths can be slightly off, so the choice stays in view.
+ */
+function CategoryPicker({
+  listing,
+  checkedName,
+  onPick,
+  onTypeId,
+}: {
+  listing: AgentListing;
+  checkedName?: string;
+  onPick: (s: CategorySuggestion) => void;
+  onTypeId: (id: string) => void;
+}) {
+  const [browsing, setBrowsing] = useState(!listing.categoryId);
+  const suggestions = useCategorySuggestions(listing.titleOptions[0] ?? listing.title, listing.categoryPath ?? '', browsing);
+
+  useEffect(() => {
+    const [top, next] = suggestions.data ?? [];
+    if (!listing.categoryId && top?.leafMatch && (next?.score ?? -1) < top.score) onPick(top);
+    // Only when new suggestions arrive; picking again on every edit would fight the user.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [suggestions.data]);
+
+  return (
+    <div>
+      <Label>eBay category</Label>
+      {listing.categoryPath && (
+        <p className="mb-1.5 text-[11px] text-textMuted">Agent recommended: {listing.categoryPath}</p>
+      )}
+      <div className="flex items-center gap-2">
+        <div className="w-28 shrink-0">
+          <Input
+            inputMode="numeric"
+            aria-label="Category ID"
+            placeholder="ID"
+            value={listing.categoryId}
+            onChange={(e) => onTypeId(e.target.value.trim())}
+          />
+        </div>
+        <span className="min-w-0 flex-1 text-xs text-textPri">
+          {checkedName ?? listing.categoryName ?? (listing.categoryId ? 'Named after the eBay check' : 'Choose one below')}
+        </span>
+        <button type="button" onClick={() => setBrowsing((v) => !v)} className="shrink-0 text-[11px] font-semibold text-primary">
+          {browsing ? 'Hide matches' : 'Change'}
+        </button>
+      </div>
+      {browsing && (
+        <div className="mt-1.5 space-y-1">
+          {suggestions.isLoading && <p className="text-[11px] text-textMuted">Finding eBay categories…</p>}
+          {suggestions.error && <p className="text-[11px] text-red-600">{suggestions.error.message}</p>}
+          {suggestions.data?.length === 0 && (
+            <p className="text-[11px] text-textMuted">eBay suggested nothing. Enter the category ID.</p>
+          )}
+          {suggestions.data?.map((s) => (
+            <button
+              key={s.id}
+              type="button"
+              onClick={() => onPick(s)}
+              className={`block w-full rounded-btn border px-2 py-1.5 text-left text-[11px] ${
+                s.id === listing.categoryId ? 'border-primary bg-primary/10' : 'border-border hover:bg-surfaceMuted'
+              }`}
+            >
+              <span className="font-semibold text-textPri">{s.name}</span>
+              <span className="text-textMuted"> · {s.id}</span>
+              <span className="block text-textMuted">{s.path}</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function ListingPublisher({ group, onPublished }: { group: PartGroup; onPublished: (itemId: string) => void }) {
   const saved = useMemo(() => load<Draft>(draftKey(group.sku)), [group.sku]);
   const [open, setOpen] = useState(!!saved?.listing);
   const [text, setText] = useState(saved?.text ?? '');
-  const [listing, setListing] = useState<AgentListing | null>(saved?.listing ?? null);
+  const [listing, setListing] = useState<AgentListing | null>(
+    // Drafts saved before these lists existed come back without them.
+    saved?.listing
+      ? { ...saved.listing, titleOptions: saved.listing.titleOptions ?? [], priceOptions: saved.listing.priceOptions ?? [] }
+      : null
+  );
   const [notes, setNotes] = useState<string[]>(saved?.notes ?? []);
   const [parseError, setParseError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
@@ -190,6 +279,8 @@ export function ListingPublisher({ group, onPublished }: { group: PartGroup; onP
   const condition = tradingCondition(group.itemCondition);
   const quantity = group.confirmedQoh ?? group.stockQty;
   const localProblems = listing ? listingProblems(listing) : [];
+  const mismatch = listing ? researchMismatch(listing, group.sku) : null;
+  const conditionWarning = listing ? descriptionConditionWarning(listing, group.itemCondition) : null;
   const busy = checkListing.isPending || publish.isPending;
 
   const update = (patch: Partial<AgentListing>) => setListing((l) => (l ? { ...l, ...patch } : l));
@@ -308,6 +399,19 @@ export function ListingPublisher({ group, onPublished }: { group: PartGroup; onP
             </p>
           ))}
 
+          {mismatch && (
+            <div className="flex gap-1.5 rounded-btn border border-red-500/40 bg-red-500/10 p-2.5 text-[11px] font-semibold text-red-600">
+              <X size={12} className="mt-0.5 shrink-0" />
+              {mismatch} Start over and paste the research for this part.
+            </div>
+          )}
+          {conditionWarning && (
+            <p className="flex gap-1.5 text-[11px] text-amber-600">
+              <AlertTriangle size={12} className="mt-0.5 shrink-0" />
+              {conditionWarning}
+            </p>
+          )}
+
           <div>
             <Label>
               Title{' '}
@@ -316,30 +420,57 @@ export function ListingPublisher({ group, onPublished }: { group: PartGroup; onP
               </span>
             </Label>
             <Input value={listing.title} onChange={(e) => update({ title: e.target.value })} />
+            {listing.titleOptions.some((t) => t !== listing.title) && (
+              <div className="mt-1.5 space-y-1">
+                <span className="text-[10px] font-semibold uppercase tracking-wide text-textMuted">Agent&apos;s titles</span>
+                {listing.titleOptions
+                  .filter((t) => t !== listing.title)
+                  .map((t) => (
+                    <button
+                      key={t}
+                      type="button"
+                      onClick={() => update({ title: t })}
+                      className="block w-full rounded-btn border border-border px-2 py-1 text-left text-[11px] text-textPri hover:bg-surfaceMuted"
+                    >
+                      {t} <span className={t.length > MAX_TITLE ? 'text-red-600' : 'text-textMuted'}>({t.length})</span>
+                    </button>
+                  ))}
+              </div>
+            )}
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <Label>Category ID</Label>
-              <Input inputMode="numeric" value={listing.categoryId} onChange={(e) => update({ categoryId: e.target.value.trim() })} />
-              <p className="mt-1 text-[11px] text-textMuted">
-                {checked?.category?.name ?? listing.categoryName ?? 'Named after the eBay check'}
-              </p>
+          <CategoryPicker
+            listing={listing}
+            checkedName={checked?.category?.id === listing.categoryId ? checked.category.name : undefined}
+            onPick={(c) => update({ categoryId: c.id, categoryName: c.name })}
+            onTypeId={(id) => update({ categoryId: id, categoryName: undefined })}
+          />
+
+          <div>
+            <Label>
+              Price (USD){listing.priceConfidence ? ` (agent confidence: ${listing.priceConfidence})` : ''}
+            </Label>
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="w-28 shrink-0">
+                <Input
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  aria-label="Price"
+                  value={numText(listing.price)}
+                  onChange={(e) => update({ price: toNum(e.target.value) })}
+                />
+              </div>
+              {listing.priceOptions.map((o) => (
+                <button key={o.label} type="button" onClick={() => update({ price: o.amount })} className={chip(listing.price === o.amount)}>
+                  {o.label} ${o.amount.toFixed(2)}
+                </button>
+              ))}
             </div>
-            <div>
-              <Label>Price (USD)</Label>
-              <Input
-                type="number"
-                min={0}
-                step="0.01"
-                value={numText(listing.price)}
-                onChange={(e) => update({ price: toNum(e.target.value) })}
-              />
-              <label className="mt-1.5 flex items-center gap-1.5 text-[11px] text-textMuted">
-                <input type="checkbox" checked={listing.bestOffer} onChange={(e) => update({ bestOffer: e.target.checked })} />
-                Accept Best Offers
-              </label>
-            </div>
+            <label className="mt-1.5 flex items-center gap-1.5 text-[11px] text-textMuted">
+              <input type="checkbox" checked={listing.bestOffer} onChange={(e) => update({ bestOffer: e.target.checked })} />
+              Accept Best Offers
+            </label>
           </div>
 
           <div>
@@ -537,7 +668,7 @@ export function ListingPublisher({ group, onPublished }: { group: PartGroup; onP
                 type="button"
                 variant={checked?.ok ? 'outline' : 'primary'}
                 onClick={runCheck}
-                disabled={busy || !policies || localProblems.length > 0}
+                disabled={busy || !policies || localProblems.length > 0 || !!mismatch}
               >
                 <ShieldCheck size={14} />
                 {checkListing.isPending ? 'Checking…' : 'Check with eBay'}

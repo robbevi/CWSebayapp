@@ -5,6 +5,7 @@ import {
   fillFromPart,
   groupPartsBySku,
   listingProblems,
+  researchMismatch,
   tradingCondition,
   type ListingCheck,
   type PartGroup,
@@ -17,6 +18,7 @@ import {
   getSellerSetup,
   ListingRejectedError,
   publishListing,
+  suggestCategories,
   verifyListing,
   type PublishInput,
 } from '../ebay/publishService.js';
@@ -26,7 +28,7 @@ export const ebayListingRouter = Router();
 
 // Switched off, these routes don't exist: nothing reachable can list, or even look up the
 // account's policies.
-ebayListingRouter.use(['/ebay/seller-setup', '/parts/:id/listing'], (_req, res, next) => {
+ebayListingRouter.use(['/ebay/seller-setup', '/ebay/category-suggestions', '/parts/:id/listing'], (_req, res, next) => {
   if (env.ebayPublishing) next();
   else res.status(404).json({ error: 'eBay publishing is not enabled here.' });
 });
@@ -116,6 +118,8 @@ async function prepare(
   }
 
   const listing = fillFromPart(coerceAgentListing(b.listing), group);
+  const mismatch = researchMismatch(listing, group.sku);
+  if (mismatch) throw new HttpError(422, mismatch);
   return {
     group,
     problems: listingProblems(listing),
@@ -139,6 +143,21 @@ ebayListingRouter.get('/ebay/seller-setup', async (_req, res, next) => {
       return;
     }
     res.json(await getSellerSetup());
+  } catch (err) {
+    next(err);
+  }
+});
+
+/** eBay categories near the agent's recommendation, best match first. */
+ebayListingRouter.get('/ebay/category-suggestions', async (req, res, next) => {
+  try {
+    const title = typeof req.query.title === 'string' ? req.query.title : '';
+    const path = typeof req.query.path === 'string' ? req.query.path : '';
+    if (!title.trim() && !path.trim()) {
+      res.status(400).json({ error: 'Nothing to search for.' });
+      return;
+    }
+    res.json(await suggestCategories(title, path));
   } catch (err) {
     next(err);
   }

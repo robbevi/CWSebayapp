@@ -1,5 +1,6 @@
 import type {
   AppUser,
+  CategorySuggestion,
   CreatePartInput,
   DiscrepancyLogEntry,
   HealthStatus,
@@ -186,6 +187,12 @@ async function listingJson<T>(res: Response): Promise<T> {
 
 export async function fetchSellerSetup(): Promise<SellerSetup> {
   const res = await fetch('/api/ebay/seller-setup');
+  return parseJson(res);
+}
+
+export async function fetchCategorySuggestions(title: string, path: string): Promise<CategorySuggestion[]> {
+  const params = new URLSearchParams({ title, path });
+  const res = await fetch(`/api/ebay/category-suggestions?${params.toString()}`);
   return parseJson(res);
 }
 
