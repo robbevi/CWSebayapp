@@ -40,6 +40,11 @@ export interface PublishInput {
   imageUrls: string[];
   policies: PolicyChoice;
   shipFrom: ShipFrom;
+  /**
+   * Start the listing later instead of now. It waits under Scheduled in Seller Hub, where it
+   * can be reviewed or edited first: the nearest the Trading API has to a draft.
+   */
+  scheduleTime?: string;
 }
 
 export class ListingRejectedError extends Error {
@@ -238,7 +243,8 @@ function itemXml(input: PublishInput): string {
 <SKU>${xmlEscape(input.sku)}</SKU>
 <ListingType>FixedPriceItem</ListingType>
 <ListingDuration>GTC</ListingDuration>
-<Country>${xmlEscape(input.shipFrom.country)}</Country>
+${input.scheduleTime ? `<ScheduleTime>${xmlEscape(input.scheduleTime)}</ScheduleTime>
+` : ''}<Country>${xmlEscape(input.shipFrom.country)}</Country>
 <Currency>USD</Currency>
 <Location>${xmlEscape(input.shipFrom.location)}</Location>
 <PostalCode>${xmlEscape(input.shipFrom.postalCode)}</PostalCode>
