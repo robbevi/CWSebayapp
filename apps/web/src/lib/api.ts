@@ -241,6 +241,8 @@ export interface Session {
 
 export interface LoginUser {
   name: string;
+  /** Admins sign in with a PIN; everyone else by name alone. */
+  needsPin: boolean;
   hasPin: boolean;
   canSetUp: boolean;
 }
@@ -274,7 +276,7 @@ export async function fetchLoginUsers(): Promise<LoginUser[]> {
   return authJson(await fetch('/api/auth/users'));
 }
 
-export async function login(name: string, pin: string): Promise<Session> {
+export async function login(name: string, pin?: string): Promise<Session> {
   return authJson(await post('/api/auth/login', { name, pin }));
 }
 

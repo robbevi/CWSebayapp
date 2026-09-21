@@ -27,8 +27,8 @@ authRouter.get('/auth/users', async (_req, res, next) => {
     res.json(
       env.appUsers.map((u) => {
         const hasPin = records.has(u.name.trim().toLowerCase());
-        // Only an admin may create their own first PIN; everyone else is given one.
-        return { name: u.name, hasPin, canSetUp: !hasPin && !!u.admin };
+        // Only admins sign in with a PIN, and they choose their own the first time.
+        return { name: u.name, needsPin: !!u.admin, hasPin, canSetUp: !hasPin && !!u.admin };
       })
     );
   } catch (err) {
@@ -48,8 +48,18 @@ authRouter.get('/auth/me', (req, res) => {
 authRouter.post('/auth/login', async (req: Request, res: Response, next) => {
   try {
     const user = findUser(req.body?.name);
+    if (!user) {
+      res.status(400).json({ error: 'Choose your name.' });
+      return;
+    }
+    // Everyone else signs in by name alone. A PIN guards what only admins can do —
+    // publishing to eBay — so that is where it is asked for.
+    if (!user.admin) {
+      signIn(res, user);
+      return;
+    }
     const pin = req.body?.pin;
-    if (!user || !isValidPin(pin)) {
+    if (!isValidPin(pin)) {
       res.status(400).json({ error: 'Choose your name and enter your 4–6 digit PIN.' });
       return;
     }
@@ -60,7 +70,7 @@ authRouter.post('/auth/login', async (req: Request, res: Response, next) => {
     }
     const access = await getAccess(user.name);
     if (!access) {
-      res.status(403).json({ error: 'No PIN has been set for you yet. Ask an admin to set one.' });
+      res.status(403).json({ error: 'You have no PIN yet. Choose one to set it up.' });
       return;
     }
     if (!verifyPin(pin, access.pinHash)) {
@@ -162,6 +172,10 @@ authRouter.post('/auth/admin/pin', ...adminOnly, async (req, res, next) => {
     const target = findUser(req.body?.name);
     if (!target) {
       res.status(404).json({ error: 'No one by that name is on the roster.' });
+      return;
+    }
+    if (!target.admin) {
+      res.status(400).json({ error: `${target.name} signs in without a PIN.` });
       return;
     }
     if (!isValidPin(req.body?.pin)) {

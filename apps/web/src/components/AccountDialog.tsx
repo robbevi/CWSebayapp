@@ -27,7 +27,17 @@ function pinInput(value: string, onChange: (v: string) => void, label: string) {
 }
 
 /** One row of the admin list: a person, whether they have a PIN, and a way to set it. */
-function AdminRow({ name, hasPin, setAt, setBy }: { name: string; hasPin: boolean; setAt: string | null; setBy: string | null }) {
+function AdminRow({
+  name,
+  hasPin,
+  setAt,
+  setBy,
+}: {
+  name: string;
+  hasPin: boolean;
+  setAt: string | null;
+  setBy: string | null;
+}) {
   const [editing, setEditing] = useState(false);
   const [pin, setPin] = useState('');
   const [busy, setBusy] = useState(false);
@@ -57,7 +67,9 @@ function AdminRow({ name, hasPin, setAt, setBy }: { name: string; hasPin: boolea
         <div className="min-w-0">
           <div className="truncate text-sm font-semibold text-textPri">{name}</div>
           <div className="text-[11px] text-textMuted">
-            {hasPin ? `PIN set ${setAt ? formatDate(setAt) : ''}${setBy && setBy !== name ? ` by ${setBy}` : ''}` : 'No PIN yet — cannot sign in'}
+            {hasPin
+              ? `PIN set ${setAt ? formatDate(setAt) : ''}${setBy && setBy !== name ? ` by ${setBy}` : ''}`
+              : 'No PIN yet — cannot sign in'}
           </div>
         </div>
         {!editing && (
@@ -82,8 +94,8 @@ function AdminRow({ name, hasPin, setAt, setBy }: { name: string; hasPin: boolea
 }
 
 /**
- * The signed-in person's account: switch user, change their PIN, and — for admins — set
- * everyone else's. Opened from the name in the header.
+ * The signed-in person's account: switch user and, for admins — the only people who sign
+ * in with a PIN — change their own or reset another admin's. Opened from the name in the header.
  */
 export function AccountDialog({ onClose }: { onClose: () => void }) {
   useBodyScrollLock(true);
@@ -142,7 +154,12 @@ export function AccountDialog({ onClose }: { onClose: () => void }) {
               )}
             </div>
           </div>
-          <button type="button" onClick={onClose} aria-label="Close" className="rounded-btn p-1 text-textMuted hover:bg-surfaceMuted">
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close"
+            className="rounded-btn p-1 text-textMuted hover:bg-surfaceMuted"
+          >
             <X size={18} />
           </button>
         </div>
@@ -151,19 +168,26 @@ export function AccountDialog({ onClose }: { onClose: () => void }) {
           <LogOut size={14} /> Switch user
         </Button>
 
-        <form onSubmit={change} className="mt-5 space-y-2">
-          <div className="flex items-center gap-1.5 text-xs font-semibold text-textMuted">
-            <KeyRound size={13} /> Change my PIN
-          </div>
-          {pinInput(current, setCurrent, 'Current PIN')}
-          <div className="grid grid-cols-2 gap-2">
-            {pinInput(next, setNext, 'New PIN')}
-            {pinInput(again, setAgain, 'New PIN again')}
-          </div>
-          <Button type="submit" variant="outline" disabled={busy || !PIN.test(current) || !PIN.test(next) || !again} className="w-full">
-            Change PIN
-          </Button>
-        </form>
+        {admin && (
+          <form onSubmit={change} className="mt-5 space-y-2">
+            <div className="flex items-center gap-1.5 text-xs font-semibold text-textMuted">
+              <KeyRound size={13} /> Change my PIN
+            </div>
+            {pinInput(current, setCurrent, 'Current PIN')}
+            <div className="grid grid-cols-2 gap-2">
+              {pinInput(next, setNext, 'New PIN')}
+              {pinInput(again, setAgain, 'New PIN again')}
+            </div>
+            <Button
+              type="submit"
+              variant="outline"
+              disabled={busy || !PIN.test(current) || !PIN.test(next) || !again}
+              className="w-full"
+            >
+              Change PIN
+            </Button>
+          </form>
+        )}
 
         {admin && (
           <div className="mt-6">
@@ -171,14 +195,16 @@ export function AccountDialog({ onClose }: { onClose: () => void }) {
               <ShieldCheck size={13} /> Manage PINs
             </div>
             <p className="mt-1 text-[11px] text-textMuted">
-              Set someone&apos;s PIN, then tell them what it is. They can change it from here once they&apos;re in.
+              Only admins sign in with a PIN. If one forgets theirs, set a new one here and tell them what it is.
             </p>
             {people.isLoading && <p className="mt-2 text-xs text-textMuted">Loading…</p>}
             {people.error && <p className="mt-2 text-xs text-red-600">{people.error.message}</p>}
             <ul className="mt-2">
               {people.data
-                ?.filter((p) => p.name !== session.name)
-                .map((p) => <AdminRow key={p.name} name={p.name} hasPin={p.hasPin} setAt={p.setAt} setBy={p.setBy} />)}
+                ?.filter((p) => p.admin && p.name !== session.name)
+                .map((p) => (
+                  <AdminRow key={p.name} name={p.name} hasPin={p.hasPin} setAt={p.setAt} setBy={p.setBy} />
+                ))}
             </ul>
           </div>
         )}

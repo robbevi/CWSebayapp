@@ -9,12 +9,15 @@ const MIN = 4;
 const MAX = 6;
 
 /**
- * Sign-in for shared warehouse tablets: tap your name, type your PIN on a big keypad.
- * An admin with no PIN yet chooses one here the first time; everyone else is given one by
- * an admin, so nobody can claim a name before its owner does.
+ * Sign-in for shared warehouse tablets: tap your name. Admins then type a PIN on a big
+ * keypad — choosing one here the first time — because they can publish to eBay; everyone
+ * else is signed straight in.
  */
 export function LoginScreen({ onSignedIn }: { onSignedIn: (s: Session) => void }) {
-  const users = useQuery({ queryKey: ['login-users'], queryFn: fetchLoginUsers });
+  const users = useQuery({
+    queryKey: ['login-users'],
+    queryFn: fetchLoginUsers,
+  });
   const [picked, setPicked] = useState<LoginUser | null>(null);
   const [pin, setPin] = useState('');
   // While creating a PIN: the first entry, waiting to be confirmed.
@@ -23,7 +26,6 @@ export function LoginScreen({ onSignedIn }: { onSignedIn: (s: Session) => void }
   const [busy, setBusy] = useState(false);
 
   const settingUp = !!picked?.canSetUp;
-  const blocked = !!picked && !picked.hasPin && !picked.canSetUp;
 
   const reset = (user: LoginUser | null) => {
     setPicked(user);
@@ -57,12 +59,28 @@ export function LoginScreen({ onSignedIn }: { onSignedIn: (s: Session) => void }
     }
   }, [picked, pin, busy, settingUp, firstEntry, onSignedIn]);
 
+  const choose = async (user: LoginUser) => {
+    if (user.needsPin) {
+      reset(user);
+      return;
+    }
+    setError(null);
+    setBusy(true);
+    try {
+      onSignedIn(await login(user.name));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Sign-in failed.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const press = useCallback((digit: string) => setPin((p) => (p.length < MAX ? p + digit : p)), []);
   const back = useCallback(() => setPin((p) => p.slice(0, -1)), []);
 
   // A keyboard works too, for anyone signing in at a desk.
   useEffect(() => {
-    if (!picked || blocked) return;
+    if (!picked) return;
     const onKey = (e: KeyboardEvent) => {
       if (/^\d$/.test(e.key)) press(e.key);
       else if (e.key === 'Backspace') back();
@@ -71,7 +89,7 @@ export function LoginScreen({ onSignedIn }: { onSignedIn: (s: Session) => void }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [picked, blocked, press, back, submit]);
+  }, [picked, press, back, submit]);
 
   const prompt = settingUp
     ? firstEntry === null
@@ -86,7 +104,9 @@ export function LoginScreen({ onSignedIn }: { onSignedIn: (s: Session) => void }
         <span aria-hidden="true" className="h-8 w-px bg-white/20" />
         <div>
           <img src={spareWordmark} alt="SPARE" className="h-4 w-auto object-contain sm:h-5" />
-          <p className="mt-1 text-[11px] font-medium tracking-wide text-white/60">Surplus Parts &amp; Asset Recovery Exchange</p>
+          <p className="mt-1 text-[11px] font-medium tracking-wide text-white/60">
+            Surplus Parts &amp; Asset Recovery Exchange
+          </p>
         </div>
       </header>
 
@@ -95,21 +115,21 @@ export function LoginScreen({ onSignedIn }: { onSignedIn: (s: Session) => void }
           {!picked && (
             <>
               <h1 className="text-lg font-semibold text-textPri">Who&apos;s signing in?</h1>
-              <p className="mt-1 text-xs text-textMuted">Tap your name, then enter your PIN.</p>
+              <p className="mt-1 text-xs text-textMuted">Tap your name.</p>
               {users.isLoading && <p className="mt-6 text-sm text-textMuted">Loading…</p>}
               {users.error && <p className="mt-6 text-sm text-red-600">{users.error.message}</p>}
+              {error && <p className="mt-4 text-sm text-red-600">{error}</p>}
               <div className="mt-5 grid grid-cols-1 gap-2 sm:grid-cols-2">
                 {users.data?.map((u) => (
                   <button
                     key={u.name}
                     type="button"
-                    onClick={() => reset(u)}
-                    className="rounded-btn border border-border bg-surface px-4 py-3 text-left hover:bg-surfaceMuted"
+                    onClick={() => void choose(u)}
+                    disabled={busy}
+                    className="rounded-btn border border-border bg-surface px-4 py-3 text-left hover:bg-surfaceMuted disabled:opacity-50"
                   >
                     <span className="block text-sm font-semibold text-textPri">{u.name}</span>
-                    {!u.hasPin && (
-                      <span className="block text-[11px] text-textMuted">{u.canSetUp ? 'Set up your PIN' : 'No PIN yet'}</span>
-                    )}
+                    {u.canSetUp && <span className="block text-[11px] text-textMuted">Set up your PIN</span>}
                   </button>
                 ))}
               </div>
@@ -127,60 +147,54 @@ export function LoginScreen({ onSignedIn }: { onSignedIn: (s: Session) => void }
               </button>
               <h1 className="text-lg font-semibold text-textPri">{picked.name}</h1>
 
-              {blocked ? (
-                <p className="mt-3 text-sm text-textMuted">
-                  You don&apos;t have a PIN yet. Ask an admin to set one for you, then sign in here.
-                </p>
-              ) : (
-                <>
-                  <p className="mt-1 text-xs text-textMuted">{prompt}</p>
-                  <div className="my-5 flex justify-center gap-3" aria-label={`${pin.length} digits entered`}>
-                    {Array.from({ length: Math.max(MIN, pin.length) }).map((_, i) => (
-                      <span
-                        key={i}
-                        className={`h-3.5 w-3.5 rounded-full ${i < pin.length ? 'bg-primary' : 'border-2 border-border'}`}
-                      />
-                    ))}
-                  </div>
-                  {error && <p className="mb-3 text-center text-xs text-red-600">{error}</p>}
-                  <div className="grid grid-cols-3 gap-2">
-                    {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map((d) => (
-                      <button
-                        key={d}
-                        type="button"
-                        onClick={() => press(d)}
-                        className="h-14 rounded-btn border border-border bg-surface text-xl font-semibold text-textPri hover:bg-surfaceMuted active:bg-border"
-                      >
-                        {d}
-                      </button>
-                    ))}
+              <>
+                <p className="mt-1 text-xs text-textMuted">{prompt}</p>
+                <div className="my-5 flex justify-center gap-3" aria-label={`${pin.length} digits entered`}>
+                  {Array.from({ length: Math.max(MIN, pin.length) }).map((_, i) => (
+                    <span
+                      key={i}
+                      className={`h-3.5 w-3.5 rounded-full ${i < pin.length ? 'bg-primary' : 'border-2 border-border'}`}
+                    />
+                  ))}
+                </div>
+                {error && <p className="mb-3 text-center text-xs text-red-600">{error}</p>}
+                <div className="grid grid-cols-3 gap-2">
+                  {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map((d) => (
                     <button
+                      key={d}
                       type="button"
-                      onClick={back}
-                      aria-label="Delete last digit"
-                      className="flex h-14 items-center justify-center rounded-btn text-textMuted hover:bg-surfaceMuted"
-                    >
-                      <Delete size={22} />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => press('0')}
+                      onClick={() => press(d)}
                       className="h-14 rounded-btn border border-border bg-surface text-xl font-semibold text-textPri hover:bg-surfaceMuted active:bg-border"
                     >
-                      0
+                      {d}
                     </button>
-                    <button
-                      type="button"
-                      onClick={() => void submit()}
-                      disabled={pin.length < MIN || busy}
-                      aria-label={settingUp && firstEntry === null ? 'Next' : 'Sign in'}
-                      className="flex h-14 items-center justify-center rounded-btn bg-primary text-white disabled:opacity-40"
-                    >
-                      <LogIn size={22} />
-                    </button>
-                  </div>
-                </>
-              )}
+                  ))}
+                  <button
+                    type="button"
+                    onClick={back}
+                    aria-label="Delete last digit"
+                    className="flex h-14 items-center justify-center rounded-btn text-textMuted hover:bg-surfaceMuted"
+                  >
+                    <Delete size={22} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => press('0')}
+                    className="h-14 rounded-btn border border-border bg-surface text-xl font-semibold text-textPri hover:bg-surfaceMuted active:bg-border"
+                  >
+                    0
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void submit()}
+                    disabled={pin.length < MIN || busy}
+                    aria-label={settingUp && firstEntry === null ? 'Next' : 'Sign in'}
+                    className="flex h-14 items-center justify-center rounded-btn bg-primary text-white disabled:opacity-40"
+                  >
+                    <LogIn size={22} />
+                  </button>
+                </div>
+              </>
             </>
           )}
         </div>
