@@ -46,9 +46,9 @@ if (process.env.NODE_ENV === 'production') {
 
 app.use(errorHandler);
 
-// Dynamically use Render's port, your config port, or fallback to 10000
-const port = process.env.PORT || env.port || 10000;
-
-app.listen(port, '0.0.0.0', () => {
-  console.log(`Server listening on port ${port}`);
+// env.port is Render's PORT when it sets one (4000 locally), already a number: listen()
+// with a hostname only accepts a numeric port, and process.env.PORT is a string. Bound
+// to 0.0.0.0 so Render's router can reach it on every interface.
+app.listen(env.port, '0.0.0.0', () => {
+  console.log(`Server listening on port ${env.port}`);
 });
