@@ -5,6 +5,8 @@ export type UserRole = 'warehouse' | 'lister';
 export interface AppUser {
   name: string;
   role: UserRole;
+  /** Can publish to eBay and set other people's PINs. Set in APP_USERS_JSON. */
+  admin?: boolean;
 }
 
 // The actual roster (real names) lives server-side only, in the APP_USERS_JSON env

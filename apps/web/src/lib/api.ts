@@ -19,7 +19,12 @@ import type {
   SubmissionSummary,
 } from '@warehouse/shared';
 
+/** Fired when the server says the session has gone, so the app can show sign-in again. */
+export const SIGNED_OUT_EVENT = 'spare:signed-out';
+const signalSignedOut = () => window.dispatchEvent(new Event(SIGNED_OUT_EVENT));
+
 async function parseJson<T>(res: Response): Promise<T> {
+  if (res.status === 401) signalSignedOut();
   if (!res.ok) {
     const body = await res.json().catch(() => ({}) as { error?: string });
     throw new Error(body.error || `Request failed with status ${res.status}`);
@@ -182,6 +187,7 @@ export class ListingRequestError extends Error {
 
 async function listingJson<T>(res: Response): Promise<T> {
   if (res.ok) return res.json() as Promise<T>;
+  if (res.status === 401) signalSignedOut();
   const body = (await res.json().catch(() => ({}))) as { error?: string; messages?: TradingMessage[] };
   throw new ListingRequestError(body.error || `Request failed with status ${res.status}`, body.messages ?? []);
 }
@@ -224,3 +230,71 @@ export async function publishListing(partId: string, body: ListingRequest): Prom
   });
   return listingJson(res);
 }
+
+// Sign-in.
+
+export interface Session {
+  name: string;
+  role: 'warehouse' | 'lister';
+  admin: boolean;
+}
+
+export interface LoginUser {
+  name: string;
+  hasPin: boolean;
+  canSetUp: boolean;
+}
+
+export interface AdminUser {
+  name: string;
+  role: string;
+  admin: boolean;
+  hasPin: boolean;
+  setAt: string | null;
+  setBy: string | null;
+}
+
+async function authJson<T>(res: Response): Promise<T> {
+  if (res.ok) return res.json() as Promise<T>;
+  const body = (await res.json().catch(() => ({}))) as { error?: string };
+  throw new Error(body.error || `Request failed with status ${res.status}`);
+}
+
+const post = (url: string, body?: unknown) =>
+  fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body ?? {}) });
+
+/** The current session, or null when nobody is signed in. Never fires the signed-out event. */
+export async function fetchMe(): Promise<Session | null> {
+  const res = await fetch('/api/auth/me');
+  if (res.status === 401) return null;
+  return authJson(res);
+}
+
+export async function fetchLoginUsers(): Promise<LoginUser[]> {
+  return authJson(await fetch('/api/auth/users'));
+}
+
+export async function login(name: string, pin: string): Promise<Session> {
+  return authJson(await post('/api/auth/login', { name, pin }));
+}
+
+export async function setUpPin(name: string, pin: string): Promise<Session> {
+  return authJson(await post('/api/auth/setup', { name, pin }));
+}
+
+export async function logout(): Promise<void> {
+  await post('/api/auth/logout');
+}
+
+export async function changeMyPin(currentPin: string, newPin: string): Promise<void> {
+  await authJson(await post('/api/auth/pin', { currentPin, newPin }));
+}
+
+export async function fetchAdminUsers(): Promise<AdminUser[]> {
+  return authJson(await fetch('/api/auth/admin/users'));
+}
+
+export async function adminSetPin(name: string, pin: string): Promise<void> {
+  await authJson(await post('/api/auth/admin/pin', { name, pin }));
+}
+

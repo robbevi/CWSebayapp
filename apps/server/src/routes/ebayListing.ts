@@ -14,6 +14,7 @@ import {
 } from '@warehouse/shared';
 import { env, isGoogleConfigured } from '../config/env.js';
 import { isEbayConfigured } from '../ebay/ordersService.js';
+import { requireAdmin } from '../middleware/auth.js';
 import {
   getSellerSetup,
   ListingRejectedError,
@@ -166,7 +167,7 @@ ebayListingRouter.get('/ebay/category-suggestions', async (req, res, next) => {
 /** eBay's verdict on the listing as it stands, with fees. Nothing is listed. */
 ebayListingRouter.post('/parts/:id/listing/verify', async (req, res, next) => {
   try {
-    const { input, problems, conditionLabel } = await prepare(req.params.id, req.body);
+    const { input, problems, conditionLabel } = await prepare(String(req.params.id), req.body);
     const outcome = await verifyListing(input);
     const body: ListingCheck = {
       ...outcome,
@@ -186,10 +187,11 @@ ebayListingRouter.post('/parts/:id/listing/verify', async (req, res, next) => {
 });
 
 /** Puts the listing live, and records its ID against the part. */
-ebayListingRouter.post('/parts/:id/listing/publish', async (req, res, next) => {
+// Admins only: publishing puts real stock on sale. Checking with eBay stays open to all.
+ebayListingRouter.post('/parts/:id/listing/publish', requireAdmin, async (req, res, next) => {
   let sku: string | undefined;
   try {
-    const { group, input, problems } = await prepare(req.params.id, req.body);
+    const { group, input, problems } = await prepare(String(req.params.id), req.body);
     if (problems.length) throw new HttpError(422, problems.join(' '));
     for (const [key, at] of recentlyPublished) if (Date.now() - at > RECENT_MS) recentlyPublished.delete(key);
     if (publishing.has(group.sku) || recentlyPublished.has(group.sku)) {
@@ -200,7 +202,7 @@ ebayListingRouter.post('/parts/:id/listing/publish', async (req, res, next) => {
 
     const listed = await publishListing(input);
     recentlyPublished.set(group.sku, Date.now());
-    const submittedBy = typeof req.body?.submittedBy === 'string' ? req.body.submittedBy : undefined;
+    const submittedBy = req.user?.name;
 
     // The listing is live whatever happens next, so a failed write must not read as a
     // failed publish. The SKU is set as the listing's Custom Label, so the next sync

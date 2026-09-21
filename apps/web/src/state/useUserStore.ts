@@ -1,28 +1,23 @@
 import { create } from 'zustand';
-
-const STORAGE_KEY = 'currentUser';
+import type { Session } from '../lib/api';
 
 interface UserState {
-  currentUser: string | null;
   /**
-   * Whether the picker is open for a deliberate change of user, as opposed to the first
-   * sign-in. Kept separate from `currentUser` so backing out of a change leaves the
-   * original user signed in — clearing the name to reopen the picker would sign them out
-   * of a shared warehouse tablet on a mis-tap.
+   * The signed-in person's name. Kept alongside `session` because much of the app only
+   * needs the name, and read it from here before sign-in existed.
    */
-  switching: boolean;
-  setUser: (name: string) => void;
-  startSwitch: () => void;
-  cancelSwitch: () => void;
+  currentUser: string | null;
+  session: Session | null;
+  /** The server has answered whether anyone is signed in. */
+  checked: boolean;
+  setSession: (session: Session | null) => void;
 }
 
+// Who is signed in comes only from the server's session cookie. Nothing is remembered in
+// the browser: a name kept there could be edited to take credit as someone else.
 export const useUserStore = create<UserState>((set) => ({
-  currentUser: localStorage.getItem(STORAGE_KEY),
-  switching: false,
-  setUser: (name) => {
-    localStorage.setItem(STORAGE_KEY, name);
-    set({ currentUser: name, switching: false });
-  },
-  startSwitch: () => set({ switching: true }),
-  cancelSwitch: () => set({ switching: false }),
+  currentUser: null,
+  session: null,
+  checked: false,
+  setSession: (session) => set({ session, currentUser: session?.name ?? null, checked: true }),
 }));

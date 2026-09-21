@@ -3,7 +3,9 @@ import { fileURLToPath } from 'node:url';
 import cors from 'cors';
 import express from 'express';
 import { env } from './config/env.js';
+import { requireUser } from './middleware/auth.js';
 import { errorHandler } from './middleware/errorHandler.js';
+import { authRouter } from './routes/auth.js';
 import { draftsRouter } from './routes/drafts.js';
 import { ebayListingRouter } from './routes/ebayListing.js';
 import { researchRouter } from './routes/research.js';
@@ -23,6 +25,10 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+// Sign-in first, then the gate: every API route after it needs a signed-in person,
+// apart from the few requireUser lets through (health, photo images for eBay).
+app.use('/api', authRouter);
+app.use('/api', requireUser);
 app.use('/api', healthRouter);
 app.use('/api', partsRouter);
 app.use('/api', photosRouter);

@@ -87,7 +87,10 @@ partsRouter.post('/parts', async (req, res, next) => {
 
 partsRouter.patch('/parts/:id', async (req, res, next) => {
   try {
-    const { submittedBy, ...patch } = req.body as InventoryPartPatch & { submittedBy?: string };
+    // Credit goes to whoever is signed in, never to a name the browser sends.
+    const patch = { ...(req.body as InventoryPartPatch & { submittedBy?: string }) };
+    delete patch.submittedBy;
+    const submittedBy = req.user?.name;
     if (isGoogleConfigured()) {
       res.json(await updatePartGoogle(req.params.id, patch, submittedBy));
       return;

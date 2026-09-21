@@ -239,6 +239,7 @@ export function ListingPublisher({ group, onPublished }: { group: PartGroup; onP
   const [policies, setPolicies] = useState<PolicyChoice | null>(() => load<PolicyChoice>(POLICY_KEY));
   const [check, setCheck] = useState<{ key: string; result: ListingCheck } | null>(null);
   const currentUser = useUserStore((s) => s.currentUser);
+  const isAdmin = useUserStore((s) => !!s.session?.admin);
   const { data: status } = useSalesStatus();
 
   const setup = useSellerSetup(open);
@@ -748,6 +749,9 @@ export function ListingPublisher({ group, onPublished }: { group: PartGroup; onP
             </div>
           )}
 
+          {!isAdmin && checked?.ok && (
+            <p className="text-[11px] text-textMuted">eBay accepts this listing. Only an admin can publish it.</p>
+          )}
           <div className="flex flex-wrap gap-2">
             <Button type="button" variant="ghost" onClick={startOver} disabled={busy}>
               <RotateCcw size={14} /> Start over
@@ -762,7 +766,12 @@ export function ListingPublisher({ group, onPublished }: { group: PartGroup; onP
                 <ShieldCheck size={14} />
                 {checkListing.isPending ? 'Checking…' : 'Check with eBay'}
               </Button>
-              <Button type="button" onClick={runPublish} disabled={busy || !checked?.ok}>
+              <Button
+                type="button"
+                onClick={runPublish}
+                disabled={busy || !checked?.ok || !isAdmin}
+                title={isAdmin ? undefined : 'Only an admin can publish to eBay'}
+              >
                 <Tag size={14} />
                 {publish.isPending ? 'Publishing…' : 'Publish to eBay'}
               </Button>

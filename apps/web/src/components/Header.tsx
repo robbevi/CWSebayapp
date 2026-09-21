@@ -35,6 +35,7 @@ import { useDarkMode } from '../hooks/useDarkMode';
 import { useGoalsPopupStore } from '../state/useGoalsPopupStore';
 import { useSalesStatus, useSyncSales } from '../hooks/useSales';
 import { useUserStore } from '../state/useUserStore';
+import { AccountDialog } from './AccountDialog';
 import { Scoreboard } from './Scoreboard';
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
@@ -72,7 +73,7 @@ export function Header() {
   const [scoreboardOpen, setScoreboardOpen] = useState(false);
   const [dark, setDark] = useDarkMode();
   const currentUser = useUserStore((s) => s.currentUser);
-  const startSwitch = useUserStore((s) => s.startSwitch);
+  const [accountOpen, setAccountOpen] = useState(false);
   const setGoalsOpen = useGoalsPopupStore((s) => s.setOpen);
   const { data: salesStatus } = useSalesStatus();
   const syncSales = useSyncSales();
@@ -98,10 +99,10 @@ export function Header() {
       {currentUser && (
         <button
           type="button"
-          onClick={startSwitch}
+          onClick={() => setAccountOpen(true)}
           className="ml-auto flex shrink-0 items-center gap-2 rounded-full p-0.5 text-white hover:bg-white/10 sm:p-1 sm:pr-3"
-          title={`Logged in as ${currentUser} — tap to change user`}
-          aria-label={`Logged in as ${currentUser}. Change user.`}
+          title={`Logged in as ${currentUser} — switch user or change PIN`}
+          aria-label={`Logged in as ${currentUser}. Account.`}
         >
           <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white/15 text-[11px] font-bold">
             {initials(currentUser)}
@@ -176,6 +177,7 @@ export function Header() {
       </button>
 
       {scoreboardOpen && <Scoreboard onClose={() => setScoreboardOpen(false)} />}
+      {accountOpen && <AccountDialog onClose={() => setAccountOpen(false)} />}
 
       {infoOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">

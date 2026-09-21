@@ -38,6 +38,7 @@ const rawSchema = z.object({
   PUBLIC_BASE_URL: z.string().optional(),
   EBAY_PUBLISHING: z.string().optional(),
   SPARE_RESEARCH_URL: z.string().optional(),
+  SESSION_SECRET: z.string().optional(),
   SPARE_RESEARCH_FOLDER_ID: z.string().optional(),
   PORT: z.string().optional(),
 });
@@ -104,6 +105,8 @@ function parseAppUsers(json: string | undefined): AppUser[] {
   }
   // A role that isn't one of the two known values would silently mis-score submissions.
   for (const u of users) {
+    // Only a literal true makes an admin, so a stray string can't grant publishing.
+    u.admin = u.admin === true;
     if (u.role !== 'warehouse' && u.role !== 'lister') {
       console.error(`APP_USERS_JSON: "${u.name}" has role "${u.role}"; expected warehouse or lister.`);
       u.role = 'warehouse';
@@ -145,6 +148,8 @@ export const env = {
   // The Copilot Studio workflow's HTTP trigger. Its URL carries the access signature, so
   // it is set only in the environment.
   researchUrl: raw.SPARE_RESEARCH_URL?.trim() || undefined,
+  // Signs session cookies. Without it sessions end whenever the server restarts.
+  sessionSecret: raw.SESSION_SECRET?.trim() || undefined,
   // Where the workflow saves each reply as <SKU>.md: Calfrac Files / SPARE Research.
   researchFolderId: raw.SPARE_RESEARCH_FOLDER_ID?.trim() || '1QBXyxbrGVJrk4opmKJrIE5TZKUBCzk-K',
   port: Number(raw.PORT ?? 4000),

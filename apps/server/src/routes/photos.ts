@@ -31,7 +31,8 @@ photosRouter.post('/photos', upload.single('file'), async (req, res, next) => {
     }
     const sku = (req.body?.sku as string | undefined)?.trim();
     const itemId = (req.body?.itemId as string | undefined)?.trim();
-    const submittedBy = (req.body?.submittedBy as string | undefined)?.trim() || undefined;
+    // The signed-in person, not a name the browser sends.
+    const submittedBy = req.user?.name;
     const site = (req.body?.site as string | undefined)?.trim() || undefined;
     if (!sku || !req.file) {
       res.status(400).json({ error: 'sku and file are required.' });
