@@ -1,6 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { AgentListing, PolicyChoice } from '@warehouse/shared';
-import { checkListing, fetchCategorySuggestions, fetchSellerSetup, publishListing } from '../lib/api';
+import {
+  checkListing,
+  fetchCategorySuggestions,
+  fetchResearch,
+  fetchSellerSetup,
+  publishListing,
+  requestResearch,
+} from '../lib/api';
 import { useToastStore } from '../state/useToastStore';
 import { PARTS_QUERY_KEY } from './useInventoryParts';
 
@@ -28,6 +35,27 @@ export function useCategorySuggestions(title: string, path: string, enabled: boo
     queryFn: () => fetchCategorySuggestions(title, path),
     enabled: enabled && !!(title.trim() || path.trim()),
     staleTime: Infinity,
+  });
+}
+
+/**
+ * The newest Copilot research for a part. Polls while a request is outstanding, since the
+ * agent takes a few minutes and nothing tells SPARE when it has finished.
+ */
+export function useResearch(partId: string, enabled: boolean, waiting: boolean) {
+  return useQuery({
+    queryKey: ['research', partId],
+    queryFn: () => fetchResearch(partId),
+    enabled,
+    refetchInterval: waiting ? 20_000 : false,
+  });
+}
+
+export function useRequestResearch() {
+  const toast = useToastStore((s) => s.show);
+  return useMutation({
+    mutationFn: (partId: string) => requestResearch(partId),
+    onError: (err) => toast(err instanceof Error ? err.message : 'Research request failed', 'error'),
   });
 }
 

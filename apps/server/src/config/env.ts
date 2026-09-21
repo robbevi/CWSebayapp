@@ -37,6 +37,8 @@ const rawSchema = z.object({
   EBAY_MARKETPLACE_ID: z.string().optional(),
   PUBLIC_BASE_URL: z.string().optional(),
   EBAY_PUBLISHING: z.string().optional(),
+  SPARE_RESEARCH_URL: z.string().optional(),
+  SPARE_RESEARCH_FOLDER_ID: z.string().optional(),
   PORT: z.string().optional(),
 });
 
@@ -140,6 +142,11 @@ export const env = {
   // Publishing puts real listings on eBay, so it is off unless switched on outright —
   // an environment that has never heard of it (production, until it's ready) can't list.
   ebayPublishing: raw.EBAY_PUBLISHING?.trim().toLowerCase() === 'on',
+  // The Copilot Studio workflow's HTTP trigger. Its URL carries the access signature, so
+  // it is set only in the environment.
+  researchUrl: raw.SPARE_RESEARCH_URL?.trim() || undefined,
+  // Where the workflow saves each reply as <SKU>.md: Calfrac Files / SPARE Research.
+  researchFolderId: raw.SPARE_RESEARCH_FOLDER_ID?.trim() || '1QBXyxbrGVJrk4opmKJrIE5TZKUBCzk-K',
   port: Number(raw.PORT ?? 4000),
 };
 

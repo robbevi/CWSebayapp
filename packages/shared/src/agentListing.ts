@@ -684,6 +684,15 @@ export interface PublishResult {
   note?: string;
 }
 
+/** The newest Copilot research saved for a part. */
+export interface ResearchResult {
+  found: boolean;
+  createdAt?: string;
+  listing?: AgentListing | null;
+  notes?: string[];
+  error?: string;
+}
+
 export interface ListingRequest {
   listing: AgentListing;
   policies: PolicyChoice;

@@ -3,6 +3,7 @@ import {
   descriptionConditionWarning,
   draftReadiness,
   fillFromPart,
+  formatDate,
   listingProblems,
   MAX_TITLE,
   parseAgentOutput,
@@ -16,9 +17,16 @@ import {
   type PolicyChoice,
   type SellerPolicy,
 } from '@warehouse/shared';
-import { AlertTriangle, Check, ChevronDown, ClipboardCopy, Eye, Info, Plus, RotateCcw, ShieldCheck, Tag, X } from 'lucide-react';
+import { AlertTriangle, Check, ChevronDown, ClipboardCopy, Eye, Info, Plus, RotateCcw, ShieldCheck, Sparkles, Tag, X } from 'lucide-react';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { useCategorySuggestions, useCheckListing, usePublishListing, useSellerSetup } from '../hooks/useEbayListing';
+import {
+  useCategorySuggestions,
+  useCheckListing,
+  usePublishListing,
+  useRequestResearch,
+  useResearch,
+  useSellerSetup,
+} from '../hooks/useEbayListing';
 import { useSalesStatus } from '../hooks/useSales';
 import { ListingRequestError } from '../lib/api';
 import { useUserStore } from '../state/useUserStore';
@@ -234,6 +242,32 @@ export function ListingPublisher({ group, onPublished }: { group: PartGroup; onP
   const { data: status } = useSalesStatus();
 
   const setup = useSellerSetup(open);
+
+  // Copilot research: a request goes to the Copilot Studio workflow, and its reply turns up
+  // minutes later as a file SPARE reads. The pending request survives closing the panel.
+  const researchKey = `spare.research.${group.sku}`;
+  const researchEnabled = !!status?.research;
+  const [requestedAt, setRequestedAt] = useState<string | null>(() => load<string>(researchKey));
+  const research = useResearch(group.primary.id, open && researchEnabled && !listing, !!requestedAt);
+  const requestResearch = useRequestResearch();
+
+  // A reply newer than the request fills the form in by itself. Drive's clock and the
+  // server's can disagree slightly, hence the minute's allowance.
+  useEffect(() => {
+    const r = research.data;
+    if (!requestedAt || !r?.found || !r.createdAt) return;
+    if (Date.parse(r.createdAt) < Date.parse(requestedAt) - 60_000) return;
+    setRequestedAt(null);
+    store(researchKey, null);
+    if (r.listing) {
+      setListing(fillFromPart(r.listing, group));
+      setNotes(r.notes ?? []);
+      setCheck(null);
+      setParseError(null);
+    } else {
+      setParseError(r.error ?? "Couldn't read Copilot's research.");
+    }
+  }, [research.data, requestedAt, researchKey, group]);
   const checkListing = useCheckListing();
   const publish = usePublishListing();
 
@@ -306,6 +340,26 @@ export function ListingPublisher({ group, onPublished }: { group: PartGroup; onP
     setCheck(null);
   };
 
+  const startResearch = () =>
+    requestResearch.mutate(group.primary.id, {
+      onSuccess: (r) => {
+        setRequestedAt(r.requestedAt);
+        store(researchKey, r.requestedAt);
+      },
+    });
+
+  const applyResearch = () => {
+    const r = research.data;
+    if (!r?.listing) {
+      setParseError(r?.error ?? "Couldn't read Copilot's research.");
+      return;
+    }
+    setParseError(null);
+    setListing(fillFromPart(r.listing, group));
+    setNotes(r.notes ?? []);
+    setCheck(null);
+  };
+
   const startOver = () => {
     setText('');
     setListing(null);
@@ -366,6 +420,41 @@ export function ListingPublisher({ group, onPublished }: { group: PartGroup; onP
 
       {open && !listing && (
         <div className="mt-3 space-y-3 border-t border-primary/20 pt-3">
+          {researchEnabled && (
+            <div className="rounded-btn border border-border bg-surface p-2.5">
+              <div className="mb-1 flex items-center gap-1.5 text-xs font-semibold text-textPri">
+                <Sparkles size={13} />
+                Copilot research
+              </div>
+              <p className="text-[11px] text-textMuted">
+                {requestedAt
+                  ? `Researching since ${new Date(requestedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}, usually 2–4 minutes. The listing fills in by itself when it's done.`
+                  : research.data?.found
+                    ? `Research from ${formatDate(research.data.createdAt)} is ready${research.data.error ? `, but ${research.data.error}` : '.'}`
+                    : 'Copilot researches the part — title, category, price, description, specifics — and fills in the listing. Takes a few minutes.'}
+              </p>
+              <div className="mt-2 flex gap-2">
+                {research.data?.found && research.data.listing && !requestedAt && (
+                  <Button type="button" onClick={applyResearch} className="flex-1">
+                    Use this research
+                  </Button>
+                )}
+                <Button
+                  type="button"
+                  variant={research.data?.found ? 'outline' : 'primary'}
+                  onClick={startResearch}
+                  disabled={requestResearch.isPending || !!requestedAt}
+                  className="flex-1"
+                >
+                  <Sparkles size={14} />
+                  {requestedAt ? 'Researching…' : research.data?.found ? 'Research again' : 'Research with Copilot'}
+                </Button>
+              </div>
+            </div>
+          )}
+          {researchEnabled && (
+            <p className="text-[10px] font-semibold uppercase tracking-wide text-textMuted">Or by hand in Copilot chat</p>
+          )}
           <div>
             <Label>1. Give your agent this part</Label>
             <Button type="button" variant="outline" onClick={copyPrompt} className="w-full">

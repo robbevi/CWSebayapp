@@ -10,6 +10,7 @@ import type {
   ListingCheck,
   ListingRequest,
   PublishResult,
+  ResearchResult,
   SellerSetup,
   TradingMessage,
   Photo,
@@ -132,7 +133,7 @@ export async function fetchListings(): Promise<Listing[]> {
   return parseJson(res);
 }
 
-export async function fetchSalesStatus(): Promise<{ ebayConfigured: boolean; ebayPublishing?: boolean }> {
+export async function fetchSalesStatus(): Promise<{ ebayConfigured: boolean; ebayPublishing?: boolean; research?: boolean }> {
   const res = await fetch('/api/sales/status');
   return parseJson(res);
 }
@@ -193,6 +194,16 @@ export async function fetchSellerSetup(): Promise<SellerSetup> {
 export async function fetchCategorySuggestions(title: string, path: string): Promise<CategorySuggestion[]> {
   const params = new URLSearchParams({ title, path });
   const res = await fetch(`/api/ebay/category-suggestions?${params.toString()}`);
+  return parseJson(res);
+}
+
+export async function requestResearch(partId: string): Promise<{ requestedAt: string }> {
+  const res = await fetch(`/api/parts/${encodeURIComponent(partId)}/research`, { method: 'POST' });
+  return parseJson(res);
+}
+
+export async function fetchResearch(partId: string): Promise<ResearchResult> {
+  const res = await fetch(`/api/parts/${encodeURIComponent(partId)}/research`);
   return parseJson(res);
 }
 

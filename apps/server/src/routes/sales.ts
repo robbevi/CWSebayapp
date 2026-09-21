@@ -77,7 +77,11 @@ salesRouter.get('/listings', async (_req, res, next) => {
 });
 
 salesRouter.get('/sales/status', (_req, res) => {
-  res.json({ ebayConfigured: isEbayConfigured(), ebayPublishing: isEbayConfigured() && env.ebayPublishing });
+  res.json({
+    ebayConfigured: isEbayConfigured(),
+    ebayPublishing: isEbayConfigured() && env.ebayPublishing,
+    research: !!env.researchUrl,
+  });
 });
 
 /**
