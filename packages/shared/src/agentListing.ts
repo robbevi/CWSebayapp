@@ -60,11 +60,18 @@ export interface AgentParseResult {
 /** eBay caps item specific names and values at 65 characters each. */
 export const MAX_SPECIFIC = 65;
 
-/** eBay's Trading API condition IDs, for the conditions SPARE records. */
+/**
+ * eBay's Trading API condition IDs, for the conditions SPARE records.
+ *
+ * The warehouse grades how a part looks, not whether it was used: almost all of this stock
+ * is new surplus, and "Good" or "Like New" means new with shelf dust or a tired box. Those
+ * list as New — the agent's standard Condition statement already covers packaging wear.
+ * "Fair" and below are where a part itself is in question.
+ */
 const TRADING_CONDITIONS: Record<string, { id: string; label: string }> = {
   New: { id: '1000', label: 'New' },
-  'Like New': { id: '3000', label: 'Used' },
-  Good: { id: '3000', label: 'Used' },
+  'Like New': { id: '1000', label: 'New' },
+  Good: { id: '1000', label: 'New' },
   Fair: { id: '3000', label: 'Used' },
   // Deliberately conservative, as in draft.ts: Poor is likelier to disappoint than delight.
   Poor: { id: '7000', label: 'For parts or not working' },
@@ -105,6 +112,7 @@ export function agentPrompt(group: PartGroup): string {
   const qty = group.confirmedQoh ?? group.stockQty;
   const notes = group.records.find((r) => r.notes?.trim())?.notes?.trim();
   const condition = group.itemCondition?.trim();
+  const listsAsNew = tradingCondition(condition)?.id === '1000';
   const facts = [
     `SKU: ${group.sku}`,
     `Description: ${group.description || 'Not Available'}`,
@@ -120,7 +128,7 @@ export function agentPrompt(group: PartGroup): string {
     ...facts.map((f) => `- ${f}`),
     '',
     // The agent's standard Condition statement says every item is new and unused.
-    ...(condition && condition !== 'New'
+    ...(condition && !listsAsNew
       ? [
           `This part was inspected as "${condition}", not new. In the Condition section, describe it as ${condition.toLowerCase()} instead of using the standard new-and-unused statement.`,
           '',

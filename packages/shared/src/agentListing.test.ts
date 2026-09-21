@@ -265,8 +265,9 @@ describe('researchMismatch', () => {
 describe('descriptionConditionWarning', () => {
   const standard = { ...complete, descriptionHtml: HTML };
 
-  it('is quiet for a new part', () => {
+  it('is quiet for a new part, including one graded Good for shelf dust', () => {
     expect(descriptionConditionWarning(standard, 'New')).toBeNull();
+    expect(descriptionConditionWarning(standard, 'Good')).toBeNull();
   });
 
   it("flags the standard new-and-unused statement on a part that isn't new", () => {
@@ -340,7 +341,9 @@ describe('listingProblems', () => {
 describe('tradingCondition', () => {
   it("maps SPARE's conditions onto eBay's IDs", () => {
     expect(tradingCondition('New')?.id).toBe('1000');
-    expect(tradingCondition('Good')?.id).toBe('3000');
+    expect(tradingCondition('Like New')?.id).toBe('1000');
+    expect(tradingCondition('Good')?.id).toBe('1000');
+    expect(tradingCondition('Fair')?.id).toBe('3000');
     expect(tradingCondition('Poor')?.id).toBe('7000');
     expect(tradingCondition(undefined)).toBeNull();
   });
@@ -355,6 +358,10 @@ describe('agentPrompt', () => {
     expect(prompt).toContain('- Warehouse notes: Two in sealed bags');
     expect(prompt).toContain('7. SPARE Import');
     expect(prompt).not.toMatch(/instead of using the standard new-and-unused statement/);
+  });
+
+  it('asks for the standard statement on a part graded Good, which lists as New', () => {
+    expect(agentPrompt(group({ itemCondition: 'Good' }))).not.toMatch(/not new/);
   });
 
   it("tells the agent not to call a used part new", () => {
