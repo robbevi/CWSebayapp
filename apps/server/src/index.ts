@@ -46,6 +46,9 @@ if (process.env.NODE_ENV === 'production') {
 
 app.use(errorHandler);
 
-app.listen(env.port, () => {
-  console.log(`Server listening on http://localhost:${env.port}`);
+// Dynamically use Render's port, your config port, or fallback to 10000
+const port = process.env.PORT || env.port || 10000;
+
+app.listen(port, '0.0.0.0', () => {
+  console.log(`Server listening on port ${port}`);
 });
