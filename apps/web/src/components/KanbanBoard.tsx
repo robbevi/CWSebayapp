@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import {
+  ageBandOf,
   checkpointCount,
   draftReadiness,
   getCheckpoints,
@@ -9,6 +10,7 @@ import {
   indexSales,
   listingFor,
   salesForGroup,
+  type AgeBandKey,
   type Listing,
   type PartGroup,
   type SalesIndex,
@@ -181,6 +183,8 @@ export function KanbanBoard() {
     completedTasks,
     research,
     sales: saleFilters,
+    progress,
+    ages,
     margins,
     discrepancies,
     needsReview,
@@ -204,6 +208,8 @@ export function KanbanBoard() {
         matchesCompletedTasks(g, completedTasks) &&
         matchesResearch(g, research, researched) &&
         matchesSales(g, saleFilters, salesIndex) &&
+        (progress.length === 0 || progress.includes(checkpointCount(g))) &&
+        (ages.length === 0 || ages.includes(ageBandOf(g) as AgeBandKey)) &&
         (margins.length === 0 || margins.includes(g.grossMarginStatus as (typeof margins)[number])) &&
         (discrepancies.length === 0 ||
           discrepancies.includes(getGroupDiscrepancy(g)?.kind as (typeof discrepancies)[number])) &&
@@ -223,6 +229,8 @@ export function KanbanBoard() {
     researched,
     saleFilters,
     salesIndex,
+    progress,
+    ages,
     margins,
     discrepancies,
     needsReview,

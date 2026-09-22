@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { TaskKey, WorkflowStatus } from '@warehouse/shared';
+import type { AgeBandKey, TaskKey, WorkflowStatus } from '@warehouse/shared';
 
 export type SortKey =
   | 'SKU'
@@ -43,6 +43,10 @@ interface UIState {
   discrepancies: DiscrepancyFilter[];
   research: ResearchFilter[];
   sales: SaleFilter[];
+  /** Parts with exactly this many of the five checkpoints done. */
+  progress: number[];
+  /** How long since anyone touched the part. */
+  ages: AgeBandKey[];
   needsReview: boolean;
   sort: SortKey;
   selectedId: string | null;
@@ -63,6 +67,8 @@ const DEFAULTS = {
   discrepancies: [] as DiscrepancyFilter[],
   research: [] as ResearchFilter[],
   sales: [] as SaleFilter[],
+  progress: [] as number[],
+  ages: [] as AgeBandKey[],
   needsReview: false,
   sort: 'Bin Location' as SortKey,
 };

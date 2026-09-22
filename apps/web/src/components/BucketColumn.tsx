@@ -10,7 +10,8 @@ import {
   type WorkflowStatus,
 } from '@warehouse/shared';
 import { cn } from '../lib/cn';
-import { ColumnSummaryDialog } from './ColumnSummaryDialog';
+import { ColumnSummaryDialog, type FilterPatch } from './ColumnSummaryDialog';
+import { useUIStore } from '../state/useUIStore';
 import { PartCard } from './PartCard';
 import { SelectDropdown } from './ui/SelectDropdown';
 
@@ -79,6 +80,7 @@ export function BucketColumn({
   // and are always open, so this state is simply ignored from `lg:` up.
   const [expanded, setExpanded] = useState(false);
   const [summaryOpen, setSummaryOpen] = useState(false);
+  const setFilters = useUIStore((s) => s.set);
 
   // A count on its own can't say whether a column is small or merely filtered.
   const filtered = shown.length !== total;
@@ -211,6 +213,10 @@ export function BucketColumn({
           salesIndex={salesIndex}
           listingsIndex={listingsIndex}
           onClose={() => setSummaryOpen(false)}
+          onFilter={(patch: FilterPatch) => {
+            setFilters(patch);
+            setSummaryOpen(false);
+          }}
         />
       )}
     </div>

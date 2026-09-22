@@ -15,7 +15,7 @@ import {
   Wrench,
   X,
 } from 'lucide-react';
-import type { TaskKey, WorkflowStatus } from '@warehouse/shared';
+import { AGE_BANDS, type AgeBandKey, type TaskKey, type WorkflowStatus } from '@warehouse/shared';
 import { useBodyScrollLock } from '../hooks/useBodyScrollLock';
 import type { DiscrepancyFilter, MarginFilter, ResearchFilter, SaleFilter } from '../state/useUIStore';
 import { Button } from './ui/Button';
@@ -43,6 +43,11 @@ export const RESEARCH_OPTIONS: { key: ResearchFilter; label: string; icon: React
   { key: 'ready', label: 'Ready to research', icon: <Hourglass size={14} /> },
   { key: 'notReady', label: 'Not ready yet', icon: <CircleDashed size={14} /> },
 ];
+
+/** 0 to 5 of the processing checkpoints finished. */
+export const PROGRESS_OPTIONS = [0, 1, 2, 3, 4, 5].map((n) => ({ key: n, label: `${n} of 5 steps done` }));
+
+export const AGE_OPTIONS = AGE_BANDS.map((b) => ({ key: b.key, label: b.label }));
 
 export const SALE_OPTIONS: { key: SaleFilter; label: string; icon: React.ReactNode }[] = [
   { key: 'sold', label: 'Sold, in part or whole', icon: <ShoppingCart size={14} /> },
@@ -88,6 +93,10 @@ interface FilterDrawerProps {
   onToggleResearch: (key: ResearchFilter) => void;
   sales: SaleFilter[];
   onToggleSale: (key: SaleFilter) => void;
+  progress: number[];
+  onToggleProgress: (key: number) => void;
+  ages: AgeBandKey[];
+  onToggleAge: (key: AgeBandKey) => void;
   researchEnabled: boolean;
   needsReview: boolean;
   onToggleNeedsReview: () => void;
@@ -124,6 +133,10 @@ export function FilterDrawer({
   onToggleResearch,
   sales,
   onToggleSale,
+  progress,
+  onToggleProgress,
+  ages,
+  onToggleAge,
   researchEnabled,
   needsReview,
   onToggleNeedsReview,
@@ -271,6 +284,43 @@ export function FilterDrawer({
                 </label>
               ))}
             </div>
+          </div>
+
+          <div>
+            <span className="mb-1 block text-xs font-semibold text-textMuted">Steps Finished</span>
+            <div className="space-y-2 rounded-btn border border-border p-3">
+              {PROGRESS_OPTIONS.map((opt) => (
+                <label key={opt.key} className="flex cursor-pointer items-center gap-2 text-xs text-textPri">
+                  <input
+                    type="checkbox"
+                    checked={progress.includes(opt.key)}
+                    onChange={() => onToggleProgress(opt.key)}
+                    className="h-4 w-4 shrink-0 accent-primary"
+                  />
+                  {opt.label}
+                </label>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <span className="mb-1 block text-xs font-semibold text-textMuted">Last Touched</span>
+            <div className="space-y-2 rounded-btn border border-border p-3">
+              {AGE_OPTIONS.map((opt) => (
+                <label key={opt.key} className="flex cursor-pointer items-center gap-2 text-xs text-textPri">
+                  <input
+                    type="checkbox"
+                    checked={ages.includes(opt.key)}
+                    onChange={() => onToggleAge(opt.key)}
+                    className="h-4 w-4 shrink-0 accent-primary"
+                  />
+                  {opt.label}
+                </label>
+              ))}
+            </div>
+            <p className="mt-1.5 text-[11px] text-textMuted">
+              Since anyone last photographed, counted, graded or edited the part.
+            </p>
           </div>
 
           <div>

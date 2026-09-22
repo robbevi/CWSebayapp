@@ -23,7 +23,11 @@ export interface ProgressBand {
   value: number;
 }
 
+/** The age bands, as something the board can filter by rather than only display. */
+export type AgeBandKey = 'week' | 'month' | 'quarter' | 'older';
+
 export interface AgeBand {
+  key: AgeBandKey;
   label: string;
   parts: number;
   value: number;
@@ -92,12 +96,25 @@ function lastTouchedMs(group: PartGroup): number | null {
 
 const DAY_MS = 86_400_000;
 
-const BANDS: { label: string; min: number; max: number }[] = [
-  { label: 'Under a week', min: 0, max: 7 },
-  { label: '1–4 weeks', min: 7, max: 28 },
-  { label: '1–3 months', min: 28, max: 90 },
-  { label: 'Over 3 months', min: 90, max: Infinity },
+export const AGE_BANDS: { key: AgeBandKey; label: string; min: number; max: number }[] = [
+  { key: 'week', label: 'Under a week', min: 0, max: 7 },
+  { key: 'month', label: '1–4 weeks', min: 7, max: 28 },
+  { key: 'quarter', label: '1–3 months', min: 28, max: 90 },
+  { key: 'older', label: 'Over 3 months', min: 90, max: Infinity },
 ];
+
+/** Days since anyone last touched the part, or null when nothing carries a date. */
+export function daysSinceTouched(group: PartGroup, now: Date = new Date()): number | null {
+  const touched = lastTouchedMs(group);
+  return touched == null ? null : Math.max(0, Math.floor((now.getTime() - touched) / DAY_MS));
+}
+
+/** Which age band a part falls in, for filtering the board by the same bands. */
+export function ageBandOf(group: PartGroup, now: Date = new Date()): AgeBandKey | null {
+  const days = daysSinceTouched(group, now);
+  if (days == null) return null;
+  return AGE_BANDS.find((b) => days >= b.min && days < b.max)?.key ?? null;
+}
 
 function median(values: number[]): number | null {
   if (!values.length) return null;
@@ -119,7 +136,7 @@ export function columnSummary(
     value: 0,
   }));
   const taskCounts = new Map<TaskKey, number>(TASK_KEYS.map((k) => [k, 0]));
-  const bands: AgeBand[] = BANDS.map((b) => ({ label: b.label, parts: 0, value: 0 }));
+  const bands: AgeBand[] = AGE_BANDS.map((b) => ({ key: b.key, label: b.label, parts: 0, value: 0 }));
   const siteTotals = new Map<string, SiteBreakdown>();
   const ages: number[] = [];
 
@@ -158,11 +175,10 @@ export function columnSummary(
     const checks = getCheckpoints(g);
     for (const key of TASK_KEYS) if (checks[key]) taskCounts.set(key, (taskCounts.get(key) ?? 0) + 1);
 
-    const touched = lastTouchedMs(g);
-    if (touched != null) {
-      const days = Math.max(0, Math.floor((now.getTime() - touched) / DAY_MS));
+    const days = daysSinceTouched(g, now);
+    if (days != null) {
       ages.push(days);
-      const band = BANDS.findIndex((b) => days >= b.min && days < b.max);
+      const band = AGE_BANDS.findIndex((b) => days >= b.min && days < b.max);
       if (band >= 0) {
         bands[band].parts += 1;
         bands[band].value += worth;

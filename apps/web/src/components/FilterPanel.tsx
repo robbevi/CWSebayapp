@@ -6,7 +6,7 @@ import { useUIStore, type SortKey } from '../state/useUIStore';
 import { cn } from '../lib/cn';
 import { AddPartModal } from './AddPartModal';
 import { DISCREPANCY_LABELS } from '@warehouse/shared';
-import { FilterDrawer, RESEARCH_OPTIONS, SALE_OPTIONS, STATUS_OPTIONS, TASK_OPTIONS } from './FilterDrawer';
+import { AGE_OPTIONS, FilterDrawer, RESEARCH_OPTIONS, SALE_OPTIONS, STATUS_OPTIONS, TASK_OPTIONS } from './FilterDrawer';
 import { Input } from './ui/Input';
 import { SelectDropdown } from './ui/SelectDropdown';
 
@@ -54,6 +54,8 @@ export function FilterPanel() {
     completedTasks,
     research,
     sales,
+    progress,
+    ages,
     margins,
     discrepancies,
     needsReview,
@@ -87,6 +89,14 @@ export function FilterPanel() {
 
   const toggleStatus = (key: (typeof statuses)[number]) => {
     set({ statuses: statuses.includes(key) ? statuses.filter((s) => s !== key) : [...statuses, key] });
+  };
+
+  const toggleProgress = (key: number) => {
+    set({ progress: progress.includes(key) ? progress.filter((x) => x !== key) : [...progress, key] });
+  };
+
+  const toggleAge = (key: (typeof ages)[number]) => {
+    set({ ages: ages.includes(key) ? ages.filter((x) => x !== key) : [...ages, key] });
   };
 
   const toggleSale = (key: (typeof sales)[number]) => {
@@ -135,6 +145,16 @@ export function FilterPanel() {
       key: 'completedTasks',
       label: `Completed: ${completedTasks.map((t) => TASK_OPTIONS.find((o) => o.key === t)?.label ?? t).join(', ')}`,
       onRemove: () => set({ completedTasks: [] }),
+    },
+    progress.length > 0 && {
+      key: 'progress',
+      label: `Steps: ${[...progress].sort().map((n) => `${n}/5`).join(', ')}`,
+      onRemove: () => set({ progress: [] }),
+    },
+    ages.length > 0 && {
+      key: 'ages',
+      label: `Last touched: ${ages.map((a) => AGE_OPTIONS.find((o) => o.key === a)?.label ?? a).join(', ')}`,
+      onRemove: () => set({ ages: [] }),
     },
     sales.length > 0 && {
       key: 'sales',
@@ -278,6 +298,10 @@ export function FilterPanel() {
           onToggleResearch={toggleResearch}
           sales={sales}
           onToggleSale={toggleSale}
+          progress={progress}
+          onToggleProgress={toggleProgress}
+          ages={ages}
+          onToggleAge={toggleAge}
           researchEnabled={!!status?.research}
           needsReview={needsReview}
           onToggleNeedsReview={() => set({ needsReview: !needsReview })}
