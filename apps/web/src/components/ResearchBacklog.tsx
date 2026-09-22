@@ -7,6 +7,17 @@ import { Button } from './ui/Button';
 
 const KEY = ['research-backlog'];
 const SIZES = [10, 25, 50];
+/** Measured across the first runs: the agent answers in about four minutes a part. */
+const MINUTES_EACH = 4;
+
+/** "about 40 minutes", "about 3½ hours" — long enough runs are planned around, not watched. */
+function roughly(parts: number): string {
+  const mins = parts * MINUTES_EACH;
+  if (mins < 90) return `about ${mins} minutes`;
+  const halves = Math.round(mins / 30);
+  const hours = Math.floor(halves / 2);
+  return `about ${hours}${halves % 2 ? '½' : ''} hours`;
+}
 
 /**
  * Researching the backlog: Copilot writes up every part that is ready to list, one at a
@@ -67,7 +78,7 @@ export function ResearchBacklog() {
           <p className="mt-1 text-[11px] text-textMuted">
             {s.running
               ? `Researching ${s.current ?? '…'}${waitingMins >= 1 ? ` for ${waitingMins} ${waitingMins === 1 ? 'minute' : 'minutes'}` : ''} — ${done} of ${s.limit} done. Leave SPARE open.`
-              : `${s.waiting} ${s.waiting === 1 ? 'part is' : 'parts are'} ready to list with no research yet. Copilot can write them up in the background.`}
+              : `${s.waiting} ${s.waiting === 1 ? 'part is' : 'parts are'} ready to list with no research yet — ${roughly(s.waiting)} for all of them, at about ${MINUTES_EACH} minutes each.`}
           </p>
 
           {s.running ? (
@@ -84,7 +95,7 @@ export function ResearchBacklog() {
               >
                 {SIZES.map((n) => (
                   <option key={n} value={n}>
-                    {n} parts
+                    {n} parts · {roughly(Math.min(n, s.waiting))}
                   </option>
                 ))}
               </select>
