@@ -213,6 +213,41 @@ export async function fetchResearch(partId: string): Promise<ResearchResult> {
   return parseJson(res);
 }
 
+/** A run of Copilot research over the parts that are ready to list but not yet researched. */
+export interface ResearchBacklog {
+  running: boolean;
+  limit: number;
+  sent: number;
+  answered: number;
+  failed: { sku: string; error: string }[];
+  current: string | null;
+  /** Parts still waiting for research, this run's queue included. */
+  waiting: number;
+  startedAt: string | null;
+  finishedAt: string | null;
+  startedBy: string | null;
+  stoppedBy: string | null;
+}
+
+export async function fetchResearchBacklog(): Promise<ResearchBacklog> {
+  const res = await fetch('/api/research/backlog');
+  return parseJson(res);
+}
+
+export async function startResearchBacklog(limit: number): Promise<ResearchBacklog> {
+  const res = await fetch('/api/research/backlog/start', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ limit }),
+  });
+  return parseJson(res);
+}
+
+export async function stopResearchBacklog(): Promise<ResearchBacklog> {
+  const res = await fetch('/api/research/backlog/stop', { method: 'POST' });
+  return parseJson(res);
+}
+
 export async function checkListing(partId: string, body: ListingRequest): Promise<ListingCheck> {
   const res = await fetch(`/api/parts/${encodeURIComponent(partId)}/listing/verify`, {
     method: 'POST',

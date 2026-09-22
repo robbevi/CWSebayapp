@@ -4,7 +4,9 @@ import { useState, type FormEvent } from 'react';
 import { formatDate } from '@warehouse/shared';
 import { useBodyScrollLock } from '../hooks/useBodyScrollLock';
 import { adminSetPin, changeMyPin, fetchAdminUsers, logout } from '../lib/api';
+import { useSalesStatus } from '../hooks/useSales';
 import { useUserStore } from '../state/useUserStore';
+import { ResearchBacklog } from './ResearchBacklog';
 import { useToastStore } from '../state/useToastStore';
 import { Button } from './ui/Button';
 import { Input } from './ui/Input';
@@ -105,6 +107,7 @@ export function AccountDialog({ onClose }: { onClose: () => void }) {
   const toast = useToastStore((s) => s.show);
   const admin = !!session?.admin;
   const people = useQuery({ queryKey: ['admin-users'], queryFn: fetchAdminUsers, enabled: admin });
+  const { data: status } = useSalesStatus();
 
   const [current, setCurrent] = useState('');
   const [next, setNext] = useState('');
@@ -188,6 +191,8 @@ export function AccountDialog({ onClose }: { onClose: () => void }) {
             </Button>
           </form>
         )}
+
+        {admin && status?.research && <ResearchBacklog />}
 
         {admin && (
           <div className="mt-6">
