@@ -8,12 +8,8 @@ import {
   Sparkles,
   Layers,
   MapPin,
-  Boxes,
-  CalendarDays,
-  Eye,
   Package,
   ShoppingCart,
-  Signal,
   Wrench,
 } from 'lucide-react';
 import {
@@ -37,6 +33,18 @@ import { ProcessingStatusChips } from './ProcessingStatusChips';
 
 function money(value: number): string {
   return value.toLocaleString('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2 });
+}
+
+/** One figure from the listing: the number first, what it counts underneath. */
+function Stat({ value, label, title, muted }: { value: string; label: string; title: string; muted?: boolean }) {
+  return (
+    <div className="text-center" title={title}>
+      <div className={cn('text-sm font-bold leading-tight tabular-nums', muted ? 'text-textMuted' : 'text-textPri')}>
+        {value}
+      </div>
+      <div className="text-[9px] font-semibold uppercase tracking-wide text-textMuted">{label}</div>
+    </div>
+  );
 }
 
 export function PartCard({
@@ -85,11 +93,21 @@ export function PartCard({
     >
       <div className="flex items-start gap-1.5">
         <span className="min-w-0 flex-1 text-sm font-semibold text-textPri">{part.sku}</span>
+        {onEbay && (
+          <span className="shrink-0 text-right">
+            <span className="block text-sm font-bold leading-tight tabular-nums text-textPri">
+              {sold.soldQty > 0 ? money(sold.totals.gross) : askingPrice > 0 ? money(askingPrice) : '—'}
+            </span>
+            <span className="block text-[9px] font-semibold uppercase tracking-wide text-textMuted">
+              {sold.soldOut ? 'Sold' : sold.soldQty > 0 ? 'Part sold' : 'Listed'}
+            </span>
+          </span>
+        )}
         {isHighPriority(part.fieldReviewPriority) && (
           <span
             title={part.fieldReviewPriority}
             aria-label={`High priority: ${part.fieldReviewPriority}`}
-            className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-700"
+            className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-surfaceMuted text-orange-500"
           >
             <AlertTriangle size={12} />
           </span>
@@ -133,6 +151,14 @@ export function PartCard({
         )}
       </div>
       <div className="mb-2 line-clamp-2 min-h-[2rem] text-xs leading-snug text-textMuted">{part.description}</div>
+      {/* Where it is kept and how many, which the figures below don't say. */}
+      {onEbay && (
+        <div className="mb-2.5 truncate text-[11px] text-textMuted">
+          {part.inventorySite || '—'}
+          <span className="mx-1.5 text-border">·</span>
+          <span className="font-medium text-textPri">Qty {listing ? listing.quantityAvailable : part.qoh}</span>
+        </div>
+      )}
       {/* Same two-column grid as ProcessingStatusChips below, so the two blocks line up
           instead of one being a ragged wrap and the other a tidy grid. */}
       <div className="grid grid-cols-2 gap-1.5">
@@ -140,32 +166,23 @@ export function PartCard({
           /* Once something is on eBay, how it is performing is the useful thing to see at
              a glance. Manufacturer, site, bin and quantity are a click away in Part
              Detail, and remain sortable and filterable from the toolbar. */
-          <>
-            <Pill tone="chip" className="w-full">
-              <CalendarDays size={12} className="shrink-0" />
-              <span className="truncate" title="Days since it was listed on eBay">
-                {listedDays != null ? `${listedDays} days` : 'Days —'}
-              </span>
-            </Pill>
-            <Pill tone="chip" className="w-full">
-              <Eye size={12} className="shrink-0" />
-              <span className="truncate" title="Views in the last 30 days">
-                {listing?.views != null ? `${listing.views} views` : 'Views —'}
-              </span>
-            </Pill>
-            <Pill tone="chip" className="w-full">
-              <Signal size={12} className="shrink-0" />
-              <span className="truncate" title="Times shown in search or the store, last 30 days">
-                {listing?.impressions != null ? `${listing.impressions.toLocaleString()} Impr` : 'Impr —'}
-              </span>
-            </Pill>
-            <Pill tone="chip" className="w-full">
-              <Boxes size={12} className="shrink-0" />
-              <span className="truncate" title="Quantity available on the listing">
-                {listing ? `Qty ${listing.quantityAvailable}` : `Qty ${part.qoh}`}
-              </span>
-            </Pill>
-          </>
+          /* Four figures rather than four chips: on eBay these are all counts of the same
+             kind, and read across as a row the way a listing's own stats do. */
+          <div className="col-span-2 grid grid-cols-4 gap-1 border-t border-border pt-2.5">
+            <Stat value={listedDays != null ? String(listedDays) : '—'} label="Days live" title="Days since it was listed on eBay" />
+            <Stat
+              value={listing?.impressions != null ? listing.impressions.toLocaleString() : '—'}
+              label="Impr."
+              title="Times shown in search or the store, last 30 days"
+            />
+            <Stat value={listing?.views != null ? String(listing.views) : '—'} label="Views" title="Views in the last 30 days" />
+            <Stat
+              value={listing ? String(listing.watchers) : '—'}
+              label="Watch"
+              title="People watching this listing"
+              muted={!listing?.watchers}
+            />
+          </div>
         ) : (
           <>
 
@@ -220,7 +237,7 @@ export function PartCard({
         )}
         {/* A counted-but-mismatched quantity is the one thing on a card that needs chasing,
             so it gets a hard colour rather than the neutral chip treatment. */}
-        {discrepancy && discrepancy.kind !== 'none' && (
+        {discrepancy && discrepancy.kind !== 'none' && !onEbay && (
           <Pill
             className={cn(
               'w-full font-semibold',
@@ -268,9 +285,6 @@ export function PartCard({
               ? `${sold.soldQty} sold · ${sold.remainingQty} left`
               : 'Active on eBay'}
         </span>
-        <span className="ml-auto shrink-0 font-semibold tabular-nums text-textPri">
-          {sold.soldQty > 0 ? money(sold.totals.gross) : askingPrice > 0 ? money(askingPrice) : '—'}
-        </span>
         {listingUrl && (
           <a
             href={listingUrl}
@@ -278,7 +292,7 @@ export function PartCard({
             rel="noreferrer"
             // The card behind this opens the detail modal; the link must not do both.
             onClick={(e) => e.stopPropagation()}
-            className="shrink-0 font-medium text-primary hover:underline"
+            className="ml-auto shrink-0 rounded-btn border border-border px-2 py-0.5 font-medium text-primary hover:bg-surfaceMuted"
             title="Open this listing on eBay"
           >
             View <ExternalLink size={10} className="inline align-[-1px]" />

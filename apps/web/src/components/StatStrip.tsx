@@ -32,7 +32,7 @@ function Card({
       </div>
       <div
         className={cn(
-          'mt-auto text-2xl font-bold leading-tight tabular-nums',
+          'mt-auto text-2xl font-bold leading-tight tabular-nums lg:text-xl',
           tone === 'warn' ? 'text-amber-600' : 'text-textPri'
         )}
       >

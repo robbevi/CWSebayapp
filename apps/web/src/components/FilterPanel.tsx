@@ -154,7 +154,7 @@ export function FilterPanel() {
   ].filter((c): c is { key: string; label: string; onRemove: () => void } => !!c);
 
   return (
-    <div className="relative rounded-card bg-surfaceMuted p-4">
+    <div className="relative rounded-card bg-surfaceMuted p-4 lg:p-1.5">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
         <div className="relative flex-1">
           <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-textMuted" />

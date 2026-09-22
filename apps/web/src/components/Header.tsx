@@ -79,7 +79,7 @@ export function Header() {
   const syncSales = useSyncSales();
 
   return (
-    <header className="flex shrink-0 items-center gap-1 bg-primaryDeep px-3 py-4 sm:gap-3 sm:px-6">
+    <header className="flex shrink-0 items-center gap-1 bg-primaryDeep px-3 py-4 sm:gap-3 sm:px-6 lg:py-3">
       <img src={calfracLogo} alt="Calfrac" className="h-8 w-8 shrink-0 object-contain sm:h-10 sm:w-10" />
       <span aria-hidden="true" className="hidden h-8 w-px shrink-0 bg-white/20 sm:block" />
       {/* shrink-0 rather than min-w-0: a flex-squashed wordmark renders as a stray few

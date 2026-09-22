@@ -1,6 +1,14 @@
 import { useMemo, useState, type ReactElement } from 'react';
 import { ChevronDown, ClipboardList, Tag, Wrench } from 'lucide-react';
-import { salesForGroup, type Listing, type PartGroup, type SalesIndex, type WorkflowStatus } from '@warehouse/shared';
+import {
+  extendedValue,
+  listingFor,
+  salesForGroup,
+  type Listing,
+  type PartGroup,
+  type SalesIndex,
+  type WorkflowStatus,
+} from '@warehouse/shared';
 import { cn } from '../lib/cn';
 import { PartCard } from './PartCard';
 import { SelectDropdown } from './ui/SelectDropdown';
@@ -10,6 +18,30 @@ const BUCKET_META: Record<WorkflowStatus, { label: string; icon: ReactElement; b
   Processing: { label: 'Processing', icon: <Wrench size={18} />, badgeBg: 'bg-amber-500', iconColor: 'text-white' },
   Listed: { label: 'Listed / Sold', icon: <Tag size={18} />, badgeBg: 'bg-primary', iconColor: 'text-white' },
 };
+
+function money(value: number): string {
+  return value.toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
+}
+
+/**
+ * What the column is worth, in the terms that fit it: stock still to be sold is carried at
+ * its recovery basis, while anything on eBay is worth what eBay is currently asking. Shown
+ * for what is on screen, so it answers the filters rather than the whole catalogue.
+ */
+function columnValue(
+  status: WorkflowStatus,
+  parts: PartGroup[],
+  listingsIndex: Map<string, Listing>
+): { label: string; value: number } {
+  if (status !== 'Listed') {
+    return { label: 'Est. Recovery', value: parts.reduce((sum, g) => sum + extendedValue(g), 0) };
+  }
+  const value = parts.reduce((sum, g) => {
+    const listing = listingFor(g.records, listingsIndex);
+    return sum + (listing ? listing.price * listing.quantityAvailable : 0);
+  }, 0);
+  return { label: 'Live on eBay', value };
+}
 
 export function BucketColumn({
   status,
@@ -43,6 +75,8 @@ export function BucketColumn({
   // and are always open, so this state is simply ignored from `lg:` up.
   const [expanded, setExpanded] = useState(false);
 
+  const subtotal = useMemo(() => columnValue(status, shown, listingsIndex), [status, shown, listingsIndex]);
+
   return (
     <div className="flex flex-col rounded-card border border-border bg-surfaceMuted lg:h-full lg:min-h-0">
       <div className="flex w-full items-center gap-3 rounded-t-card border-b border-border bg-columnHeaderBg p-4">
@@ -59,7 +93,15 @@ export function BucketColumn({
           >
             {meta.icon}
           </div>
-          <span className="text-sm font-semibold text-textPri">{meta.label}</span>
+          <span className="min-w-0">
+            <span className="block text-base font-bold text-textPri lg:text-lg">{meta.label}</span>
+            {/* Desktop only: on a phone the columns stack and collapse, where another line
+                sits between someone and their work. */}
+            <span className="hidden text-[11px] leading-tight text-textMuted lg:block">
+              <span className="font-semibold tabular-nums text-textPri">{money(subtotal.value)}</span>{' '}
+              {subtotal.label}
+            </span>
+          </span>
         </button>
 
         {split ? (
