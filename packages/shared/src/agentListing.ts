@@ -682,6 +682,8 @@ export interface PublishResult {
   /** False when eBay listed it but writing the listing ID back to the sheet failed. */
   recorded: boolean;
   note?: string;
+  /** Set when the listing is waiting under Scheduled rather than live. */
+  scheduledFor?: string;
 }
 
 /** The newest Copilot research saved for a part. */
@@ -697,6 +699,29 @@ export interface ListingRequest {
   listing: AgentListing;
   policies: PolicyChoice;
   submittedBy?: string;
+  /**
+   * When the listing should go live, as an ISO timestamp. Absent means now. eBay holds a
+   * scheduled listing under Scheduled in Seller Hub until then, which is the nearest thing
+   * the Trading API has to a draft.
+   */
+  scheduleTime?: string;
+}
+
+/** eBay's own limits on a scheduled start, and a small fee applies per scheduled listing. */
+export const SCHEDULE_MIN_MINUTES = 60;
+export const SCHEDULE_MAX_DAYS = 21;
+
+/**
+ * Checks a requested start time against eBay's window. Returns the reason it won't do, or
+ * null when it will.
+ */
+export function scheduleProblem(iso: string, now: Date = new Date()): string | null {
+  const at = Date.parse(iso);
+  if (Number.isNaN(at)) return 'That is not a time eBay can read.';
+  const minutes = (at - now.getTime()) / 60_000;
+  if (minutes < SCHEDULE_MIN_MINUTES) return `eBay needs a start at least ${SCHEDULE_MIN_MINUTES} minutes from now.`;
+  if (minutes > SCHEDULE_MAX_DAYS * 24 * 60) return `eBay won't schedule more than ${SCHEDULE_MAX_DAYS} days ahead.`;
+  return null;
 }
 
 // Words that appear in almost every parts category path, and so say nothing about fit.

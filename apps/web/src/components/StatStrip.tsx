@@ -1,5 +1,5 @@
-import { useMemo } from 'react';
-import { AlertTriangle, Boxes, Coins, Layers, Tag, TrendingDown, TrendingUp } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { AlertTriangle, Boxes, ChevronDown, Coins, Layers, Tag, TrendingDown, TrendingUp } from 'lucide-react';
 import { computeDashboardStats, groupPartsBySku } from '@warehouse/shared';
 import { useInventoryParts } from '../hooks/useInventoryParts';
 import { useSales } from '../hooks/useSales';
@@ -43,6 +43,18 @@ function Card({
   );
 }
 
+/** One figure on the collapsed line: the number, then what it counts. */
+function Figure({ value, label, tone }: { value: string; label: string; tone?: 'warn' }) {
+  return (
+    <span className="flex items-baseline gap-1">
+      <span className={cn('font-bold tabular-nums', tone === 'warn' ? 'text-amber-600' : 'text-textPri')}>
+        {value}
+      </span>
+      {label}
+    </span>
+  );
+}
+
 /**
  * Week-on-week movement in listings. Direction is carried by the arrow as well as the
  * colour, so it still reads without relying on being able to tell red from green.
@@ -65,9 +77,28 @@ function Trend({ pct }: { pct: number | null }) {
  * search field would push it off the screen — the same figures live in the Scoreboard,
  * which is a tap away.
  */
+const COLLAPSED_KEY = 'spare.stats.collapsed';
+
 export function StatStrip() {
   const { data: parts } = useInventoryParts();
   const { data: sales } = useSales();
+  // Remembered per browser: someone who works from the board all day shouldn't have to
+  // put the strip away every morning.
+  const [collapsed, setCollapsed] = useState(() => {
+    try {
+      return localStorage.getItem(COLLAPSED_KEY) === '1';
+    } catch {
+      return false;
+    }
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(COLLAPSED_KEY, collapsed ? '1' : '0');
+    } catch {
+      // A browser that refuses storage still works; it just forgets.
+    }
+  }, [collapsed]);
 
   const stats = useMemo(
     () => computeDashboardStats(groupPartsBySku(parts ?? []), sales ?? []),
@@ -76,8 +107,40 @@ export function StatStrip() {
 
   if (!parts) return null;
 
+  const toggle = (
+    <button
+      type="button"
+      onClick={() => setCollapsed((c) => !c)}
+      aria-expanded={!collapsed}
+      className="flex shrink-0 items-center gap-1 rounded-btn px-1.5 py-1 text-[11px] font-semibold text-textMuted hover:bg-surfaceMuted hover:text-textPri"
+      title={collapsed ? 'Show the summary' : 'Hide the summary'}
+    >
+      {collapsed ? 'Summary' : 'Hide'}
+      <ChevronDown size={13} className={cn('transition-transform', !collapsed && 'rotate-180')} />
+    </button>
+  );
+
+  // Put away, the figures stay on one quiet line rather than disappearing: the board gains
+  // the height, and nobody has to open anything to see where the pile stands.
+  if (collapsed) {
+    return (
+      <div className="hidden items-center gap-3 rounded-card border border-border bg-surface px-3 py-1.5 text-xs text-textMuted lg:flex">
+        <Figure value={stats.totalItems.toLocaleString()} label="items" />
+        <Figure value={stats.totalQoh.toLocaleString()} label="QOH" />
+        <Figure value={money(stats.estRecoveryValue)} label="est. recovery" />
+        <Figure value={stats.listedThisWeek.toLocaleString()} label="listed this week" />
+        <Figure
+          value={stats.needsReview.toLocaleString()}
+          label="need review"
+          tone={stats.needsReview > 0 ? 'warn' : undefined}
+        />
+        <span className="ml-auto">{toggle}</span>
+      </div>
+    );
+  }
+
   return (
-    <div className="hidden gap-3 lg:grid lg:grid-cols-5">
+    <div className="relative hidden gap-3 lg:grid lg:grid-cols-5">
       <Card label="Total Items" value={stats.totalItems.toLocaleString()} icon={<Layers size={13} />}>
         {stats.totalRecords.toLocaleString()} stock records
       </Card>
@@ -104,6 +167,11 @@ export function StatStrip() {
       >
         {stats.needsReview === 0 ? 'nothing flagged' : 'awaiting a second look'}
       </Card>
+      {/* Sits over the last card's top-right corner: a control of the strip, not a sixth
+          thing to read. */}
+      <div className="pointer-events-none absolute right-1 top-1 flex justify-end">
+        <span className="pointer-events-auto">{toggle}</span>
+      </div>
     </div>
   );
 }

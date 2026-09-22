@@ -16,6 +16,8 @@ interface ListingVars {
   listing: AgentListing;
   policies: PolicyChoice;
   submittedBy?: string;
+  /** ISO time to start the listing. Absent lists it now. */
+  scheduleTime?: string;
 }
 
 /** Business policies and ship-from. Only fetched once someone opens a listing. */
@@ -71,12 +73,20 @@ export function usePublishListing() {
 
   return useMutation({
     mutationFn: (v: ListingVars) =>
-      publishListing(v.partId, { listing: v.listing, policies: v.policies, submittedBy: v.submittedBy }),
+      publishListing(v.partId, {
+        listing: v.listing,
+        policies: v.policies,
+        submittedBy: v.submittedBy,
+        scheduleTime: v.scheduleTime,
+      }),
     onSuccess: (result) => {
       qc.invalidateQueries({ queryKey: PARTS_QUERY_KEY });
       qc.invalidateQueries({ queryKey: ['listings'] });
-      if (result.recorded) toast(`Listed on eBay — item ${result.itemId}`);
-      else toast(`Listed on eBay as item ${result.itemId}, but SPARE couldn't save it — ${result.note}`, 'error');
+      const what = result.scheduledFor
+        ? `Scheduled on eBay for ${new Date(result.scheduledFor).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })} — item ${result.itemId}`
+        : `Listed on eBay — item ${result.itemId}`;
+      if (result.recorded) toast(what);
+      else toast(`${what}, but SPARE couldn't save it — ${result.note}`, 'error');
     },
     onError: (err) => toast(err instanceof Error ? err.message : 'Publishing failed', 'error'),
   });

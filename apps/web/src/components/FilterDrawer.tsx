@@ -8,6 +8,7 @@ import {
   Hourglass,
   ListChecks,
   MapPin,
+  ShoppingCart,
   Sparkles,
   Tag,
   TruckIcon,
@@ -16,7 +17,7 @@ import {
 } from 'lucide-react';
 import type { TaskKey, WorkflowStatus } from '@warehouse/shared';
 import { useBodyScrollLock } from '../hooks/useBodyScrollLock';
-import type { DiscrepancyFilter, MarginFilter, ResearchFilter } from '../state/useUIStore';
+import type { DiscrepancyFilter, MarginFilter, ResearchFilter, SaleFilter } from '../state/useUIStore';
 import { Button } from './ui/Button';
 import { MultiSelectDropdown } from './ui/MultiSelectDropdown';
 
@@ -41,6 +42,11 @@ export const RESEARCH_OPTIONS: { key: ResearchFilter; label: string; icon: React
   { key: 'researched', label: 'Researched', icon: <Sparkles size={14} /> },
   { key: 'ready', label: 'Ready to research', icon: <Hourglass size={14} /> },
   { key: 'notReady', label: 'Not ready yet', icon: <CircleDashed size={14} /> },
+];
+
+export const SALE_OPTIONS: { key: SaleFilter; label: string; icon: React.ReactNode }[] = [
+  { key: 'sold', label: 'Sold, in part or whole', icon: <ShoppingCart size={14} /> },
+  { key: 'unsold', label: 'Nothing sold yet', icon: <Tag size={14} /> },
 ];
 
 export const TASK_OPTIONS: { key: TaskKey; label: string; icon: React.ReactNode }[] = [
@@ -80,6 +86,8 @@ interface FilterDrawerProps {
   onToggleDiscrepancy: (key: DiscrepancyFilter) => void;
   research: ResearchFilter[];
   onToggleResearch: (key: ResearchFilter) => void;
+  sales: SaleFilter[];
+  onToggleSale: (key: SaleFilter) => void;
   researchEnabled: boolean;
   needsReview: boolean;
   onToggleNeedsReview: () => void;
@@ -114,6 +122,8 @@ export function FilterDrawer({
   onToggleDiscrepancy,
   research,
   onToggleResearch,
+  sales,
+  onToggleSale,
   researchEnabled,
   needsReview,
   onToggleNeedsReview,
@@ -257,6 +267,24 @@ export function FilterDrawer({
                     onChange={() => onToggleMargin(opt.key)}
                     className="h-4 w-4 shrink-0 accent-primary"
                   />
+                  {opt.label}
+                </label>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <span className="mb-1 block text-xs font-semibold text-textMuted">Sales</span>
+            <div className="space-y-2 rounded-btn border border-border p-3">
+              {SALE_OPTIONS.map((opt) => (
+                <label key={opt.key} className="flex cursor-pointer items-center gap-2 text-xs text-textPri">
+                  <input
+                    type="checkbox"
+                    checked={sales.includes(opt.key)}
+                    onChange={() => onToggleSale(opt.key)}
+                    className="h-4 w-4 shrink-0 accent-primary"
+                  />
+                  <span className="text-textMuted">{opt.icon}</span>
                   {opt.label}
                 </label>
               ))}

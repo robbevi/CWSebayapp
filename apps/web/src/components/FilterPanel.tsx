@@ -6,7 +6,7 @@ import { useUIStore, type SortKey } from '../state/useUIStore';
 import { cn } from '../lib/cn';
 import { AddPartModal } from './AddPartModal';
 import { DISCREPANCY_LABELS } from '@warehouse/shared';
-import { FilterDrawer, RESEARCH_OPTIONS, STATUS_OPTIONS, TASK_OPTIONS } from './FilterDrawer';
+import { FilterDrawer, RESEARCH_OPTIONS, SALE_OPTIONS, STATUS_OPTIONS, TASK_OPTIONS } from './FilterDrawer';
 import { Input } from './ui/Input';
 import { SelectDropdown } from './ui/SelectDropdown';
 
@@ -53,6 +53,7 @@ export function FilterPanel() {
     statuses,
     completedTasks,
     research,
+    sales,
     margins,
     discrepancies,
     needsReview,
@@ -86,6 +87,10 @@ export function FilterPanel() {
 
   const toggleStatus = (key: (typeof statuses)[number]) => {
     set({ statuses: statuses.includes(key) ? statuses.filter((s) => s !== key) : [...statuses, key] });
+  };
+
+  const toggleSale = (key: (typeof sales)[number]) => {
+    set({ sales: sales.includes(key) ? sales.filter((x) => x !== key) : [...sales, key] });
   };
 
   const toggleResearch = (key: (typeof research)[number]) => {
@@ -130,6 +135,11 @@ export function FilterPanel() {
       key: 'completedTasks',
       label: `Completed: ${completedTasks.map((t) => TASK_OPTIONS.find((o) => o.key === t)?.label ?? t).join(', ')}`,
       onRemove: () => set({ completedTasks: [] }),
+    },
+    sales.length > 0 && {
+      key: 'sales',
+      label: `Sales: ${sales.map((x) => SALE_OPTIONS.find((o) => o.key === x)?.label ?? x).join(', ')}`,
+      onRemove: () => set({ sales: [] }),
     },
     research.length > 0 && {
       key: 'research',
@@ -266,6 +276,8 @@ export function FilterPanel() {
           onToggleDiscrepancy={toggleDiscrepancy}
           research={research}
           onToggleResearch={toggleResearch}
+          sales={sales}
+          onToggleSale={toggleSale}
           researchEnabled={!!status?.research}
           needsReview={needsReview}
           onToggleNeedsReview={() => set({ needsReview: !needsReview })}

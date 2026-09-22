@@ -8,8 +8,10 @@ import {
   indexListings,
   indexSales,
   listingFor,
+  salesForGroup,
   type Listing,
   type PartGroup,
+  type SalesIndex,
   type TaskKey,
   type WorkflowStatus,
 } from '@warehouse/shared';
@@ -17,7 +19,7 @@ import { useInventoryParts } from '../hooks/useInventoryParts';
 import { isResearched, useResearchedSkus } from '../hooks/useResearchedSkus';
 import { useListings } from '../hooks/useListings';
 import { useSales } from '../hooks/useSales';
-import { useUIStore, type ResearchFilter, type SortKey } from '../state/useUIStore';
+import { useUIStore, type ResearchFilter, type SaleFilter, type SortKey } from '../state/useUIStore';
 import { BucketColumn } from './BucketColumn';
 
 // Searches every row behind the SKU, so a part is still findable by a bin or site that
@@ -53,6 +55,11 @@ function researchState(g: PartGroup, researched: Set<string>): ResearchFilter {
 function matchesResearch(g: PartGroup, filters: ResearchFilter[], researched: Set<string>): boolean {
   if (filters.length === 0) return true;
   return filters.includes(researchState(g, researched));
+}
+
+function matchesSales(g: PartGroup, filters: SaleFilter[], salesIndex: SalesIndex): boolean {
+  if (filters.length === 0) return true;
+  return filters.includes(salesForGroup(g, salesIndex).length > 0 ? 'sold' : 'unsold');
 }
 
 function matchesCompletedTasks(g: PartGroup, completedTasks: TaskKey[]): boolean {
@@ -166,6 +173,7 @@ export function KanbanBoard() {
     statuses,
     completedTasks,
     research,
+    sales: saleFilters,
     margins,
     discrepancies,
     needsReview,
@@ -188,6 +196,7 @@ export function KanbanBoard() {
         matchesSet(g.records.map((r) => r.manufacturer), manufacturers) &&
         matchesCompletedTasks(g, completedTasks) &&
         matchesResearch(g, research, researched) &&
+        matchesSales(g, saleFilters, salesIndex) &&
         (margins.length === 0 || margins.includes(g.grossMarginStatus as (typeof margins)[number])) &&
         (discrepancies.length === 0 ||
           discrepancies.includes(getGroupDiscrepancy(g)?.kind as (typeof discrepancies)[number])) &&
@@ -205,6 +214,8 @@ export function KanbanBoard() {
     completedTasks,
     research,
     researched,
+    saleFilters,
+    salesIndex,
     margins,
     discrepancies,
     needsReview,

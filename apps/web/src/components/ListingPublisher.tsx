@@ -8,6 +8,9 @@ import {
   MAX_TITLE,
   parseAgentOutput,
   researchMismatch,
+  SCHEDULE_MAX_DAYS,
+  SCHEDULE_MIN_MINUTES,
+  scheduleProblem,
   tradingCondition,
   type AgentListing,
   type CategorySuggestion,
@@ -17,7 +20,21 @@ import {
   type PolicyChoice,
   type SellerPolicy,
 } from '@warehouse/shared';
-import { AlertTriangle, Check, ChevronDown, ClipboardCopy, Eye, Info, Plus, RotateCcw, ShieldCheck, Sparkles, Tag, X } from 'lucide-react';
+import {
+  AlertTriangle,
+  CalendarClock,
+  Check,
+  ChevronDown,
+  ClipboardCopy,
+  Eye,
+  Info,
+  Plus,
+  RotateCcw,
+  ShieldCheck,
+  Sparkles,
+  Tag,
+  X,
+} from 'lucide-react';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import {
   useCategorySuggestions,
@@ -222,6 +239,20 @@ function CategoryPicker({
   );
 }
 
+/** A datetime-local value in the browser's own timezone, which is how the input reads it. */
+function inputValue(date: Date): string {
+  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60_000);
+  return local.toISOString().slice(0, 16);
+}
+
+/** Tomorrow morning: far enough off to be reviewed, close enough to not be forgotten. */
+function defaultScheduleAt(): string {
+  const at = new Date();
+  at.setDate(at.getDate() + 1);
+  at.setHours(9, 0, 0, 0);
+  return inputValue(at);
+}
+
 export function ListingPublisher({ group, onPublished }: { group: PartGroup; onPublished: (itemId: string) => void }) {
   const saved = useMemo(() => load<Draft>(draftKey(group.sku)), [group.sku]);
   const [open, setOpen] = useState(!!saved?.listing);
@@ -236,6 +267,10 @@ export function ListingPublisher({ group, onPublished }: { group: PartGroup; onP
   const [parseError, setParseError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
+  // Empty means list now. A scheduled listing waits under Scheduled in Seller Hub, where it
+  // can be read over once more before it goes live.
+  const [scheduleAt, setScheduleAt] = useState('');
+  const [scheduleError, setScheduleError] = useState<string | null>(null);
   const [policies, setPolicies] = useState<PolicyChoice | null>(() => load<PolicyChoice>(POLICY_KEY));
   const [check, setCheck] = useState<{ key: string; result: ListingCheck } | null>(null);
   const currentUser = useUserStore((s) => s.currentUser);
@@ -382,12 +417,30 @@ export function ListingPublisher({ group, onPublished }: { group: PartGroup; onP
 
   const runPublish = () => {
     if (!listing || !policies || !checked?.ok) return;
+    const startsAt = scheduleAt ? new Date(scheduleAt) : null;
+    if (startsAt) {
+      const problem = scheduleProblem(startsAt.toISOString());
+      if (problem) {
+        setScheduleError(problem);
+        return;
+      }
+    }
     const confirmed = window.confirm(
-      `Publish "${listing.title}" to eBay at $${listing.price?.toFixed(2)} (qty ${quantity})?\n\nIt goes live immediately.`
+      `Publish "${listing.title}" to eBay at $${listing.price?.toFixed(2)} (qty ${quantity})?\n\n${
+        startsAt
+          ? `It waits under Scheduled in Seller Hub until ${startsAt.toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}.`
+          : 'It goes live immediately.'
+      }`
     );
     if (!confirmed) return;
     publish.mutate(
-      { partId: group.primary.id, listing, policies, submittedBy: currentUser ?? undefined },
+      {
+        partId: group.primary.id,
+        listing,
+        policies,
+        submittedBy: currentUser ?? undefined,
+        scheduleTime: startsAt ? startsAt.toISOString() : undefined,
+      },
       {
         onSuccess: (result) => {
           store(draftKey(group.sku), null);
@@ -756,6 +809,42 @@ export function ListingPublisher({ group, onPublished }: { group: PartGroup; onP
           {!isAdmin && checked?.ok && (
             <p className="text-[11px] text-textMuted">eBay accepts this listing. Only an admin can publish it.</p>
           )}
+          {/* Scheduling is eBay's own: the listing is created now and held until the time
+              given, so nothing has to keep running here for it to go live. */}
+          <div className="flex flex-wrap items-center gap-2 text-[11px] text-textMuted">
+            <span className="flex items-center gap-1.5 font-semibold text-textPri">
+              <CalendarClock size={13} /> Start
+            </span>
+            <select
+              aria-label="When the listing should start"
+              value={scheduleAt ? 'later' : 'now'}
+              onChange={(e) => {
+                setScheduleError(null);
+                setScheduleAt(e.target.value === 'now' ? '' : defaultScheduleAt());
+              }}
+              className="rounded-btn border border-border bg-surface px-2 py-1 text-xs text-textPri"
+            >
+              <option value="now">Immediately</option>
+              <option value="later">At a set time</option>
+            </select>
+            {scheduleAt && (
+              <input
+                type="datetime-local"
+                aria-label="Listing start time"
+                value={scheduleAt}
+                min={inputValue(new Date(Date.now() + SCHEDULE_MIN_MINUTES * 60_000))}
+                max={inputValue(new Date(Date.now() + SCHEDULE_MAX_DAYS * 24 * 60 * 60_000))}
+                onChange={(e) => {
+                  setScheduleError(null);
+                  setScheduleAt(e.target.value);
+                }}
+                className="rounded-btn border border-border bg-surface px-2 py-1 text-xs text-textPri"
+              />
+            )}
+            {scheduleAt && !scheduleError && <span>Waits under Scheduled in Seller Hub until then.</span>}
+            {scheduleError && <span className="font-semibold text-red-600">{scheduleError}</span>}
+          </div>
+
           <div className="flex flex-wrap gap-2">
             <Button type="button" variant="ghost" onClick={startOver} disabled={busy}>
               <RotateCcw size={14} /> Start over
@@ -777,7 +866,13 @@ export function ListingPublisher({ group, onPublished }: { group: PartGroup; onP
                 title={isAdmin ? undefined : 'Only an admin can publish to eBay'}
               >
                 <Tag size={14} />
-                {publish.isPending ? 'Publishing…' : 'Publish to eBay'}
+                {publish.isPending
+                  ? scheduleAt
+                    ? 'Scheduling…'
+                    : 'Publishing…'
+                  : scheduleAt
+                    ? 'Schedule on eBay'
+                    : 'Publish to eBay'}
               </Button>
             </div>
           </div>

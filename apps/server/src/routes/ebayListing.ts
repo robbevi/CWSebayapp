@@ -6,6 +6,7 @@ import {
   groupPartsBySku,
   listingProblems,
   researchMismatch,
+  scheduleProblem,
   tradingCondition,
   type ListingCheck,
   type PartGroup,
@@ -82,8 +83,18 @@ async function prepare(
   if (!isEbayConfigured()) throw new HttpError(503, 'eBay is not connected.');
   if (!isGoogleConfigured()) throw new HttpError(503, 'No data backend is configured for this environment.');
 
-  const b = (body ?? {}) as { listing?: unknown; policies?: Partial<PolicyChoice> };
+  const b = (body ?? {}) as { listing?: unknown; policies?: Partial<PolicyChoice>; scheduleTime?: unknown };
   if (!b.listing) throw new HttpError(400, 'No listing was sent.');
+
+  // A start time is optional. eBay then holds the listing under Scheduled in Seller Hub,
+  // which is where a last look before it goes live can happen.
+  let scheduleTime: string | undefined;
+  if (b.scheduleTime != null && b.scheduleTime !== '') {
+    if (typeof b.scheduleTime !== 'string') throw new HttpError(400, 'That is not a time eBay can read.');
+    const problem = scheduleProblem(b.scheduleTime);
+    if (problem) throw new HttpError(400, problem);
+    scheduleTime = new Date(b.scheduleTime).toISOString();
+  }
 
   const group = groupPartsBySku(await getAllParts()).find((g) => g.records.some((r) => r.id === partId));
   if (!group) throw new HttpError(404, 'Part not found.');
@@ -127,6 +138,7 @@ async function prepare(
     conditionLabel: condition.label,
     input: {
       listing,
+      scheduleTime,
       sku: group.sku,
       quantity,
       conditionId: condition.id,
@@ -201,6 +213,7 @@ ebayListingRouter.post('/parts/:id/listing/publish', requireAdmin, async (req, r
     publishing.add(sku);
 
     const listed = await publishListing(input);
+    const scheduledFor = input.scheduleTime;
     recentlyPublished.set(group.sku, Date.now());
     const submittedBy = req.user?.name;
 
@@ -220,7 +233,7 @@ ebayListingRouter.post('/parts/:id/listing/publish', requireAdmin, async (req, r
       note = `the next eBay sync will link it (${err instanceof Error ? err.message : 'write failed'})`;
     }
 
-    const body: PublishResult = { ...listed, recorded, note };
+    const body: PublishResult = { ...listed, recorded, note, scheduledFor };
     res.json(body);
   } catch (err) {
     fail(err, res, next);

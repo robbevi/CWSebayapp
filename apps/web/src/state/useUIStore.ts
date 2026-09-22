@@ -28,6 +28,9 @@ export type DiscrepancyFilter = 'shortage' | 'overage' | 'notFound';
  */
 export type ResearchFilter = 'researched' | 'ready' | 'notReady';
 
+/** Whether anything has sold. Sold parts stay on the board, in the Listed / Sold column. */
+export type SaleFilter = 'sold' | 'unsold';
+
 interface UIState {
   search: string;
   sites: string[];
@@ -39,6 +42,7 @@ interface UIState {
   margins: MarginFilter[];
   discrepancies: DiscrepancyFilter[];
   research: ResearchFilter[];
+  sales: SaleFilter[];
   needsReview: boolean;
   sort: SortKey;
   selectedId: string | null;
@@ -58,6 +62,7 @@ const DEFAULTS = {
   margins: [] as MarginFilter[],
   discrepancies: [] as DiscrepancyFilter[],
   research: [] as ResearchFilter[],
+  sales: [] as SaleFilter[],
   needsReview: false,
   sort: 'Bin Location' as SortKey,
 };
