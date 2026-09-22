@@ -21,11 +21,22 @@ export function isResearchConfigured(): boolean {
 export async function requestResearch(group: PartGroup): Promise<{ requestedAt: string }> {
   if (!env.researchUrl) throw new Error('Copilot research is not configured. Set SPARE_RESEARCH_URL.');
   const requestedAt = new Date().toISOString();
-  const res = await fetch(env.researchUrl, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ sku: group.sku, requestedAt, message: agentPrompt(group) }),
-  });
+  let res: Response;
+  try {
+    res = await fetch(env.researchUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sku: group.sku, requestedAt, message: agentPrompt(group) }),
+    });
+  } catch (err) {
+    // fetch's own errors quote the URL, signature and all, and this one reaches the app.
+    const bad = err instanceof TypeError && /parse URL/i.test(err.message);
+    throw new Error(
+      bad
+        ? 'SPARE_RESEARCH_URL is not a valid URL. Its value should be just the https:// address.'
+        : "Couldn't reach the Copilot research workflow."
+    );
+  }
   if (!res.ok) {
     // The body may echo the request URL; keep only the status and a short, URL-free reason.
     const reason = (await res.text()).replace(/https?:\/\/\S+/g, '[url]').slice(0, 200);

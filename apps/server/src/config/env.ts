@@ -115,6 +115,19 @@ function parseAppUsers(json: string | undefined): AppUser[] {
   return users;
 }
 
+/**
+ * A URL pasted into a dashboard, forgiving the usual slips: the whole .env line
+ * (NAME="...") instead of just its value, or the value still in quotes.
+ */
+export function cleanUrlVar(value: string | undefined): string | undefined {
+  const v = value
+    ?.trim()
+    .replace(/^[A-Z][A-Z0-9_]*\s*=\s*/, '')
+    .replace(/^(["'])(.*)\1$/, '$2')
+    .trim();
+  return v || undefined;
+}
+
 export const env = {
   tenantId: raw.AZURE_TENANT_ID,
   clientId: raw.AZURE_CLIENT_ID,
@@ -147,7 +160,7 @@ export const env = {
   ebayPublishing: raw.EBAY_PUBLISHING?.trim().toLowerCase() === 'on',
   // The Copilot Studio workflow's HTTP trigger. Its URL carries the access signature, so
   // it is set only in the environment.
-  researchUrl: raw.SPARE_RESEARCH_URL?.trim() || undefined,
+  researchUrl: cleanUrlVar(raw.SPARE_RESEARCH_URL),
   // Signs session cookies. Without it sessions end whenever the server restarts.
   sessionSecret: raw.SESSION_SECRET?.trim() || undefined,
   // Where the workflow saves each reply as <SKU>.md: Calfrac Files / SPARE Research.
