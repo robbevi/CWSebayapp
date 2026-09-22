@@ -1,9 +1,11 @@
 import {
   ArrowRight,
   Camera,
+  CircleDashed,
   ClipboardCheck,
   Factory,
   Flag,
+  Hourglass,
   ListChecks,
   MapPin,
   Sparkles,
@@ -36,8 +38,9 @@ export const DISCREPANCY_OPTIONS: { key: DiscrepancyFilter; label: string }[] = 
 ];
 
 export const RESEARCH_OPTIONS: { key: ResearchFilter; label: string; icon: React.ReactNode }[] = [
-  { key: 'researched', label: 'Research ready', icon: <Sparkles size={14} /> },
-  { key: 'notResearched', label: 'Not researched yet', icon: <Sparkles size={14} /> },
+  { key: 'researched', label: 'Researched', icon: <Sparkles size={14} /> },
+  { key: 'ready', label: 'Ready to research', icon: <Hourglass size={14} /> },
+  { key: 'notReady', label: 'Not ready yet', icon: <CircleDashed size={14} /> },
 ];
 
 export const TASK_OPTIONS: { key: TaskKey; label: string; icon: React.ReactNode }[] = [
@@ -75,8 +78,8 @@ interface FilterDrawerProps {
   onToggleMargin: (key: MarginFilter) => void;
   discrepancies: DiscrepancyFilter[];
   onToggleDiscrepancy: (key: DiscrepancyFilter) => void;
-  research: ResearchFilter | null;
-  onResearchChange: (next: ResearchFilter | null) => void;
+  research: ResearchFilter[];
+  onToggleResearch: (key: ResearchFilter) => void;
   researchEnabled: boolean;
   needsReview: boolean;
   onToggleNeedsReview: () => void;
@@ -110,7 +113,7 @@ export function FilterDrawer({
   discrepancies,
   onToggleDiscrepancy,
   research,
-  onResearchChange,
+  onToggleResearch,
   researchEnabled,
   needsReview,
   onToggleNeedsReview,
@@ -267,11 +270,9 @@ export function FilterDrawer({
                 {RESEARCH_OPTIONS.map((opt) => (
                   <label key={opt.key} className="flex cursor-pointer items-center gap-2 text-xs text-textPri">
                     <input
-                      type="radio"
-                      name="research"
-                      checked={research === opt.key}
-                      onChange={() => onResearchChange(research === opt.key ? null : opt.key)}
-                      onClick={() => research === opt.key && onResearchChange(null)}
+                      type="checkbox"
+                      checked={research.includes(opt.key)}
+                      onChange={() => onToggleResearch(opt.key)}
                       className="h-4 w-4 shrink-0 accent-primary"
                     />
                     <span className="text-textMuted">{opt.icon}</span>
@@ -279,9 +280,6 @@ export function FilterDrawer({
                   </label>
                 ))}
               </div>
-              <p className="mt-1.5 text-[11px] text-textMuted">
-                Whether Copilot has written the part up. Choose the same one again to clear it.
-              </p>
             </div>
           )}
 

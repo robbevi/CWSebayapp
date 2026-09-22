@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import {
   checkpointCount,
+  draftReadiness,
   getCheckpoints,
   getGroupDiscrepancy,
   groupPartsBySku,
@@ -39,9 +40,19 @@ function matchesSet(values: (string | undefined)[], selected: string[]): boolean
 // A part matches when it has finished every checked task. Checking more boxes narrows
 // rather than broadens: "photographed and listed" means both are done, which is how the
 // checklist reads to someone ticking boxes.
-function matchesResearch(g: PartGroup, filter: ResearchFilter | null, researched: Set<string>): boolean {
-  if (!filter) return true;
-  return isResearched(researched, g.sku) === (filter === 'researched');
+/**
+ * Where the part stands with Copilot. "Ready to research" is the same bar the backlog run
+ * uses — photographed, counted, graded and not yet listed — so the board and the run agree
+ * on what is waiting.
+ */
+function researchState(g: PartGroup, researched: Set<string>): ResearchFilter {
+  if (isResearched(researched, g.sku)) return 'researched';
+  return draftReadiness(g).ready ? 'ready' : 'notReady';
+}
+
+function matchesResearch(g: PartGroup, filters: ResearchFilter[], researched: Set<string>): boolean {
+  if (filters.length === 0) return true;
+  return filters.includes(researchState(g, researched));
 }
 
 function matchesCompletedTasks(g: PartGroup, completedTasks: TaskKey[]): boolean {

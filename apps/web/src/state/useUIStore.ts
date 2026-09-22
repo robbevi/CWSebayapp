@@ -22,8 +22,11 @@ export type MarginFilter = 'Positive Gross Margin' | 'Negative Gross Margin';
 
 export type DiscrepancyFilter = 'shortage' | 'overage' | 'notFound';
 
-/** Whether Copilot has written the part up yet. Empty means don't care. */
-export type ResearchFilter = 'researched' | 'notResearched';
+/**
+ * Where a part stands with Copilot: written up, waiting its turn, or not far enough along
+ * the warehouse work to be worth researching. Empty means don't care.
+ */
+export type ResearchFilter = 'researched' | 'ready' | 'notReady';
 
 interface UIState {
   search: string;
@@ -35,7 +38,7 @@ interface UIState {
   completedTasks: TaskKey[];
   margins: MarginFilter[];
   discrepancies: DiscrepancyFilter[];
-  research: ResearchFilter | null;
+  research: ResearchFilter[];
   needsReview: boolean;
   sort: SortKey;
   selectedId: string | null;
@@ -54,7 +57,7 @@ const DEFAULTS = {
   completedTasks: [] as TaskKey[],
   margins: [] as MarginFilter[],
   discrepancies: [] as DiscrepancyFilter[],
-  research: null as ResearchFilter | null,
+  research: [] as ResearchFilter[],
   needsReview: false,
   sort: 'Bin Location' as SortKey,
 };

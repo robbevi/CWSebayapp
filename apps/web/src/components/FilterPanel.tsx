@@ -88,6 +88,10 @@ export function FilterPanel() {
     set({ statuses: statuses.includes(key) ? statuses.filter((s) => s !== key) : [...statuses, key] });
   };
 
+  const toggleResearch = (key: (typeof research)[number]) => {
+    set({ research: research.includes(key) ? research.filter((r) => r !== key) : [...research, key] });
+  };
+
   const toggleTask = (key: (typeof completedTasks)[number]) => {
     set({
       completedTasks: completedTasks.includes(key)
@@ -127,10 +131,10 @@ export function FilterPanel() {
       label: `Completed: ${completedTasks.map((t) => TASK_OPTIONS.find((o) => o.key === t)?.label ?? t).join(', ')}`,
       onRemove: () => set({ completedTasks: [] }),
     },
-    research && {
+    research.length > 0 && {
       key: 'research',
-      label: RESEARCH_OPTIONS.find((o) => o.key === research)?.label ?? research,
-      onRemove: () => set({ research: null }),
+      label: `Research: ${research.map((r) => RESEARCH_OPTIONS.find((o) => o.key === r)?.label ?? r).join(', ')}`,
+      onRemove: () => set({ research: [] }),
     },
     margins.length > 0 && {
       key: 'margins',
@@ -261,7 +265,7 @@ export function FilterPanel() {
           discrepancies={discrepancies}
           onToggleDiscrepancy={toggleDiscrepancy}
           research={research}
-          onResearchChange={(next) => set({ research: next })}
+          onToggleResearch={toggleResearch}
           researchEnabled={!!status?.research}
           needsReview={needsReview}
           onToggleNeedsReview={() => set({ needsReview: !needsReview })}
