@@ -13,9 +13,10 @@ import {
   type WorkflowStatus,
 } from '@warehouse/shared';
 import { useInventoryParts } from '../hooks/useInventoryParts';
+import { isResearched, useResearchedSkus } from '../hooks/useResearchedSkus';
 import { useListings } from '../hooks/useListings';
 import { useSales } from '../hooks/useSales';
-import { useUIStore, type SortKey } from '../state/useUIStore';
+import { useUIStore, type ResearchFilter, type SortKey } from '../state/useUIStore';
 import { BucketColumn } from './BucketColumn';
 
 // Searches every row behind the SKU, so a part is still findable by a bin or site that
@@ -38,6 +39,11 @@ function matchesSet(values: (string | undefined)[], selected: string[]): boolean
 // A part matches when it has finished every checked task. Checking more boxes narrows
 // rather than broadens: "photographed and listed" means both are done, which is how the
 // checklist reads to someone ticking boxes.
+function matchesResearch(g: PartGroup, filter: ResearchFilter | null, researched: Set<string>): boolean {
+  if (!filter) return true;
+  return isResearched(researched, g.sku) === (filter === 'researched');
+}
+
 function matchesCompletedTasks(g: PartGroup, completedTasks: TaskKey[]): boolean {
   if (completedTasks.length === 0) return true;
   const checkpoints = getCheckpoints(g);
@@ -148,6 +154,7 @@ export function KanbanBoard() {
     manufacturers,
     statuses,
     completedTasks,
+    research,
     margins,
     discrepancies,
     needsReview,
@@ -156,6 +163,7 @@ export function KanbanBoard() {
 
   // Every row for a SKU is folded into one card. The sheet keeps its separate rows —
   // this is purely how the board reads them.
+  const researched = useResearchedSkus();
   const groups = useMemo(() => groupPartsBySku(data ?? []), [data]);
   const salesIndex = useMemo(() => indexSales(sales ?? []), [sales]);
   const listingsIndex = useMemo(() => indexListings(listings ?? []), [listings]);
@@ -168,6 +176,7 @@ export function KanbanBoard() {
         matchesSet(g.records.map((r) => r.newBinLocation), recoveryBins) &&
         matchesSet(g.records.map((r) => r.manufacturer), manufacturers) &&
         matchesCompletedTasks(g, completedTasks) &&
+        matchesResearch(g, research, researched) &&
         (margins.length === 0 || margins.includes(g.grossMarginStatus as (typeof margins)[number])) &&
         (discrepancies.length === 0 ||
           discrepancies.includes(getGroupDiscrepancy(g)?.kind as (typeof discrepancies)[number])) &&
@@ -175,7 +184,22 @@ export function KanbanBoard() {
         matchesSearch(g, search)
     );
     return sortParts(result, sort, listingsIndex);
-  }, [groups, search, sites, bins, recoveryBins, manufacturers, completedTasks, margins, discrepancies, needsReview, sort, listingsIndex]);
+  }, [
+    groups,
+    search,
+    sites,
+    bins,
+    recoveryBins,
+    manufacturers,
+    completedTasks,
+    research,
+    researched,
+    margins,
+    discrepancies,
+    needsReview,
+    sort,
+    listingsIndex,
+  ]);
 
   if (isLoading) {
     return <div className="py-16 text-center text-textMuted">Loading inventory…</div>;

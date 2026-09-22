@@ -22,6 +22,9 @@ export type MarginFilter = 'Positive Gross Margin' | 'Negative Gross Margin';
 
 export type DiscrepancyFilter = 'shortage' | 'overage' | 'notFound';
 
+/** Whether Copilot has written the part up yet. Empty means don't care. */
+export type ResearchFilter = 'researched' | 'notResearched';
+
 interface UIState {
   search: string;
   sites: string[];
@@ -32,6 +35,7 @@ interface UIState {
   completedTasks: TaskKey[];
   margins: MarginFilter[];
   discrepancies: DiscrepancyFilter[];
+  research: ResearchFilter | null;
   needsReview: boolean;
   sort: SortKey;
   selectedId: string | null;
@@ -50,6 +54,7 @@ const DEFAULTS = {
   completedTasks: [] as TaskKey[],
   margins: [] as MarginFilter[],
   discrepancies: [] as DiscrepancyFilter[],
+  research: null as ResearchFilter | null,
   needsReview: false,
   sort: 'Bin Location' as SortKey,
 };

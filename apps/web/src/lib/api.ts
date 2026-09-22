@@ -213,6 +213,13 @@ export async function fetchResearch(partId: string): Promise<ResearchResult> {
   return parseJson(res);
 }
 
+/** The SKUs Copilot has researched, lowercased, for the board's badge and filter. */
+export async function fetchResearchedSkus(): Promise<string[]> {
+  const res = await fetch('/api/research/skus');
+  const body = await parseJson<{ skus: string[] }>(res);
+  return body.skus;
+}
+
 /** A run of Copilot research over the parts that are ready to list but not yet researched. */
 export interface ResearchBacklog {
   running: boolean;

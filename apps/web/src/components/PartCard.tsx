@@ -5,6 +5,7 @@ import {
   ExternalLink,
   Factory,
   Flag,
+  Sparkles,
   Layers,
   MapPin,
   Boxes,
@@ -29,6 +30,7 @@ import {
   type SalesIndex,
 } from '@warehouse/shared';
 import { cn } from '../lib/cn';
+import { isResearched, useResearchedSkus } from '../hooks/useResearchedSkus';
 import { useUIStore } from '../state/useUIStore';
 import { Pill } from './ui/Pill';
 import { ProcessingStatusChips } from './ProcessingStatusChips';
@@ -47,6 +49,7 @@ export function PartCard({
   listingsIndex: Map<string, Listing>;
 }) {
   const set = useUIStore((s) => s.set);
+  const researched = useResearchedSkus();
   const sold = soldPosition(part, salesForGroup(part, salesIndex));
   // What eBay says it is asking, not what the spreadsheet hoped for. The two differ —
   // one belt is listed at $60 against a $44.99 basis — and the live figure is the one
@@ -107,6 +110,16 @@ export function PartCard({
             className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-purple-100 text-purple-700"
           >
             <Flag size={12} />
+          </span>
+        )}
+        {/* Copilot has written this part up: whoever lists it can go straight to eBay. */}
+        {isResearched(researched, part.sku) && !part.itemListed && (
+          <span
+            title="Copilot research is ready"
+            aria-label="Copilot research is ready"
+            className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-sky-100 text-sky-700"
+          >
+            <Sparkles size={12} />
           </span>
         )}
         {isPositiveMargin(part.grossMarginStatus) && (

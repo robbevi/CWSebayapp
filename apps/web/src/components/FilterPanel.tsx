@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ArrowUpDown, Filter, Plus, Search, X } from 'lucide-react';
 import { useInventoryParts } from '../hooks/useInventoryParts';
+import { useSalesStatus } from '../hooks/useSales';
 import { useUIStore, type SortKey } from '../state/useUIStore';
 import { cn } from '../lib/cn';
 import { AddPartModal } from './AddPartModal';
 import { DISCREPANCY_LABELS } from '@warehouse/shared';
-import { FilterDrawer, STATUS_OPTIONS, TASK_OPTIONS } from './FilterDrawer';
+import { FilterDrawer, RESEARCH_OPTIONS, STATUS_OPTIONS, TASK_OPTIONS } from './FilterDrawer';
 import { Input } from './ui/Input';
 import { SelectDropdown } from './ui/SelectDropdown';
 
@@ -42,6 +43,7 @@ function countBy(values: (string | undefined)[]): Record<string, number> {
 
 export function FilterPanel() {
   const { data: parts } = useInventoryParts();
+  const { data: status } = useSalesStatus();
   const {
     search,
     sites,
@@ -50,6 +52,7 @@ export function FilterPanel() {
     manufacturers,
     statuses,
     completedTasks,
+    research,
     margins,
     discrepancies,
     needsReview,
@@ -123,6 +126,11 @@ export function FilterPanel() {
       key: 'completedTasks',
       label: `Completed: ${completedTasks.map((t) => TASK_OPTIONS.find((o) => o.key === t)?.label ?? t).join(', ')}`,
       onRemove: () => set({ completedTasks: [] }),
+    },
+    research && {
+      key: 'research',
+      label: RESEARCH_OPTIONS.find((o) => o.key === research)?.label ?? research,
+      onRemove: () => set({ research: null }),
     },
     margins.length > 0 && {
       key: 'margins',
@@ -252,6 +260,9 @@ export function FilterPanel() {
           onToggleMargin={toggleMargin}
           discrepancies={discrepancies}
           onToggleDiscrepancy={toggleDiscrepancy}
+          research={research}
+          onResearchChange={(next) => set({ research: next })}
+          researchEnabled={!!status?.research}
           needsReview={needsReview}
           onToggleNeedsReview={() => set({ needsReview: !needsReview })}
         />

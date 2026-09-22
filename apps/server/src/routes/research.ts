@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { groupPartsBySku, type ResearchResult } from '@warehouse/shared';
-import { backlogGroups, batchStatus, startBatch, stopBatch } from '../ebay/researchBatch.js';
+import { backlogGroups, batchStatus, researchedSkus, startBatch, stopBatch } from '../ebay/researchBatch.js';
 import { isResearchConfigured, latestResearch, requestResearch } from '../ebay/researchService.js';
 import { requireAdmin } from '../middleware/auth.js';
 import { getAllParts } from '../google/sheetsService.js';
@@ -8,7 +8,7 @@ import { getAllParts } from '../google/sheetsService.js';
 export const researchRouter = Router();
 
 // Without a workflow URL there is nothing to call, so the routes don't exist.
-researchRouter.use(['/parts/:id/research', '/research/backlog'], (_req, res, next) => {
+researchRouter.use(['/parts/:id/research', '/research/backlog', '/research/skus'], (_req, res, next) => {
   if (isResearchConfigured()) next();
   else res.status(404).json({ error: 'Copilot research is not configured here.' });
 });
@@ -26,6 +26,25 @@ researchRouter.post('/parts/:id/research', async (req, res, next) => {
       return;
     }
     res.json(await requestResearch(group));
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * Which SKUs Copilot has written up, for the board's Researched badge and filter. One
+ * Drive listing serves the whole board, and it is cached: research arrives over minutes,
+ * so a slightly old answer costs nothing.
+ */
+const SKUS_TTL_MS = 60_000;
+let skusCache: { at: number; skus: string[] } | undefined;
+
+researchRouter.get('/research/skus', async (_req, res, next) => {
+  try {
+    if (!skusCache || Date.now() - skusCache.at > SKUS_TTL_MS) {
+      skusCache = { at: Date.now(), skus: [...(await researchedSkus())] };
+    }
+    res.json({ skus: skusCache.skus });
   } catch (err) {
     next(err);
   }

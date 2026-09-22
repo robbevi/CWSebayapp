@@ -1,7 +1,20 @@
-import { ArrowRight, Camera, ClipboardCheck, Factory, Flag, ListChecks, MapPin, Tag, TruckIcon, Wrench, X } from 'lucide-react';
+import {
+  ArrowRight,
+  Camera,
+  ClipboardCheck,
+  Factory,
+  Flag,
+  ListChecks,
+  MapPin,
+  Sparkles,
+  Tag,
+  TruckIcon,
+  Wrench,
+  X,
+} from 'lucide-react';
 import type { TaskKey, WorkflowStatus } from '@warehouse/shared';
 import { useBodyScrollLock } from '../hooks/useBodyScrollLock';
-import type { DiscrepancyFilter, MarginFilter } from '../state/useUIStore';
+import type { DiscrepancyFilter, MarginFilter, ResearchFilter } from '../state/useUIStore';
 import { Button } from './ui/Button';
 import { MultiSelectDropdown } from './ui/MultiSelectDropdown';
 
@@ -20,6 +33,11 @@ export const DISCREPANCY_OPTIONS: { key: DiscrepancyFilter; label: string }[] = 
   { key: 'shortage', label: 'Short (fewer than expected)' },
   { key: 'notFound', label: 'Not Found (none on shelf)' },
   { key: 'overage', label: 'Over (more than expected)' },
+];
+
+export const RESEARCH_OPTIONS: { key: ResearchFilter; label: string; icon: React.ReactNode }[] = [
+  { key: 'researched', label: 'Research ready', icon: <Sparkles size={14} /> },
+  { key: 'notResearched', label: 'Not researched yet', icon: <Sparkles size={14} /> },
 ];
 
 export const TASK_OPTIONS: { key: TaskKey; label: string; icon: React.ReactNode }[] = [
@@ -57,6 +75,9 @@ interface FilterDrawerProps {
   onToggleMargin: (key: MarginFilter) => void;
   discrepancies: DiscrepancyFilter[];
   onToggleDiscrepancy: (key: DiscrepancyFilter) => void;
+  research: ResearchFilter | null;
+  onResearchChange: (next: ResearchFilter | null) => void;
+  researchEnabled: boolean;
   needsReview: boolean;
   onToggleNeedsReview: () => void;
 }
@@ -88,6 +109,9 @@ export function FilterDrawer({
   onToggleMargin,
   discrepancies,
   onToggleDiscrepancy,
+  research,
+  onResearchChange,
+  researchEnabled,
   needsReview,
   onToggleNeedsReview,
 }: FilterDrawerProps) {
@@ -235,6 +259,31 @@ export function FilterDrawer({
               ))}
             </div>
           </div>
+
+          {researchEnabled && (
+            <div>
+              <span className="mb-1 block text-xs font-semibold text-textMuted">Copilot Research</span>
+              <div className="space-y-2 rounded-btn border border-border p-3">
+                {RESEARCH_OPTIONS.map((opt) => (
+                  <label key={opt.key} className="flex cursor-pointer items-center gap-2 text-xs text-textPri">
+                    <input
+                      type="radio"
+                      name="research"
+                      checked={research === opt.key}
+                      onChange={() => onResearchChange(research === opt.key ? null : opt.key)}
+                      onClick={() => research === opt.key && onResearchChange(null)}
+                      className="h-4 w-4 shrink-0 accent-primary"
+                    />
+                    <span className="text-textMuted">{opt.icon}</span>
+                    {opt.label}
+                  </label>
+                ))}
+              </div>
+              <p className="mt-1.5 text-[11px] text-textMuted">
+                Whether Copilot has written the part up. Choose the same one again to clear it.
+              </p>
+            </div>
+          )}
 
           <div>
             <span className="mb-1 block text-xs font-semibold text-textMuted">Tasks Completed</span>
