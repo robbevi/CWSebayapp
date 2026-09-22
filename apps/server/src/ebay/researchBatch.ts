@@ -14,9 +14,13 @@ import { isResearchConfigured, requestResearch } from './researchService.js';
  * plan sleeping — ends the run, and starting again picks up where it left off.
  */
 
-/** Long enough for the agent, which usually answers in 2–4 minutes. */
-const WAIT_MS = 8 * 60_000;
-const POLL_MS = 30_000;
+/**
+ * How long to wait for one reply. The agent usually answers in 2–4 minutes, but it has
+ * taken over a quarter of an hour when Copilot is busy, so this is generous: a reply that
+ * arrives after the run has moved on is not lost, it just isn't counted here.
+ */
+const WAIT_MS = 25 * 60_000;
+const POLL_MS = 20_000;
 /** A breather between parts, so a stuck run can still be stopped promptly. */
 const GAP_MS = 5_000;
 
@@ -27,8 +31,11 @@ export interface BatchStatus {
   sent: number;
   answered: number;
   failed: { sku: string; error: string }[];
-  /** The part being researched now. */
+  /** The part being researched now, and when it was sent. */
   current: string | null;
+  currentSince: string | null;
+  /** Parts whose reply hadn't arrived before the run moved on. It may still turn up. */
+  slow: string[];
   /** Ready-to-list parts with no research yet, as counted when the run started. */
   backlog: number;
   startedAt: string | null;
@@ -44,6 +51,8 @@ const state: BatchStatus = {
   answered: 0,
   failed: [],
   current: null,
+  currentSince: null,
+  slow: [],
   backlog: 0,
   startedAt: null,
   finishedAt: null,
@@ -81,7 +90,7 @@ export async function backlogGroups(): Promise<PartGroup[]> {
 }
 
 export function batchStatus(): BatchStatus {
-  return { ...state, failed: [...state.failed] };
+  return { ...state, failed: [...state.failed], slow: [...state.slow] };
 }
 
 export function stopBatch(who: string): BatchStatus {
@@ -107,6 +116,7 @@ async function run(groups: PartGroup[]): Promise<void> {
   for (const group of groups) {
     if (!state.running) break;
     state.current = group.sku;
+    state.currentSince = new Date().toISOString();
     try {
       await requestResearch(group);
       state.sent += 1;
@@ -122,12 +132,15 @@ async function run(groups: PartGroup[]): Promise<void> {
       await sleep(POLL_MS);
       arrived = await answered(group.sku).catch(() => false);
     }
+    // A slow reply is not a failure: it lands in Drive whenever the agent finishes, and
+    // the next run skips the part because the file is there.
     if (arrived) state.answered += 1;
-    else if (state.running) state.failed.push({ sku: group.sku, error: 'No reply from Copilot within 8 minutes' });
+    else if (state.running) state.slow.push(group.sku);
     await sleep(GAP_MS);
   }
   state.running = false;
   state.current = null;
+  state.currentSince = null;
   state.finishedAt = new Date().toISOString();
 }
 
@@ -144,6 +157,8 @@ export async function startBatch(limit: number, who: string): Promise<BatchStatu
     answered: 0,
     failed: [],
     current: null,
+    currentSince: null,
+    slow: [],
     backlog: queue.length,
     startedAt: new Date().toISOString(),
     finishedAt: null,

@@ -49,6 +49,9 @@ export function ResearchBacklog() {
 
   const s = status.data;
   const done = s ? s.answered : 0;
+  // Copilot is usually quick but has taken a quarter of an hour, so say how long this one
+  // has been going: a long wait is normal, and looks like a stall without it.
+  const waitingMins = s?.currentSince ? Math.round((Date.now() - Date.parse(s.currentSince)) / 60_000) : 0;
 
   return (
     <div className="mt-6">
@@ -63,7 +66,7 @@ export function ResearchBacklog() {
         <>
           <p className="mt-1 text-[11px] text-textMuted">
             {s.running
-              ? `Researching ${s.current ?? '…'} — ${done} of ${s.limit} done, about 3 minutes each. Leave SPARE open.`
+              ? `Researching ${s.current ?? '…'}${waitingMins >= 1 ? ` for ${waitingMins} ${waitingMins === 1 ? 'minute' : 'minutes'}` : ''} — ${done} of ${s.limit} done. Leave SPARE open.`
               : `${s.waiting} ${s.waiting === 1 ? 'part is' : 'parts are'} ready to list with no research yet. Copilot can write them up in the background.`}
           </p>
 
@@ -100,6 +103,12 @@ export function ResearchBacklog() {
             <p className="mt-1.5 text-[11px] text-textMuted">
               Last run: {s.answered} researched of {s.sent} sent
               {s.stoppedBy ? `, stopped by ${s.stoppedBy}` : ''}.
+            </p>
+          )}
+          {s.slow.length > 0 && (
+            <p className="mt-1.5 text-[11px] text-textMuted">
+              Still with Copilot when the run moved on: {s.slow.join(', ')}. Their research turns up on the part
+              itself once the agent finishes.
             </p>
           )}
           {s.failed.length > 0 && (

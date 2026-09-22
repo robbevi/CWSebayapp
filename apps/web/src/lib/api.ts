@@ -221,6 +221,9 @@ export interface ResearchBacklog {
   answered: number;
   failed: { sku: string; error: string }[];
   current: string | null;
+  currentSince: string | null;
+  /** Parts the run moved on from before Copilot answered. The reply may still arrive. */
+  slow: string[];
   /** Parts still waiting for research, this run's queue included. */
   waiting: number;
   startedAt: string | null;
