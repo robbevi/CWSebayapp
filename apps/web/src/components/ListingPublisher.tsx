@@ -413,7 +413,7 @@ export function ListingPublisher({ group, onPublished }: { group: PartGroup; onP
               ? checked?.ok
                 ? 'Checked with eBay — ready to publish'
                 : 'Review the details, check with eBay, then publish'
-              : `Research with your agent, paste the answer, publish with ${group.photos.length} SPARE ${group.photos.length === 1 ? 'photo' : 'photos'}`}
+              : `${researchEnabled ? 'Research with Copilot' : 'Research with your agent, paste the answer'}, publish with ${group.photos.length} SPARE ${group.photos.length === 1 ? 'photo' : 'photos'}`}
           </span>
         </span>
         <ChevronDown size={16} className={`shrink-0 text-textMuted transition-transform ${open ? 'rotate-180' : ''}`} />
@@ -453,30 +453,34 @@ export function ListingPublisher({ group, onPublished }: { group: PartGroup; onP
               </div>
             </div>
           )}
-          {researchEnabled && (
-            <p className="text-[10px] font-semibold uppercase tracking-wide text-textMuted">Or by hand in Copilot chat</p>
+          {researchEnabled && parseError && <p className="text-[11px] text-red-600">{parseError}</p>}
+          {/* By hand in Copilot chat: only while the research workflow isn't set up, so there
+              is always some way to list. */}
+          {!researchEnabled && (
+            <>
+              <div>
+                <Label>1. Give your agent this part</Label>
+                <Button type="button" variant="outline" onClick={copyPrompt} className="w-full">
+                  {copied ? <Check size={14} /> : <ClipboardCopy size={14} />}
+                  {copied ? 'Copied — paste it into Copilot' : 'Copy prompt for the agent'}
+                </Button>
+              </div>
+              <div>
+                <Label>2. Paste the agent&apos;s answer</Label>
+                <Textarea
+                  rows={6}
+                  value={text}
+                  onChange={(e) => setText(e.target.value)}
+                  placeholder='{ "title": "…", "categoryId": "…", "price": … }'
+                  className="font-mono text-[11px]"
+                />
+                {parseError && <p className="mt-1 text-[11px] text-red-600">{parseError}</p>}
+              </div>
+              <Button type="button" onClick={readAnswer} disabled={!text.trim()} className="w-full">
+                Read answer
+              </Button>
+            </>
           )}
-          <div>
-            <Label>1. Give your agent this part</Label>
-            <Button type="button" variant="outline" onClick={copyPrompt} className="w-full">
-              {copied ? <Check size={14} /> : <ClipboardCopy size={14} />}
-              {copied ? 'Copied — paste it into Copilot' : 'Copy prompt for the agent'}
-            </Button>
-          </div>
-          <div>
-            <Label>2. Paste the agent&apos;s answer</Label>
-            <Textarea
-              rows={6}
-              value={text}
-              onChange={(e) => setText(e.target.value)}
-              placeholder='{ "title": "…", "categoryId": "…", "price": … }'
-              className="font-mono text-[11px]"
-            />
-            {parseError && <p className="mt-1 text-[11px] text-red-600">{parseError}</p>}
-          </div>
-          <Button type="button" onClick={readAnswer} disabled={!text.trim()} className="w-full">
-            Read answer
-          </Button>
         </div>
       )}
 
@@ -492,7 +496,7 @@ export function ListingPublisher({ group, onPublished }: { group: PartGroup; onP
           {mismatch && (
             <div className="flex gap-1.5 rounded-btn border border-red-500/40 bg-red-500/10 p-2.5 text-[11px] font-semibold text-red-600">
               <X size={12} className="mt-0.5 shrink-0" />
-              {mismatch} Start over and paste the research for this part.
+              {mismatch} Start over and {researchEnabled ? 'research this part again' : 'paste the research for this part'}.
             </div>
           )}
           {conditionWarning && (
