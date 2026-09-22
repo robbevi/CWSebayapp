@@ -10,3 +10,4 @@ export * from './listings.js';
 export * from './dashboardStats.js';
 export * from './programStats.js';
 export * from './sales.js';
+export * from './columnSummary.js';

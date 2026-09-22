@@ -160,6 +160,13 @@ const GRID_COLS: Record<number, string> = {
   3: 'lg:grid-cols-3',
 };
 
+/** Cards were drawn for a third of the board; a lone column shouldn't stretch to fill it. */
+const COLUMN_WIDTH: Record<number, string> = {
+  1: 'lg:max-w-md',
+  2: 'lg:max-w-3xl',
+  3: 'lg:max-w-none',
+};
+
 export function KanbanBoard() {
   const { data, isLoading } = useInventoryParts();
   const { data: sales } = useSales();
@@ -232,16 +239,26 @@ export function KanbanBoard() {
     Processing: filtered.filter((p) => p.workflowStatus === 'Processing'),
     Listed: filtered.filter((p) => p.workflowStatus === 'Listed'),
   };
+  // The same counts before filtering, so a column can say "12 of 330" rather than leaving
+  // someone to wonder whether the pile really is that small.
+  const totals: Record<WorkflowStatus, number> = {
+    NotStarted: groups.filter((p) => p.workflowStatus === 'NotStarted').length,
+    Processing: groups.filter((p) => p.workflowStatus === 'Processing').length,
+    Listed: groups.filter((p) => p.workflowStatus === 'Listed').length,
+  };
 
   const visibleStatuses = statuses.length === 0 ? ALL_STATUSES : ALL_STATUSES.filter((s) => statuses.includes(s));
 
   return (
-    <div className={`grid grid-cols-1 gap-4 lg:h-full ${GRID_COLS[visibleStatuses.length]}`}>
+    // One or two columns keep a readable width and sit in the middle, rather than a single
+    // column stretched across a desk monitor.
+    <div className={`mx-auto grid w-full grid-cols-1 gap-4 lg:h-full ${GRID_COLS[visibleStatuses.length]} ${COLUMN_WIDTH[visibleStatuses.length]}`}>
       {visibleStatuses.map((status) => (
         <BucketColumn
           key={status}
           status={status}
           parts={buckets[status]}
+          total={totals[status]}
           salesIndex={salesIndex}
           listingsIndex={listingsIndex}
         />

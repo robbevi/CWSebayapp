@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, Boxes, ChevronDown, Coins, Layers, Tag, TrendingDown, TrendingUp } from 'lucide-react';
 import { computeDashboardStats, groupPartsBySku } from '@warehouse/shared';
 import { useInventoryParts } from '../hooks/useInventoryParts';
+import { useUIStore } from '../state/useUIStore';
 import { useSales } from '../hooks/useSales';
 import { cn } from '../lib/cn';
 
@@ -15,17 +16,35 @@ function Card({
   icon,
   children,
   tone,
+  onClick,
+  active,
+  title,
 }: {
   label: string;
   value: string;
   icon: React.ReactNode;
   children?: React.ReactNode;
   tone?: 'warn';
+  /** Given, the whole tile becomes the way to filter the board by what it counts. */
+  onClick?: () => void;
+  active?: boolean;
+  title?: string;
 }) {
+  const Tag = onClick ? 'button' : 'div';
   return (
     // A column with the figure pushed down, so values sit on one line across the strip
     // however long a label runs.
-    <div className="flex h-full flex-col rounded-card border border-border bg-surface p-3">
+    <Tag
+      type={onClick ? 'button' : undefined}
+      onClick={onClick}
+      title={title}
+      aria-pressed={onClick ? !!active : undefined}
+      className={cn(
+        'flex h-full flex-col rounded-card border bg-surface p-3 text-left',
+        active ? 'border-primary ring-1 ring-primary/40' : 'border-border',
+        onClick && 'hover:border-primary/50'
+      )}
+    >
       <div className="mb-1 flex items-start gap-1.5 text-textMuted">
         <span className="mt-[1px] shrink-0">{icon}</span>
         <span className="text-[11px] font-semibold uppercase leading-tight tracking-wide">{label}</span>
@@ -39,7 +58,7 @@ function Card({
         {value}
       </div>
       <div className="min-h-[16px] text-[11px] leading-tight text-textMuted">{children ?? '\u00A0'}</div>
-    </div>
+    </Tag>
   );
 }
 
@@ -70,6 +89,8 @@ const COLLAPSED_KEY = 'spare.stats.collapsed';
 export function StatStrip() {
   const { data: parts } = useInventoryParts();
   const { data: sales } = useSales();
+  const needsReview = useUIStore((s) => s.needsReview);
+  const set = useUIStore((s) => s.set);
   // Remembered per browser: someone who works from the board all day shouldn't have to
   // put the strip away every morning.
   const [collapsed, setCollapsed] = useState(() => {
@@ -100,7 +121,7 @@ export function StatStrip() {
       type="button"
       onClick={() => setCollapsed((c) => !c)}
       aria-expanded={!collapsed}
-      className="flex shrink-0 items-center gap-1 rounded-btn px-1.5 py-1 text-[11px] font-semibold text-textMuted hover:bg-surfaceMuted hover:text-textPri"
+      className="flex h-auto min-h-0 shrink-0 items-center gap-1 rounded-btn px-1.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-textMuted hover:bg-surfaceMuted hover:text-textPri"
       title={collapsed ? 'Show the summary' : 'Hide the summary'}
     >
       {collapsed ? 'Show summary' : 'Hide summary'}
@@ -139,12 +160,15 @@ export function StatStrip() {
         value={stats.needsReview.toLocaleString()}
         icon={<AlertTriangle size={13} />}
         tone={stats.needsReview > 0 ? 'warn' : undefined}
+        onClick={stats.needsReview > 0 ? () => set({ needsReview: !needsReview }) : undefined}
+        active={needsReview}
+        title={needsReview ? 'Showing only flagged parts — click again to show everything' : 'Show only flagged parts'}
       >
         {stats.needsReview === 0 ? 'nothing flagged' : 'awaiting a second look'}
       </Card>
       {/* Sits over the last card's top-right corner: a control of the strip, not a sixth
           thing to read. */}
-      <div className="pointer-events-none absolute right-1 top-1 flex justify-end">
+      <div className="pointer-events-none absolute right-2.5 top-2.5 flex justify-end">
         <span className="pointer-events-auto">{toggle}</span>
       </div>
     </div>

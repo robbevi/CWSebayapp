@@ -10,6 +10,7 @@ import {
   type WorkflowStatus,
 } from '@warehouse/shared';
 import { cn } from '../lib/cn';
+import { ColumnSummaryDialog } from './ColumnSummaryDialog';
 import { PartCard } from './PartCard';
 import { SelectDropdown } from './ui/SelectDropdown';
 
@@ -46,11 +47,14 @@ function columnValue(
 export function BucketColumn({
   status,
   parts,
+  total,
   salesIndex,
   listingsIndex,
 }: {
   status: WorkflowStatus;
   parts: PartGroup[];
+  /** Everything in this column before any filter, so a filtered count says what it is out of. */
+  total: number;
   salesIndex: SalesIndex;
   listingsIndex: Map<string, Listing>;
 }) {
@@ -74,6 +78,10 @@ export function BucketColumn({
   // hundreds of cards. Collapsed by default there; on desktop the columns sit side by side
   // and are always open, so this state is simply ignored from `lg:` up.
   const [expanded, setExpanded] = useState(false);
+  const [summaryOpen, setSummaryOpen] = useState(false);
+
+  // A count on its own can't say whether a column is small or merely filtered.
+  const filtered = shown.length !== total;
 
   const subtotal = useMemo(() => columnValue(status, shown, listingsIndex), [status, shown, listingsIndex]);
 
@@ -139,13 +147,18 @@ export function BucketColumn({
                   <span className="font-medium">{ebayView === 'sold' ? 'Sold' : 'Listed'}</span>
                 )}
                 {shown.length}
+                {filtered && ebayView === 'all' && <span className="font-normal opacity-70"> of {total}</span>}
                 <ChevronDown size={12} className={cn('transition-transform', open && 'rotate-180')} />
               </span>
             )}
           />
         ) : (
-          <span className="rounded-pill border border-border bg-surface px-2.5 py-1 text-xs font-semibold text-textMuted">
+          <span
+            className="rounded-pill border border-border bg-surface px-2.5 py-1 text-xs font-semibold text-textMuted"
+            title={filtered ? `${shown.length} of ${total} shown by the current filters` : undefined}
+          >
             {shown.length}
+            {filtered && <span className="font-normal text-textMuted/70"> of {total}</span>}
           </span>
         )}
 
@@ -159,6 +172,17 @@ export function BucketColumn({
             size={18}
             className={cn('text-textMuted transition-transform', expanded && 'rotate-180')}
           />
+        </button>
+        {/* Desktop keeps the columns open, so the same arrow opens what the column adds up
+            to instead of collapsing it. */}
+        <button
+          type="button"
+          onClick={() => setSummaryOpen(true)}
+          aria-label={`${meta.label} summary`}
+          title="Everything this column adds up to"
+          className="hidden min-h-0 shrink-0 rounded-btn p-1 text-textMuted hover:bg-surface hover:text-textPri lg:block"
+        >
+          <ChevronDown size={18} />
         </button>
       </div>
 
@@ -178,6 +202,17 @@ export function BucketColumn({
           ))
         )}
       </div>
+
+      {summaryOpen && (
+        <ColumnSummaryDialog
+          status={status}
+          groups={shown}
+          filteredFrom={total}
+          salesIndex={salesIndex}
+          listingsIndex={listingsIndex}
+          onClose={() => setSummaryOpen(false)}
+        />
+      )}
     </div>
   );
 }
