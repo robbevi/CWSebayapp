@@ -14,10 +14,11 @@ import { SelectDropdown } from './ui/SelectDropdown';
 const NO_SECOND_SORT = 'None';
 
 /** The round buttons a phone gets instead of four stacked full-width controls. */
-const ROUND = 'flex h-11 min-h-0 shrink-0 items-center justify-center gap-1.5 rounded-full border w-11 sm:w-auto sm:px-4';
+const ROUND =
+  'flex h-11 min-h-0 shrink-0 items-center justify-center gap-2 rounded-full border w-11 sm:h-12 sm:w-auto sm:px-5';
 const ROUND_PLAIN = `${ROUND} border-border bg-surface text-textPri`;
 /** The word beside an icon: room for it from sm up, never on a phone. */
-const PILL_LABEL = 'hidden text-xs font-medium sm:inline';
+const PILL_LABEL = 'hidden text-sm font-medium sm:inline';
 
 const SORT_OPTIONS: SortKey[] = [
   'SKU',
@@ -196,7 +197,7 @@ export function FilterPanel() {
   ].filter((c): c is { key: string; label: string; onRemove: () => void } => !!c);
 
   return (
-    <div className="relative rounded-card bg-surfaceMuted p-0 sm:p-4 lg:p-1.5">
+    <div className="relative rounded-card bg-surfaceMuted p-0 lg:p-1.5">
       <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:gap-3">
         {/* Below lg the field only appears once it is asked for: a search box open all the
             time costs a row of the screen to a box most people are not typing in. */}
@@ -255,7 +256,7 @@ export function FilterPanel() {
             renderTrigger={({ open }) => (
               <span
                 className={cn(ROUND_PLAIN, 'relative', open && 'border-primary ring-2 ring-primary/40')}
-                title={`Second sort: ${sortThen ?? 'none'}`}
+                title={`Second sort: ${sortThen ?? 'none'} — orders parts that tie on ${sort}`}
               >
                 <ArrowDownWideNarrow size={18} />
                 <span className={PILL_LABEL}>2nd</span>
@@ -303,7 +304,10 @@ export function FilterPanel() {
         {/* A second key, for walking shelves in order or ranking within a site. Only ever
             breaks ties in the first, so it can be ignored entirely. Narrower than the first
             sort: a tie-breaker is the smaller decision. */}
-        <div className="hidden w-full lg:block lg:w-40">
+        <div
+          className="hidden w-full lg:block lg:w-40"
+          title={`Orders parts that tie on ${sort}. A key with few ties, such as a price, leaves little for it to do.`}
+        >
           <SelectDropdown
             options={[NO_SECOND_SORT, ...SORT_OPTIONS.filter((o) => o !== sort)]}
             value={sortThen ?? NO_SECOND_SORT}
