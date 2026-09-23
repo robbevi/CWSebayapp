@@ -144,26 +144,30 @@ export function FilterDrawer({
   useBodyScrollLock();
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center">
-      <div className="flex max-h-[85vh] w-full flex-col overflow-y-auto overscroll-contain rounded-t-card bg-surface sm:max-w-md sm:rounded-card">
+      <div className="flex max-h-[85vh] w-full flex-col overflow-hidden rounded-t-card bg-surface sm:max-w-md sm:rounded-card">
         <div className="mx-auto mt-2 h-1 w-10 shrink-0 rounded-full bg-border sm:hidden" />
-        <div className="flex shrink-0 items-center justify-between border-b border-border p-4">
+        <div className="flex shrink-0 items-center justify-between gap-3 border-b border-border p-4">
           <h2 className="text-base font-semibold text-textPri">Filters</h2>
-          <div className="flex items-center gap-4">
-            <button type="button" onClick={onClearAll} className="text-xs font-semibold text-primary hover:underline">
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={onClearAll}
+              className="flex h-9 min-h-0 items-center rounded-btn border border-border px-3 text-xs font-semibold text-primary hover:bg-surfaceMuted"
+            >
               Clear All
             </button>
             <button
               type="button"
               onClick={onClose}
               aria-label="Close"
-              className="rounded-btn p-1 hover:bg-surfaceMuted"
+              className="flex h-9 w-9 min-h-0 items-center justify-center rounded-btn border border-border text-textMuted hover:bg-surfaceMuted hover:text-textPri"
             >
               <X size={18} />
             </button>
           </div>
         </div>
 
-        <div className="space-y-4 p-4">
+        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain p-4">
           <div>
             <label className="mb-1 block text-xs font-semibold text-textMuted">Inventory Site</label>
             <MultiSelectDropdown
