@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ArrowUpDown, Filter, Plus, Search, X } from 'lucide-react';
+import { ArrowDownWideNarrow, ArrowUpDown, Filter, Plus, Search, X } from 'lucide-react';
 import { useInventoryParts } from '../hooks/useInventoryParts';
 import { useSalesStatus } from '../hooks/useSales';
 import { useUIStore, type SortKey } from '../state/useUIStore';
@@ -12,6 +12,10 @@ import { SelectDropdown } from './ui/SelectDropdown';
 
 /** Reads as a value in the menu, so "no second sort" needs no separate control. */
 const NO_SECOND_SORT = 'None';
+
+/** The round buttons a phone gets instead of four stacked full-width controls. */
+const ROUND = 'flex h-11 w-11 min-h-0 shrink-0 items-center justify-center rounded-full border';
+const ROUND_PLAIN = `${ROUND} border-border bg-surface text-textPri`;
 
 const SORT_OPTIONS: SortKey[] = [
   'SKU',
@@ -210,7 +214,61 @@ export function FilterPanel() {
           )}
         </div>
 
-        <div className="w-full sm:w-48">
+        {/* A phone gets one row of round buttons: four stacked full-width controls took a
+            third of the screen before any stock appeared. Each still opens the same menu,
+            and a dot marks a sort or filter that is set. */}
+        <div className="flex items-center justify-between gap-2 sm:hidden">
+          <SelectDropdown
+            options={SORT_OPTIONS}
+            value={sort}
+            onChange={(v) => set({ sort: v as SortKey })}
+            renderTrigger={({ open }) => (
+              <span
+                className={cn(ROUND_PLAIN, open && 'border-primary ring-2 ring-primary/40')}
+                title={`Sort: ${sort}`}
+              >
+                <ArrowUpDown size={18} />
+              </span>
+            )}
+          />
+          <SelectDropdown
+            options={[NO_SECOND_SORT, ...SORT_OPTIONS.filter((o) => o !== sort)]}
+            value={sortThen ?? NO_SECOND_SORT}
+            onChange={(v) => set({ sortThen: v === NO_SECOND_SORT ? null : (v as SortKey) })}
+            renderTrigger={({ open }) => (
+              <span
+                className={cn(ROUND_PLAIN, 'relative', open && 'border-primary ring-2 ring-primary/40')}
+                title={`Second sort: ${sortThen ?? 'none'}`}
+              >
+                <ArrowDownWideNarrow size={18} />
+                {sortThen && <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-primary" />}
+              </span>
+            )}
+          />
+          <button
+            type="button"
+            onClick={() => setDrawerOpen(true)}
+            aria-label={chips.length ? `Filters, ${chips.length} set` : 'Filters'}
+            className={cn(ROUND_PLAIN, 'relative')}
+          >
+            <Filter size={18} />
+            {chips.length > 0 && (
+              <span className="absolute -right-0.5 -top-0.5 flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-primary px-1 text-[10px] font-bold text-white">
+                {chips.length}
+              </span>
+            )}
+          </button>
+          <button
+            type="button"
+            onClick={() => setAddPartOpen(true)}
+            aria-label="Add part"
+            className={cn(ROUND, 'border-primary bg-primary text-white')}
+          >
+            <Plus size={20} />
+          </button>
+        </div>
+
+        <div className="hidden w-full sm:block sm:w-48">
           <SelectDropdown
             icon={<ArrowUpDown size={14} />}
             options={SORT_OPTIONS}
@@ -223,10 +281,9 @@ export function FilterPanel() {
         </div>
 
         {/* A second key, for walking shelves in order or ranking within a site. Only ever
-            breaks ties in the first, so it can be ignored entirely. */}
-        {/* Narrower than the first sort: a tie-breaker is a smaller decision, and it sits
-            beside Filters rather than competing with the sort it refines. */}
-        <div className="w-full sm:w-40">
+            breaks ties in the first, so it can be ignored entirely. Narrower than the first
+            sort: a tie-breaker is the smaller decision. */}
+        <div className="hidden w-full sm:block sm:w-40">
           <SelectDropdown
             options={[NO_SECOND_SORT, ...SORT_OPTIONS.filter((o) => o !== sort)]}
             value={sortThen ?? NO_SECOND_SORT}
@@ -240,7 +297,7 @@ export function FilterPanel() {
         <button
           type="button"
           onClick={() => setDrawerOpen(true)}
-          className="flex h-11 shrink-0 items-center justify-center gap-2 rounded-btn border border-border bg-surface px-4 text-xs font-medium text-textPri hover:bg-surfaceMuted sm:w-auto"
+          className="hidden h-11 shrink-0 items-center justify-center gap-2 rounded-btn border border-border bg-surface px-4 text-xs font-medium text-textPri hover:bg-surfaceMuted sm:flex sm:w-auto"
         >
           <Filter size={14} />
           Filters
@@ -254,7 +311,7 @@ export function FilterPanel() {
         <button
           type="button"
           onClick={() => setAddPartOpen(true)}
-          className="flex h-11 shrink-0 items-center justify-center gap-2 rounded-btn bg-primary px-4 text-xs font-medium text-white hover:bg-primaryHover sm:w-auto"
+          className="hidden h-11 shrink-0 items-center justify-center gap-2 rounded-btn bg-primary px-4 text-xs font-medium text-white hover:bg-primaryHover sm:flex sm:w-auto"
         >
           <Plus size={14} />
           Add Part

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { AlertTriangle, Check, Flag, Pencil, ShoppingCart, Tag, Trash2, X } from 'lucide-react';
+import { AlertTriangle, Check, ChevronDown, Flag, Pencil, ShoppingCart, Tag, Trash2, X } from 'lucide-react';
 import {
   chicagoDateString,
   daysListed,
@@ -112,13 +112,17 @@ export function PartDetailModal() {
   const part = group?.primary;
   const [editingHeader, setEditingHeader] = useState(false);
   useBodyScrollLock(modalOpen && !!part);
-  const [summaryCollapsed, setSummaryCollapsed] = useState(false);
+  // Folded away, Details gives a phone back most of a screen. Desktop has the room and
+  // keeps it open however far the form is scrolled.
+  const [detailsCollapsed, setDetailsCollapsed] = useState(false);
 
   // Separate collapse/expand thresholds: with a single cut-off, scrolling that hovers right
   // on the line makes the panel flap open and shut on every jitter of the finger.
   const handleFormScroll = (e: React.UIEvent<HTMLFormElement>) => {
     const y = e.currentTarget.scrollTop;
-    setSummaryCollapsed((collapsed) => (collapsed ? y > 8 : y > 48));
+    // Editing keeps it open: a form that folds away mid-edit loses whoever is typing.
+    if (editingHeader) return;
+    setDetailsCollapsed((collapsed) => (collapsed ? y > 8 : y > 48));
   };
 
   const { register, control, handleSubmit, reset, watch, setValue, formState } = useForm<FormValues>({
@@ -313,9 +317,20 @@ export function PartDetailModal() {
           <div className="rounded-card bg-surfaceMuted p-3 text-xs">
             {/* Identity and location stay put — this is what you check while working. */}
             <div className="mb-2 flex items-center justify-between">
-              <span className="text-xs font-semibold text-textMuted">
+              {/* The heading is the control on a phone: tap it to bring Details back, or to
+                  put it away before scrolling. Inert from sm up, where it never folds. */}
+              <button
+                type="button"
+                onClick={() => setDetailsCollapsed((c) => !c)}
+                aria-expanded={!detailsCollapsed}
+                className="flex min-h-0 items-center gap-1 text-xs font-semibold text-textMuted sm:pointer-events-none"
+              >
                 {multiLocation ? `${group.locations.length} locations` : 'Details'}
-              </span>
+                <ChevronDown
+                  size={13}
+                  className={cn('transition-transform sm:hidden', !detailsCollapsed && 'rotate-180')}
+                />
+              </button>
               <button
                 type="button"
                 onClick={() => setEditingHeader((e) => !e)}
@@ -329,7 +344,12 @@ export function PartDetailModal() {
                 {editingHeader ? 'Done editing' : 'Edit'}
               </button>
             </div>
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-6">
+            <div
+              className={cn(
+                'grid grid-cols-2 gap-3 overflow-hidden transition-all duration-300 ease-in-out sm:grid-cols-6 sm:max-h-none sm:opacity-100',
+                detailsCollapsed && !editingHeader ? 'max-h-0 opacity-0' : 'max-h-96 opacity-100'
+              )}
+            >
               {/* SKU is fixed: photos are found in Drive by this value, so renaming it here
                   would leave the pictures behind. */}
               <Field label="SKU" value={part.sku} />
@@ -411,7 +431,7 @@ export function PartDetailModal() {
               <div
                 className={cn(
                   'overflow-hidden transition-all duration-500 ease-in-out sm:max-h-40 sm:opacity-100',
-                  summaryCollapsed ? 'max-h-0 opacity-0' : 'max-h-40 opacity-100'
+                  detailsCollapsed ? 'max-h-0 opacity-0' : 'max-h-40 opacity-100'
                 )}
               >
                 <div className="mt-3 grid grid-cols-2 gap-3 border-t border-border pt-3 sm:grid-cols-4">

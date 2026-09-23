@@ -143,8 +143,8 @@ export function FilterDrawer({
 }: FilterDrawerProps) {
   useBodyScrollLock();
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center">
-      <div className="flex max-h-[85vh] w-full flex-col overflow-hidden rounded-t-card bg-surface sm:max-w-md sm:rounded-card">
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-3 sm:items-center sm:p-6">
+      <div className="flex max-h-[85vh] w-full flex-col overflow-hidden rounded-card bg-surface sm:max-w-md">
         <div className="mx-auto mt-2 h-1 w-10 shrink-0 rounded-full bg-border sm:hidden" />
         <div className="flex shrink-0 items-center justify-between gap-3 border-b border-border bg-surfaceMuted p-4">
           <h2 className="text-base font-semibold text-textPri">Filters</h2>
