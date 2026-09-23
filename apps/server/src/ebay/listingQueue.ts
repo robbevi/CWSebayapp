@@ -11,6 +11,7 @@ import {
 import { getAllParts, updatePart } from '../google/sheetsService.js';
 import { HttpError, prepareListing } from './listingPrep.js';
 import { publishListing, suggestCategories, verifyListing } from './publishService.js';
+import { researchedSkus } from './researchBatch.js';
 import { latestResearch } from './researchService.js';
 
 /**
@@ -125,10 +126,18 @@ export async function buildPlan(
   hour: number,
   now: Date = new Date()
 ): Promise<QueuePlan> {
-  const groups = candidates(groupPartsBySku(await getAllParts()));
+  const [all, researched] = await Promise.all([
+    getAllParts().then((parts) => candidates(groupPartsBySku(parts))),
+    researchedSkus(),
+  ]);
+  // One listing of the research folder decides who is eligible, rather than a Drive lookup
+  // for every part in the catalogue: with a long backlog that was hundreds of calls to
+  // find a handful of listings.
+  const has = (g: PartGroup) => researched.has(g.sku.trim().toLowerCase());
+  const groups = all.filter(has);
+  const unresearched = all.length - groups.length;
   const wanted = days * perDay;
   const items: PlannedListing[] = [];
-  let unresearched = 0;
   let seen = 0;
 
   for (const group of groups) {
@@ -137,11 +146,10 @@ export async function buildPlan(
     const research = await latestResearch(group.sku).catch(() => null);
     // Coerced, because a research file is whatever the agent wrote: a missing field should
     // show up as a problem to fix, not throw while the plan is being built.
+    // Listed in the folder but unreadable — a half-written file, or one the agent left
+    // empty. Not a candidate, and not worth stopping the plan for.
     const found = research?.listing ? coerceAgentListing(research.listing) : null;
-    if (!found) {
-      unresearched += 1;
-      continue;
-    }
+    if (!found) continue;
     const parsed = await withCategory(found);
 
     const index = items.length;

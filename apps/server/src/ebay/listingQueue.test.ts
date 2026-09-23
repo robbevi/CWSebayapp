@@ -3,9 +3,11 @@ import type { InventoryPart, Photo } from '@warehouse/shared';
 
 const sheets = vi.hoisted(() => ({ getAllParts: vi.fn(), updatePart: vi.fn() }));
 const research = vi.hoisted(() => ({ latestResearch: vi.fn() }));
+const batch = vi.hoisted(() => ({ researchedSkus: vi.fn() }));
 
 vi.mock('../google/sheetsService.js', () => sheets);
 vi.mock('./researchService.js', () => research);
+vi.mock('./researchBatch.js', () => batch);
 vi.mock('./publishService.js', () => ({ publishListing: vi.fn(), verifyListing: vi.fn(), getSellerSetup: vi.fn() }));
 
 const { buildPlan } = await import('./listingQueue.js');
@@ -42,9 +44,18 @@ const researched = (title: string) => ({
   notes: [],
 });
 
+/** The research folder as SPARE reads it: every SKU handed in, unless a test says otherwise. */
+function folderHolds(...skus: string[]) {
+  batch.researchedSkus.mockResolvedValue(new Set(skus.map((s) => s.toLowerCase())));
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   research.latestResearch.mockResolvedValue(researched('A TITLE'));
+  batch.researchedSkus.mockImplementation(async () => {
+    const parts = (await sheets.getAllParts()) as { sku: string }[];
+    return new Set(parts.map((p) => p.sku.toLowerCase()));
+  });
 });
 
 describe('buildPlan', () => {
@@ -80,13 +91,21 @@ describe('buildPlan', () => {
 
   it('skips parts Copilot has not written up, and counts them', async () => {
     sheets.getAllParts.mockResolvedValue([part('A'), part('B')]);
-    research.latestResearch.mockImplementation(async (sku: string) =>
-      sku === 'A' ? researched('A TITLE') : { found: false }
-    );
+    folderHolds('A');
 
     const plan = await buildPlan(1, 10, 9, NOW);
     expect(plan.items.map((i) => i.sku)).toEqual(['A']);
     expect(plan.unresearched).toBe(1);
+  });
+
+  it('passes over a research file it cannot read, without stopping the plan', async () => {
+    sheets.getAllParts.mockResolvedValue([part('A'), part('B')]);
+    research.latestResearch.mockImplementation(async (sku: string) =>
+      sku === 'A' ? { found: true, createdAt: '2026-09-22T00:00:00.000Z', notes: [] } : researched('B TITLE')
+    );
+
+    const plan = await buildPlan(1, 10, 9, NOW);
+    expect(plan.items.map((i) => i.sku)).toEqual(['B']);
   });
 
   it('leaves out parts that are not ready to list', async () => {
