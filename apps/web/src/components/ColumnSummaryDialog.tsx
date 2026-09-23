@@ -187,7 +187,7 @@ export function ColumnSummaryDialog({
           <Stat
             label={status === 'Listed' ? 'Est. recovery' : 'Est. recovery'}
             value={money(s.value)}
-            sub={s.unpriced > 0 ? `${count(s.unpriced)} carried at nothing` : 'every part priced'}
+            sub={s.unpriced > 0 ? `${count(s.unpriced)} unpriced` : 'every part priced'}
           />
           <Stat
             label="Longest waiting"
