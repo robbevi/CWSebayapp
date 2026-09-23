@@ -224,13 +224,15 @@ export function FilterPanel() {
 
         {/* A second key, for walking shelves in order or ranking within a site. Only ever
             breaks ties in the first, so it can be ignored entirely. */}
-        <div className="w-full sm:w-48">
+        {/* Narrower than the first sort: a tie-breaker is a smaller decision, and it sits
+            beside Filters rather than competing with the sort it refines. */}
+        <div className="w-full sm:w-40">
           <SelectDropdown
             options={[NO_SECOND_SORT, ...SORT_OPTIONS.filter((o) => o !== sort)]}
-            value={sortThen ?? '2nd Sort'}
-            valuePrefix={sortThen ? '2nd Sort: ' : ''}
+            value={sortThen ?? NO_SECOND_SORT}
+            valuePrefix="Sort (2): "
             valueClassName="text-center"
-            triggerClassName={sortThen ? 'font-medium text-textPri' : 'text-textMuted'}
+            triggerClassName="font-medium text-textPri"
             onChange={(v) => set({ sortThen: v === NO_SECOND_SORT ? null : (v as SortKey) })}
           />
         </div>
