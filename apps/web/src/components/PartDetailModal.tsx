@@ -96,6 +96,11 @@ const schema = z.object({
 });
 type FormValues = z.infer<typeof schema>;
 
+/** Matches Tailwind's sm breakpoint, below which the board is one column and space is tight. */
+function isPhone(): boolean {
+  return typeof window !== 'undefined' && window.innerWidth < 640;
+}
+
 export function PartDetailModal() {
   const { selectedId, modalOpen, set } = useUIStore();
   const { data: parts } = useInventoryParts();
@@ -112,17 +117,21 @@ export function PartDetailModal() {
   const part = group?.primary;
   const [editingHeader, setEditingHeader] = useState(false);
   useBodyScrollLock(modalOpen && !!part);
-  // Folded away, Details gives a phone back most of a screen. Desktop has the room and
-  // keeps it open however far the form is scrolled.
-  const [detailsCollapsed, setDetailsCollapsed] = useState(false);
+  /**
+   * Folded away, Details gives a phone back most of a screen. It starts folded there,
+   * because the job on a phone is photographs and a count, not reference figures — the
+   * heading opens it when someone does want them. Desktop has the room and keeps it open
+   * however far the form is scrolled.
+   */
+  const [detailsCollapsed, setDetailsCollapsed] = useState(() => isPhone());
 
-  // Separate collapse/expand thresholds: with a single cut-off, scrolling that hovers right
-  // on the line makes the panel flap open and shut on every jitter of the finger.
+  // It folds on the first hint of a scroll and comes back only at the very top, rather
+  // than at a halfway mark that leaves it flapping as a finger jitters over the line.
   const handleFormScroll = (e: React.UIEvent<HTMLFormElement>) => {
     const y = e.currentTarget.scrollTop;
     // Editing keeps it open: a form that folds away mid-edit loses whoever is typing.
     if (editingHeader) return;
-    setDetailsCollapsed((collapsed) => (collapsed ? y > 8 : y > 48));
+    setDetailsCollapsed((collapsed) => (collapsed ? y > 0 : y > 4));
   };
 
   const { register, control, handleSubmit, reset, watch, setValue, formState } = useForm<FormValues>({
