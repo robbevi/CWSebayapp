@@ -104,7 +104,7 @@ export function BucketColumn({
             {meta.icon}
           </div>
           <span className="min-w-0">
-            <span className="block text-base font-bold text-textPri lg:text-lg">{meta.label}</span>
+            <span className="block text-base font-medium text-textPri lg:text-lg">{meta.label}</span>
             {/* Desktop only: on a phone the columns stack and collapse, where another line
                 sits between someone and their work. */}
             <span className="hidden text-[11px] leading-tight text-textMuted lg:block">
