@@ -11,7 +11,7 @@ import { Input } from './ui/Input';
 import { SelectDropdown } from './ui/SelectDropdown';
 
 /** Reads as a value in the menu, so "no second sort" needs no separate control. */
-const NO_SECOND_SORT = 'Nothing';
+const NO_SECOND_SORT = 'None';
 
 const SORT_OPTIONS: SortKey[] = [
   'SKU',
@@ -227,8 +227,8 @@ export function FilterPanel() {
         <div className="w-full sm:w-48">
           <SelectDropdown
             options={[NO_SECOND_SORT, ...SORT_OPTIONS.filter((o) => o !== sort)]}
-            value={sortThen ?? NO_SECOND_SORT}
-            valuePrefix="Then: "
+            value={sortThen ?? '2nd Sort'}
+            valuePrefix={sortThen ? '2nd Sort: ' : ''}
             valueClassName="text-center"
             triggerClassName={sortThen ? 'font-medium text-textPri' : 'text-textMuted'}
             onChange={(v) => set({ sortThen: v === NO_SECOND_SORT ? null : (v as SortKey) })}
