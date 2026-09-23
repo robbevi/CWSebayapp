@@ -6,7 +6,9 @@ import { useToastStore } from '../state/useToastStore';
 import { Button } from './ui/Button';
 
 const KEY = ['research-backlog'];
-const SIZES = [10, 25, 50];
+const SIZES = [10, 25, 50, 100];
+/** The server's own ceiling for one run. */
+const MAX_RUN = 500;
 /** Measured across the first runs: the agent answers in about four minutes a part. */
 const MINUTES_EACH = 4;
 
@@ -28,6 +30,16 @@ function roughly(parts: number): string {
  * ends it. Nothing is lost: parts already researched are skipped, so starting again
  * carries on from where it stopped.
  */
+/**
+ * The sizes worth offering for the backlog left: the fixed steps below it, and everything
+ * remaining. A long run is safe to start, because one that is cut short resumes where it
+ * stopped rather than beginning again.
+ */
+function sizeOptions(waiting: number): number[] {
+  const all = Math.min(Math.max(waiting, 1), MAX_RUN);
+  return [...new Set([...SIZES.filter((n) => n < waiting), all])];
+}
+
 export function ResearchBacklog() {
   const qc = useQueryClient();
   const toast = useToastStore((s) => s.show);
@@ -89,13 +101,15 @@ export function ResearchBacklog() {
             <div className="mt-2 flex gap-2">
               <select
                 aria-label="How many parts to research"
-                value={size}
+                // The backlog shrinks as runs finish, so a size picked earlier may no
+                // longer be on the menu; fall back rather than showing a blank box.
+                value={sizeOptions(s.waiting).includes(size) ? size : sizeOptions(s.waiting)[0]}
                 onChange={(e) => setSize(Number(e.target.value))}
                 className="rounded-btn border border-border bg-surface px-2 text-sm text-textPri"
               >
-                {SIZES.map((n) => (
+                {sizeOptions(s.waiting).map((n) => (
                   <option key={n} value={n}>
-                    {n} parts · {roughly(Math.min(n, s.waiting))}
+                    {n >= s.waiting ? `All ${s.waiting} remaining` : `${n} parts`} · {roughly(Math.min(n, s.waiting))}
                   </option>
                 ))}
               </select>
