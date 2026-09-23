@@ -127,7 +127,7 @@ export function Header() {
       <button
         type="button"
         onClick={() => setScoreboardOpen(true)}
-        className={`flex h-9 w-8 shrink-0 items-center justify-center rounded-full text-white sm:w-9 hover:bg-white/10 ${currentUser ? '' : 'ml-auto'}`}
+        className={`hidden h-9 w-8 shrink-0 items-center justify-center rounded-full text-white sm:flex sm:w-9 hover:bg-white/10 ${currentUser ? '' : 'ml-auto'}`}
         aria-label="Scoreboard"
         title="Scoreboard"
       >
@@ -152,7 +152,7 @@ export function Header() {
           the browser saves it directly and never has to hold the whole file in memory. */}
       <a
         href="/api/export"
-        className="flex h-9 w-8 shrink-0 items-center justify-center rounded-full text-white sm:w-9 hover:bg-white/10"
+        className="hidden h-9 w-8 shrink-0 items-center justify-center rounded-full text-white sm:flex sm:w-9 hover:bg-white/10"
         aria-label="Export all data to a spreadsheet"
         title="Export all data to a spreadsheet"
       >

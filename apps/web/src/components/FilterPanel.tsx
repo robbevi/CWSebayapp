@@ -192,8 +192,8 @@ export function FilterPanel() {
   ].filter((c): c is { key: string; label: string; onRemove: () => void } => !!c);
 
   return (
-    <div className="relative rounded-card bg-surfaceMuted p-4 lg:p-1.5">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+    <div className="relative rounded-card bg-surfaceMuted p-0 sm:p-4 lg:p-1.5">
+      <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:gap-3">
         <div className="relative flex-1">
           <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-textMuted" />
           <Input
@@ -217,7 +217,7 @@ export function FilterPanel() {
         {/* A phone gets one row of round buttons: four stacked full-width controls took a
             third of the screen before any stock appeared. Each still opens the same menu,
             and a dot marks a sort or filter that is set. */}
-        <div className="flex items-center justify-between gap-2 sm:hidden">
+        <div className="flex items-center justify-between gap-2 lg:hidden">
           <SelectDropdown
             options={SORT_OPTIONS}
             value={sort}
@@ -268,7 +268,7 @@ export function FilterPanel() {
           </button>
         </div>
 
-        <div className="hidden w-full sm:block sm:w-48">
+        <div className="hidden w-full lg:block lg:w-48">
           <SelectDropdown
             icon={<ArrowUpDown size={14} />}
             options={SORT_OPTIONS}
@@ -283,7 +283,7 @@ export function FilterPanel() {
         {/* A second key, for walking shelves in order or ranking within a site. Only ever
             breaks ties in the first, so it can be ignored entirely. Narrower than the first
             sort: a tie-breaker is the smaller decision. */}
-        <div className="hidden w-full sm:block sm:w-40">
+        <div className="hidden w-full lg:block lg:w-40">
           <SelectDropdown
             options={[NO_SECOND_SORT, ...SORT_OPTIONS.filter((o) => o !== sort)]}
             value={sortThen ?? NO_SECOND_SORT}
@@ -297,7 +297,7 @@ export function FilterPanel() {
         <button
           type="button"
           onClick={() => setDrawerOpen(true)}
-          className="hidden h-11 shrink-0 items-center justify-center gap-2 rounded-btn border border-border bg-surface px-4 text-xs font-medium text-textPri hover:bg-surfaceMuted sm:flex sm:w-auto"
+          className="hidden h-11 shrink-0 items-center justify-center gap-2 rounded-btn border border-border bg-surface px-4 text-xs font-medium text-textPri hover:bg-surfaceMuted lg:flex lg:w-auto"
         >
           <Filter size={14} />
           Filters
@@ -311,7 +311,7 @@ export function FilterPanel() {
         <button
           type="button"
           onClick={() => setAddPartOpen(true)}
-          className="hidden h-11 shrink-0 items-center justify-center gap-2 rounded-btn bg-primary px-4 text-xs font-medium text-white hover:bg-primaryHover sm:flex sm:w-auto"
+          className="hidden h-11 shrink-0 items-center justify-center gap-2 rounded-btn bg-primary px-4 text-xs font-medium text-white hover:bg-primaryHover lg:flex lg:w-auto"
         >
           <Plus size={14} />
           Add Part

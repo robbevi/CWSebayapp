@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import {
   ageBandOf,
   checkpointCount,
@@ -176,6 +176,12 @@ const COLUMN_WIDTH: Record<number, string> = {
 
 export function KanbanBoard() {
   const { data, isLoading } = useInventoryParts();
+  /**
+   * Which column is being worked in, below lg where the three stack. Nothing is open to
+   * begin with: the choice of pile is the first decision, and three collapsed headers make
+   * that choice in one screen rather than burying it under a hundred cards.
+   */
+  const [focused, setFocused] = useState<WorkflowStatus | null>(null);
   const { data: sales } = useSales();
   const { data: listings } = useListings();
   const {
@@ -274,6 +280,11 @@ export function KanbanBoard() {
           status={status}
           parts={buckets[status]}
           total={totals[status]}
+          expanded={focused === status}
+          onToggleExpanded={() => setFocused((f) => (f === status ? null : status))}
+          // Below lg the three stack, and the one being worked in rises to the top so the
+          // other two sit out of the way at the bottom rather than above the cards.
+          className={focused === status ? 'order-first lg:order-none' : undefined}
           salesIndex={salesIndex}
           listingsIndex={listingsIndex}
         />

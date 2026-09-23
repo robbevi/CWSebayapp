@@ -49,6 +49,9 @@ export function BucketColumn({
   status,
   parts,
   total,
+  expanded,
+  onToggleExpanded,
+  className,
   salesIndex,
   listingsIndex,
 }: {
@@ -56,6 +59,10 @@ export function BucketColumn({
   parts: PartGroup[];
   /** Everything in this column before any filter, so a filtered count says what it is out of. */
   total: number;
+  /** Below lg, whether this is the column being worked in. Ignored from lg up. */
+  expanded: boolean;
+  onToggleExpanded: () => void;
+  className?: string;
   salesIndex: SalesIndex;
   listingsIndex: Map<string, Listing>;
 }) {
@@ -75,10 +82,6 @@ export function BucketColumn({
   }, [status, parts, salesIndex]);
 
   const shown = split && ebayView !== 'all' ? (ebayView === 'sold' ? split.sold : split.listed) : parts;
-  // Mobile stacks all three buckets vertically, so an expanded one buries the others under
-  // hundreds of cards. Collapsed by default there; on desktop the columns sit side by side
-  // and are always open, so this state is simply ignored from `lg:` up.
-  const [expanded, setExpanded] = useState(false);
   const [summaryOpen, setSummaryOpen] = useState(false);
   const setFilters = useUIStore((s) => s.set);
 
@@ -88,13 +91,13 @@ export function BucketColumn({
   const subtotal = useMemo(() => columnValue(status, shown, listingsIndex), [status, shown, listingsIndex]);
 
   return (
-    <div className="flex flex-col rounded-card border border-border bg-surfaceMuted lg:h-full lg:min-h-0">
+    <div className={cn('flex flex-col rounded-card border border-border bg-surfaceMuted lg:h-full lg:min-h-0', className)}>
       <div className="flex w-full items-center gap-3 rounded-t-card border-b border-border bg-columnHeaderBg p-4">
         {/* Only the left of the header toggles the column, so the count beside it can be a
             control of its own. Inert from lg up, where columns are always open. */}
         <button
           type="button"
-          onClick={() => setExpanded((e) => !e)}
+          onClick={onToggleExpanded}
           aria-expanded={expanded}
           className="flex flex-1 items-center gap-3 text-left lg:pointer-events-none"
         >
@@ -166,7 +169,7 @@ export function BucketColumn({
 
         <button
           type="button"
-          onClick={() => setExpanded((e) => !e)}
+          onClick={onToggleExpanded}
           aria-label={expanded ? 'Collapse' : 'Expand'}
           className="min-h-0 shrink-0 lg:hidden"
         >
@@ -190,7 +193,7 @@ export function BucketColumn({
 
       <div
         className={cn(
-          'column-scroll min-h-0 max-h-[640px] flex-1 flex-col gap-3 overflow-y-auto overscroll-contain p-4 lg:flex lg:max-h-none',
+          'column-scroll min-h-0 max-h-[calc(100vh-15rem)] flex-1 flex-col gap-3 overflow-y-auto overscroll-contain p-4 lg:flex lg:max-h-none',
           expanded ? 'flex' : 'hidden'
         )}
       >
