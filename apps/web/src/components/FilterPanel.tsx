@@ -14,8 +14,10 @@ import { SelectDropdown } from './ui/SelectDropdown';
 const NO_SECOND_SORT = 'None';
 
 /** The round buttons a phone gets instead of four stacked full-width controls. */
-const ROUND = 'flex h-11 w-11 min-h-0 shrink-0 items-center justify-center rounded-full border';
+const ROUND = 'flex h-11 min-h-0 shrink-0 items-center justify-center gap-1.5 rounded-full border w-11 sm:w-auto sm:px-4';
 const ROUND_PLAIN = `${ROUND} border-border bg-surface text-textPri`;
+/** The word beside an icon: room for it from sm up, never on a phone. */
+const PILL_LABEL = 'hidden text-xs font-medium sm:inline';
 
 const SORT_OPTIONS: SortKey[] = [
   'SKU',
@@ -73,6 +75,8 @@ export function FilterPanel() {
   } = useUIStore();
   const [searchInput, setSearchInput] = useState(search);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  // Only below lg: the field is always there at a desk.
+  const [searchOpen, setSearchOpen] = useState(false);
   const [addPartOpen, setAddPartOpen] = useState(false);
 
   useEffect(() => {
@@ -194,7 +198,9 @@ export function FilterPanel() {
   return (
     <div className="relative rounded-card bg-surfaceMuted p-0 sm:p-4 lg:p-1.5">
       <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:gap-3">
-        <div className="relative flex-1">
+        {/* Below lg the field only appears once it is asked for: a search box open all the
+            time costs a row of the screen to a box most people are not typing in. */}
+        <div className={cn('relative flex-1', !searchOpen && !searchInput && 'hidden lg:block')}>
           <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-textMuted" />
           <Input
             className={cn('pl-9', searchInput && 'pr-9')}
@@ -218,6 +224,16 @@ export function FilterPanel() {
             third of the screen before any stock appeared. Each still opens the same menu,
             and a dot marks a sort or filter that is set. */}
         <div className="flex items-center justify-between gap-2 lg:hidden">
+          <button
+            type="button"
+            onClick={() => setSearchOpen((v) => !v)}
+            aria-label={searchOpen ? 'Hide search' : 'Search'}
+            aria-expanded={searchOpen}
+            className={cn(ROUND_PLAIN, 'relative', (searchOpen || searchInput) && 'border-primary text-primary')}
+          >
+            <Search size={18} />
+            <span className={PILL_LABEL}>Search</span>
+          </button>
           <SelectDropdown
             options={SORT_OPTIONS}
             value={sort}
@@ -228,6 +244,7 @@ export function FilterPanel() {
                 title={`Sort: ${sort}`}
               >
                 <ArrowUpDown size={18} />
+                <span className={PILL_LABEL}>Sort</span>
               </span>
             )}
           />
@@ -241,7 +258,8 @@ export function FilterPanel() {
                 title={`Second sort: ${sortThen ?? 'none'}`}
               >
                 <ArrowDownWideNarrow size={18} />
-                {sortThen && <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-primary" />}
+                <span className={PILL_LABEL}>2nd</span>
+                {sortThen && <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-primary" />}
               </span>
             )}
           />
@@ -252,6 +270,7 @@ export function FilterPanel() {
             className={cn(ROUND_PLAIN, 'relative')}
           >
             <Filter size={18} />
+            <span className={PILL_LABEL}>Filter</span>
             {chips.length > 0 && (
               <span className="absolute -right-0.5 -top-0.5 flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-primary px-1 text-[10px] font-bold text-white">
                 {chips.length}
@@ -265,6 +284,7 @@ export function FilterPanel() {
             className={cn(ROUND, 'border-primary bg-primary text-white')}
           >
             <Plus size={20} />
+            <span className={PILL_LABEL}>Add</span>
           </button>
         </div>
 

@@ -46,6 +46,7 @@ import {
 } from '../hooks/useEbayListing';
 import { useSalesStatus } from '../hooks/useSales';
 import { ListingRequestError } from '../lib/api';
+import { cn } from '../lib/cn';
 import { useUserStore } from '../state/useUserStore';
 import { Button } from './ui/Button';
 import { Input } from './ui/Input';
@@ -454,7 +455,7 @@ export function ListingPublisher({ group, onPublished }: { group: PartGroup; onP
   const rejectedBy = requestError instanceof ListingRequestError ? requestError.messages : [];
 
   return (
-    <div className="rounded-card border border-primary/30 bg-primary/5 p-3">
+    <div className={cn('rounded-card border border-primary/30 bg-primary/5 p-3', !isAdmin && 'hidden lg:block')}>
       <button type="button" onClick={() => setOpen((v) => !v)} className="flex w-full items-center justify-between gap-2 text-left">
         <span className="min-w-0">
           <span className="flex items-center gap-1.5 text-xs font-semibold text-textPri">

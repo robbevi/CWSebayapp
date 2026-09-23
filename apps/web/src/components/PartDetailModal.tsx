@@ -96,9 +96,9 @@ const schema = z.object({
 });
 type FormValues = z.infer<typeof schema>;
 
-/** Matches Tailwind's sm breakpoint, below which the board is one column and space is tight. */
-function isPhone(): boolean {
-  return typeof window !== 'undefined' && window.innerWidth < 640;
+/** Matches Tailwind's lg breakpoint: below it the board is one column and space is tight. */
+function isNarrow(): boolean {
+  return typeof window !== 'undefined' && window.innerWidth < 1024;
 }
 
 export function PartDetailModal() {
@@ -123,13 +123,17 @@ export function PartDetailModal() {
    * heading opens it when someone does want them. Desktop has the room and keeps it open
    * however far the form is scrolled.
    */
-  const [detailsCollapsed, setDetailsCollapsed] = useState(() => isPhone());
+  const [detailsCollapsed, setDetailsCollapsed] = useState(() => isNarrow());
+  // Tracked apart from the fold above: Details starts folded on a small screen, but the
+  // title's second line is worth reading when the part opens and only in the way later.
+  const [scrolled, setScrolled] = useState(false);
 
   // It folds on the first hint of a scroll and comes back only at the very top, rather
   // than at a halfway mark that leaves it flapping as a finger jitters over the line.
   const handleFormScroll = (e: React.UIEvent<HTMLFormElement>) => {
     const y = e.currentTarget.scrollTop;
     // Editing keeps it open: a form that folds away mid-edit loses whoever is typing.
+    setScrolled(y > 4);
     if (editingHeader) return;
     setDetailsCollapsed((collapsed) => (collapsed ? y > 0 : y > 4));
   };
@@ -299,10 +303,22 @@ export function PartDetailModal() {
   return (
     <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 p-4 sm:p-6">
       <div className="flex max-h-[85vh] w-full flex-col rounded-card bg-surface sm:w-[720px]">
-        <div className="flex shrink-0 items-center justify-between border-b border-border p-4">
-          <div>
-            <div className="text-base font-semibold text-textPri">{part.sku}</div>
-            <div className="text-xs text-textMuted">
+        {/* Scrolled, the title line gives up its second row too: on a phone that is another
+            card's worth of the screen, and the SKU alone says which part this is. */}
+        <div
+          className={cn(
+            'flex shrink-0 items-center justify-between border-b border-border px-4 transition-all duration-300',
+            scrolled ? 'py-2 lg:py-4' : 'py-4'
+          )}
+        >
+          <div className="min-w-0">
+            <div className="truncate text-base font-semibold text-textPri">{part.sku}</div>
+            <div
+              className={cn(
+                'overflow-hidden text-xs text-textMuted transition-all duration-300 lg:max-h-8 lg:opacity-100',
+                scrolled ? 'max-h-0 opacity-0' : 'max-h-8 opacity-100'
+              )}
+            >
               {multiLocation
                 ? `${group.locations.length} locations · ${group.qoh} total`
                 : `Bin ${part.binLocation || '—'}`}
@@ -332,12 +348,12 @@ export function PartDetailModal() {
                 type="button"
                 onClick={() => setDetailsCollapsed((c) => !c)}
                 aria-expanded={!detailsCollapsed}
-                className="flex min-h-0 items-center gap-1 text-xs font-semibold text-textMuted sm:pointer-events-none"
+                className="flex min-h-0 items-center gap-1 text-xs font-semibold text-textMuted lg:pointer-events-none"
               >
                 {multiLocation ? `${group.locations.length} locations` : 'Details'}
                 <ChevronDown
                   size={13}
-                  className={cn('transition-transform sm:hidden', !detailsCollapsed && 'rotate-180')}
+                  className={cn('transition-transform lg:hidden', !detailsCollapsed && 'rotate-180')}
                 />
               </button>
               <button
@@ -355,7 +371,7 @@ export function PartDetailModal() {
             </div>
             <div
               className={cn(
-                'grid grid-cols-2 gap-3 overflow-hidden transition-all duration-300 ease-in-out sm:grid-cols-6 sm:max-h-none sm:opacity-100',
+                'grid grid-cols-2 gap-3 overflow-hidden transition-all duration-300 ease-in-out sm:grid-cols-6 lg:max-h-none lg:opacity-100',
                 detailsCollapsed && !editingHeader ? 'max-h-0 opacity-0' : 'max-h-96 opacity-100'
               )}
             >
@@ -439,7 +455,7 @@ export function PartDetailModal() {
             {hasRecoveryData && (
               <div
                 className={cn(
-                  'overflow-hidden transition-all duration-500 ease-in-out sm:max-h-40 sm:opacity-100',
+                  'overflow-hidden transition-all duration-500 ease-in-out lg:max-h-40 lg:opacity-100',
                   detailsCollapsed ? 'max-h-0 opacity-0' : 'max-h-40 opacity-100'
                 )}
               >
