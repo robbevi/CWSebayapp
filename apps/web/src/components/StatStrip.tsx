@@ -124,7 +124,7 @@ export function StatStrip() {
       className="flex h-auto min-h-0 shrink-0 items-center gap-1 rounded-btn px-1.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-textMuted hover:bg-surfaceMuted hover:text-textPri"
       title={collapsed ? 'Show the summary' : 'Hide the summary'}
     >
-      {collapsed ? 'Show summary' : 'Hide summary'}
+      {collapsed ? 'Show' : 'Hide'}
       <ChevronDown size={13} className={cn('transition-transform', !collapsed && 'rotate-180')} />
     </button>
   );

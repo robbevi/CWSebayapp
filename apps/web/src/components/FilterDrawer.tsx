@@ -146,7 +146,7 @@ export function FilterDrawer({
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center">
       <div className="flex max-h-[85vh] w-full flex-col overflow-hidden rounded-t-card bg-surface sm:max-w-md sm:rounded-card">
         <div className="mx-auto mt-2 h-1 w-10 shrink-0 rounded-full bg-border sm:hidden" />
-        <div className="flex shrink-0 items-center justify-between gap-3 border-b border-border p-4">
+        <div className="flex shrink-0 items-center justify-between gap-3 border-b border-border bg-surfaceMuted p-4">
           <h2 className="text-base font-semibold text-textPri">Filters</h2>
           <div className="flex items-center gap-2">
             <button
