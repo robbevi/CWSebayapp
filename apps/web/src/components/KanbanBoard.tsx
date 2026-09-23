@@ -103,53 +103,58 @@ function byNumberAsc(a: number | null | undefined, b: number | null | undefined)
 // eBay figures live on the listing rather than the part, so they sort through the index.
 // Anything without a live listing sorts last rather than as zero — no listing is not the
 // same as no interest.
-function sortByListing(
-  parts: PartGroup[],
+function byListing(
   listingsIndex: Map<string, Listing>,
   pick: (l: Listing) => number | null
-): PartGroup[] {
+): (a: PartGroup, b: PartGroup) => number {
   const value = (p: PartGroup) => {
     const l = listingFor(p.records, listingsIndex);
     const v = l ? pick(l) : null;
     return v ?? -1;
   };
-  return [...parts].sort((a, b) => value(b) - value(a));
+  return (a, b) => value(b) - value(a);
 }
 
-function sortParts(parts: PartGroup[], sort: SortKey, listingsIndex: Map<string, Listing>): PartGroup[] {
-  if (sort === 'Watchers') return sortByListing(parts, listingsIndex, (l) => l.watchers);
-  if (sort === 'Views') return sortByListing(parts, listingsIndex, (l) => l.views);
-  if (sort === 'Impressions') return sortByListing(parts, listingsIndex, (l) => l.impressions);
-  if (sort === 'Qty Listed') return sortByListing(parts, listingsIndex, (l) => l.quantityAvailable);
-  if (sort === 'Quantity On Hand') {
-    return [...parts].sort((a, b) => a.qoh - b.qoh);
-  }
-  if (sort === 'Progress') {
-    return [...parts].sort((a, b) => checkpointCount(a) - checkpointCount(b));
-  }
+/** How one sort key orders two parts. Kept separate so a second key can break its ties. */
+function comparatorFor(sort: SortKey, listingsIndex: Map<string, Listing>): (a: PartGroup, b: PartGroup) => number {
+  if (sort === 'Watchers') return byListing(listingsIndex, (l) => l.watchers);
+  if (sort === 'Views') return byListing(listingsIndex, (l) => l.views);
+  if (sort === 'Impressions') return byListing(listingsIndex, (l) => l.impressions);
+  if (sort === 'Qty Listed') return byListing(listingsIndex, (l) => l.quantityAvailable);
+  if (sort === 'Quantity On Hand') return (a, b) => a.qoh - b.qoh;
+  if (sort === 'Progress') return (a, b) => checkpointCount(a) - checkpointCount(b);
   if (sort === 'Recovery Bin') {
     // Parts not yet moved to the Iron Barn have no code — they sort after the ones that
     // do, so the shelved stock reads as a contiguous list.
-    return [...parts].sort((a, b) =>
-      (a.newBinLocation || '￿').localeCompare(b.newBinLocation || '￿')
-    );
+    return (a, b) => (a.newBinLocation || '￿').localeCompare(b.newBinLocation || '￿');
   }
-  if (sort === 'Revenue Priority') {
-    return [...parts].sort((a, b) => byNumberAsc(a.revenuePriorityRank, b.revenuePriorityRank));
-  }
+  if (sort === 'Revenue Priority') return (a, b) => byNumberAsc(a.revenuePriorityRank, b.revenuePriorityRank);
   if (sort === 'Field Review Priority') {
     // The values are prefixed with their tier ("1 - Highest Priority"), so a plain string
     // compare already orders them 1 → 4; only the empty case needs special handling.
-    return [...parts].sort((a, b) =>
-      (a.fieldReviewPriority || '￿').localeCompare(b.fieldReviewPriority || '￿')
-    );
+    return (a, b) => (a.fieldReviewPriority || '￿').localeCompare(b.fieldReviewPriority || '￿');
   }
   const descField = DESCENDING_NUMERIC[sort];
   if (descField) {
-    return [...parts].sort((a, b) => byNumberDesc(a[descField] as number | null, b[descField] as number | null));
+    return (a, b) => byNumberDesc(a[descField] as number | null, b[descField] as number | null);
   }
   const field = SORT_FIELD[sort]!;
-  return [...parts].sort((a, b) => String(a[field] ?? '').localeCompare(String(b[field] ?? '')));
+  return (a, b) => String(a[field] ?? '').localeCompare(String(b[field] ?? ''));
+}
+
+/**
+ * Sorts by one key, then another where the first ties — the order a picker walks shelves
+ * in, or the priority within a site.
+ */
+function sortParts(
+  parts: PartGroup[],
+  sort: SortKey,
+  then: SortKey | null,
+  listingsIndex: Map<string, Listing>
+): PartGroup[] {
+  const primary = comparatorFor(sort, listingsIndex);
+  const secondary = then && then !== sort ? comparatorFor(then, listingsIndex) : null;
+  return [...parts].sort((a, b) => primary(a, b) || (secondary ? secondary(a, b) : 0));
 }
 
 const ALL_STATUSES: WorkflowStatus[] = ['NotStarted', 'Processing', 'Listed'];
@@ -189,6 +194,7 @@ export function KanbanBoard() {
     discrepancies,
     needsReview,
     sort,
+    sortThen,
   } = useUIStore();
 
   // Every row for a SKU is folded into one card. The sheet keeps its separate rows —
@@ -216,7 +222,7 @@ export function KanbanBoard() {
         (!needsReview || g.needsReview) &&
         matchesSearch(g, search)
     );
-    return sortParts(result, sort, listingsIndex);
+    return sortParts(result, sort, sortThen, listingsIndex);
   }, [
     groups,
     search,
@@ -235,6 +241,7 @@ export function KanbanBoard() {
     discrepancies,
     needsReview,
     sort,
+    sortThen,
     listingsIndex,
   ]);
 

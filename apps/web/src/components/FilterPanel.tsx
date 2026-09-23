@@ -10,6 +10,9 @@ import { AGE_OPTIONS, FilterDrawer, RESEARCH_OPTIONS, SALE_OPTIONS, STATUS_OPTIO
 import { Input } from './ui/Input';
 import { SelectDropdown } from './ui/SelectDropdown';
 
+/** Reads as a value in the menu, so "no second sort" needs no separate control. */
+const NO_SECOND_SORT = 'Nothing';
+
 const SORT_OPTIONS: SortKey[] = [
   'SKU',
   'Bin Location',
@@ -60,6 +63,7 @@ export function FilterPanel() {
     discrepancies,
     needsReview,
     sort,
+    sortThen,
     set,
     clearAll,
   } = useUIStore();
@@ -215,6 +219,19 @@ export function FilterPanel() {
             valueClassName="text-center"
             triggerClassName="font-medium text-textPri"
             onChange={(v) => set({ sort: v as SortKey })}
+          />
+        </div>
+
+        {/* A second key, for walking shelves in order or ranking within a site. Only ever
+            breaks ties in the first, so it can be ignored entirely. */}
+        <div className="w-full sm:w-48">
+          <SelectDropdown
+            options={[NO_SECOND_SORT, ...SORT_OPTIONS.filter((o) => o !== sort)]}
+            value={sortThen ?? NO_SECOND_SORT}
+            valuePrefix="Then: "
+            valueClassName="text-center"
+            triggerClassName={sortThen ? 'font-medium text-textPri' : 'text-textMuted'}
+            onChange={(v) => set({ sortThen: v === NO_SECOND_SORT ? null : (v as SortKey) })}
           />
         </div>
 

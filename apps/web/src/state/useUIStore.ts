@@ -49,6 +49,8 @@ interface UIState {
   ages: AgeBandKey[];
   needsReview: boolean;
   sort: SortKey;
+  /** Breaks ties in the first sort — bin within a site, priority within a bin. */
+  sortThen: SortKey | null;
   selectedId: string | null;
   modalOpen: boolean;
   set: (patch: Partial<UIState>) => void;
@@ -71,6 +73,7 @@ const DEFAULTS = {
   ages: [] as AgeBandKey[],
   needsReview: false,
   sort: 'Bin Location' as SortKey,
+  sortThen: null as SortKey | null,
 };
 
 export const useUIStore = create<UIState>((set) => ({
