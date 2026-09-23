@@ -8,6 +8,7 @@ import { errorHandler } from './middleware/errorHandler.js';
 import { authRouter } from './routes/auth.js';
 import { draftsRouter } from './routes/drafts.js';
 import { ebayListingRouter } from './routes/ebayListing.js';
+import { listingQueueRouter } from './routes/listingQueue.js';
 import { researchRouter } from './routes/research.js';
 import { exportRouter } from './routes/export.js';
 import { healthRouter } from './routes/health.js';
@@ -40,6 +41,7 @@ app.use('/api', exportRouter);
 app.use('/api', salesRouter);
 app.use('/api', draftsRouter);
 app.use('/api', ebayListingRouter);
+app.use('/api', listingQueueRouter);
 app.use('/api', researchRouter);
 
 if (process.env.NODE_ENV === 'production') {

@@ -1,30 +1,17 @@
 import { Router, type NextFunction, type Response } from 'express';
-import {
-  coerceAgentListing,
-  draftReadiness,
-  fillFromPart,
-  groupPartsBySku,
-  listingProblems,
-  researchMismatch,
-  scheduleProblem,
-  tradingCondition,
-  type ListingCheck,
-  type PartGroup,
-  type PolicyChoice,
-  type PublishResult,
-} from '@warehouse/shared';
-import { env, isGoogleConfigured } from '../config/env.js';
+import { type ListingCheck, type PublishResult } from '@warehouse/shared';
+import { env } from '../config/env.js';
 import { isEbayConfigured } from '../ebay/ordersService.js';
 import { requireAdmin } from '../middleware/auth.js';
+import { HttpError, prepareListing } from '../ebay/listingPrep.js';
 import {
   getSellerSetup,
   ListingRejectedError,
   publishListing,
   suggestCategories,
   verifyListing,
-  type PublishInput,
 } from '../ebay/publishService.js';
-import { getAllParts, updatePart } from '../google/sheetsService.js';
+import { updatePart } from '../google/sheetsService.js';
 
 export const ebayListingRouter = Router();
 
@@ -34,12 +21,6 @@ ebayListingRouter.use(['/ebay/seller-setup', '/ebay/category-suggestions', '/par
   if (env.ebayPublishing) next();
   else res.status(404).json({ error: 'eBay publishing is not enabled here.' });
 });
-
-// eBay fetches the photographs itself. They are served by the deployed app whichever
-// server builds the listing, so a local run still hands eBay addresses it can reach.
-const PHOTO_BASE = env.publicBaseUrl ?? 'https://calfracusebayinventoryapp.onrender.com';
-// eBay's limit for a fixed-price listing.
-const MAX_PICTURES = 24;
 
 /** Parts mid-publish, so a double tap can't list the same stock twice. */
 const publishing = new Set<string>();
@@ -51,14 +32,6 @@ const publishing = new Set<string>();
 const recentlyPublished = new Map<string, number>();
 const RECENT_MS = 10 * 60_000;
 
-class HttpError extends Error {
-  status: number;
-  constructor(status: number, message: string) {
-    super(message);
-    this.status = status;
-  }
-}
-
 function fail(err: unknown, res: Response, next: NextFunction) {
   if (err instanceof HttpError) {
     res.status(err.status).json({ error: err.message });
@@ -67,86 +40,6 @@ function fail(err: unknown, res: Response, next: NextFunction) {
   } else {
     next(err);
   }
-}
-
-const NEEDS: Record<string, string> = {
-  'no photographs': 'photographs',
-  'quantity not confirmed': 'a counted quantity',
-  'no item condition': 'an item condition',
-  'nothing to build a title from': 'a description',
-};
-
-async function prepare(
-  partId: string,
-  body: unknown
-): Promise<{ group: PartGroup; input: PublishInput; problems: string[]; conditionLabel: string }> {
-  if (!isEbayConfigured()) throw new HttpError(503, 'eBay is not connected.');
-  if (!isGoogleConfigured()) throw new HttpError(503, 'No data backend is configured for this environment.');
-
-  const b = (body ?? {}) as { listing?: unknown; policies?: Partial<PolicyChoice>; scheduleTime?: unknown };
-  if (!b.listing) throw new HttpError(400, 'No listing was sent.');
-
-  // A start time is optional. eBay then holds the listing under Scheduled in Seller Hub,
-  // which is where a last look before it goes live can happen.
-  let scheduleTime: string | undefined;
-  if (b.scheduleTime != null && b.scheduleTime !== '') {
-    if (typeof b.scheduleTime !== 'string') throw new HttpError(400, 'That is not a time eBay can read.');
-    const problem = scheduleProblem(b.scheduleTime);
-    if (problem) throw new HttpError(400, problem);
-    scheduleTime = new Date(b.scheduleTime).toISOString();
-  }
-
-  const group = groupPartsBySku(await getAllParts()).find((g) => g.records.some((r) => r.id === partId));
-  if (!group) throw new HttpError(404, 'Part not found.');
-
-  const listed = group.records.find((r) => r.ebayListingId);
-  if (listed || group.records.some((r) => r.itemListed)) {
-    throw new HttpError(409, `This part is already listed on eBay${listed ? ` (${listed.ebayListingId})` : ''}.`);
-  }
-  const blockers = draftReadiness(group).blockers.filter((x) => x !== 'already listed on eBay');
-  if (blockers.length) {
-    throw new HttpError(422, `Listing needs ${blockers.map((x) => NEEDS[x] ?? x).join(', ')} first.`);
-  }
-  const condition = tradingCondition(group.itemCondition);
-  if (!condition) throw new HttpError(422, `eBay has no condition matching "${group.itemCondition}".`);
-  const quantity = group.confirmedQoh ?? group.stockQty;
-  if (quantity < 1) throw new HttpError(422, 'The counted quantity is zero — there is nothing to list.');
-
-  const setup = await getSellerSetup();
-  const policies: PolicyChoice = {
-    shipping: b.policies?.shipping ?? '',
-    returns: b.policies?.returns ?? '',
-    payment: b.policies?.payment ?? '',
-  };
-  if (
-    !setup.shipping.some((p) => p.id === policies.shipping) ||
-    !setup.returns.some((p) => p.id === policies.returns) ||
-    !setup.payment.some((p) => p.id === policies.payment)
-  ) {
-    throw new HttpError(400, 'Choose a shipping, return and payment policy.');
-  }
-  if (!setup.shipFrom) {
-    throw new HttpError(503, "Couldn't find a ship-from address on any current listing to copy.");
-  }
-
-  const listing = fillFromPart(coerceAgentListing(b.listing), group);
-  const mismatch = researchMismatch(listing, group.sku);
-  if (mismatch) throw new HttpError(422, mismatch);
-  return {
-    group,
-    problems: listingProblems(listing),
-    conditionLabel: condition.label,
-    input: {
-      listing,
-      scheduleTime,
-      sku: group.sku,
-      quantity,
-      conditionId: condition.id,
-      imageUrls: group.photos.slice(0, MAX_PICTURES).map((p) => `${PHOTO_BASE}${p.url}`),
-      policies,
-      shipFrom: setup.shipFrom,
-    },
-  };
 }
 
 ebayListingRouter.get('/ebay/seller-setup', async (_req, res, next) => {
@@ -179,7 +72,7 @@ ebayListingRouter.get('/ebay/category-suggestions', async (req, res, next) => {
 /** eBay's verdict on the listing as it stands, with fees. Nothing is listed. */
 ebayListingRouter.post('/parts/:id/listing/verify', async (req, res, next) => {
   try {
-    const { input, problems, conditionLabel } = await prepare(String(req.params.id), req.body);
+    const { input, problems, conditionLabel } = await prepareListing(String(req.params.id), req.body);
     const outcome = await verifyListing(input);
     const body: ListingCheck = {
       ...outcome,
@@ -203,7 +96,7 @@ ebayListingRouter.post('/parts/:id/listing/verify', async (req, res, next) => {
 ebayListingRouter.post('/parts/:id/listing/publish', requireAdmin, async (req, res, next) => {
   let sku: string | undefined;
   try {
-    const { group, input, problems } = await prepare(String(req.params.id), req.body);
+    const { group, input, problems } = await prepareListing(String(req.params.id), req.body);
     if (problems.length) throw new HttpError(422, problems.join(' '));
     for (const [key, at] of recentlyPublished) if (Date.now() - at > RECENT_MS) recentlyPublished.delete(key);
     if (publishing.has(group.sku) || recentlyPublished.has(group.sku)) {

@@ -1,4 +1,5 @@
 import type {
+  AgentListing,
   AppUser,
   CategorySuggestion,
   CreatePartInput,
@@ -9,6 +10,7 @@ import type {
   Listing,
   ListingCheck,
   ListingRequest,
+  PolicyChoice,
   PublishResult,
   ResearchResult,
   SellerSetup,
@@ -218,6 +220,70 @@ export async function fetchResearchedSkus(): Promise<string[]> {
   const res = await fetch('/api/research/skus');
   const body = await parseJson<{ skus: string[] }>(res);
   return body.skus;
+}
+
+// The daily listing queue: SPARE proposes a batch, an admin approves, eBay holds each
+// listing until its start time.
+
+export interface PlannedListing {
+  partId: string;
+  sku: string;
+  title: string;
+  price: number | null;
+  quantity: number;
+  photos: number;
+  condition: string;
+  startAt: string;
+  problems: string[];
+  listing: AgentListing;
+}
+
+export interface QueuePlan {
+  items: PlannedListing[];
+  remaining: number;
+  unresearched: number;
+}
+
+export interface QueueStatus {
+  running: boolean;
+  total: number;
+  scheduled: number;
+  failed: { sku: string; error: string }[];
+  current: string | null;
+  startedAt: string | null;
+  finishedAt: string | null;
+  startedBy: string | null;
+}
+
+export async function fetchQueuePlan(days: number, perDay: number, hour: number): Promise<QueuePlan> {
+  const res = await fetch('/api/listing-queue/plan', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ days, perDay, hour }),
+  });
+  return parseJson(res);
+}
+
+export async function fetchQueueStatus(): Promise<QueueStatus> {
+  const res = await fetch('/api/listing-queue/status');
+  return parseJson(res);
+}
+
+export async function scheduleQueue(
+  items: { partId: string; startAt: string; listing: AgentListing }[],
+  policies: PolicyChoice
+): Promise<QueueStatus> {
+  const res = await fetch('/api/listing-queue/schedule', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ items, policies }),
+  });
+  return parseJson(res);
+}
+
+export async function stopQueue(): Promise<QueueStatus> {
+  const res = await fetch('/api/listing-queue/stop', { method: 'POST' });
+  return parseJson(res);
 }
 
 /** A run of Copilot research over the parts that are ready to list but not yet researched. */

@@ -1,0 +1,121 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { InventoryPart, Photo } from '@warehouse/shared';
+
+const sheets = vi.hoisted(() => ({ getAllParts: vi.fn(), updatePart: vi.fn() }));
+const research = vi.hoisted(() => ({ latestResearch: vi.fn() }));
+
+vi.mock('../google/sheetsService.js', () => sheets);
+vi.mock('./researchService.js', () => research);
+vi.mock('./publishService.js', () => ({ publishListing: vi.fn(), verifyListing: vi.fn(), getSellerSetup: vi.fn() }));
+
+const { buildPlan } = await import('./listingQueue.js');
+
+const NOW = new Date('2026-09-23T15:00:00.000Z');
+
+/** A part ready to list: photographed, counted, graded, priced, not yet on eBay. */
+function part(sku: string, over: Partial<InventoryPart> = {}): InventoryPart {
+  return {
+    id: `id-${sku}`,
+    sku,
+    description: `PART ${sku}`,
+    manufacturer: 'Parker',
+    inventorySite: 'NDPARTS',
+    binLocation: 'C-4-5',
+    qoh: 2,
+    confirmedQoh: 2,
+    itemCondition: 'New',
+    boxCondition: 'Good',
+    photographed: true,
+    photos: [{ id: 'p1', url: '/api/photos/p1/content', name: 'p1.jpg' }] as Photo[],
+    activeRecoveryPriceBasis: 100,
+    itemListed: false,
+    transferredToMarketRecovery: false,
+    updatedAt: '2026-09-01T00:00:00.000Z',
+    ...over,
+  } as unknown as InventoryPart;
+}
+
+const researched = (title: string) => ({
+  found: true,
+  createdAt: '2026-09-22T00:00:00.000Z',
+  listing: { title, price: 120, categoryId: '170141', titleOptions: [], priceOptions: [], specifics: [] },
+  notes: [],
+});
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  research.latestResearch.mockResolvedValue(researched('A TITLE'));
+});
+
+describe('buildPlan', () => {
+  it('fills each day before starting the next, beginning tomorrow', async () => {
+    sheets.getAllParts.mockResolvedValue(['A', 'B', 'C', 'D'].map((s) => part(s)));
+
+    const plan = await buildPlan(2, 2, 9, NOW);
+    const days = plan.items.map((i) => new Date(i.startAt).toDateString());
+    expect(new Set(days).size).toBe(2);
+    expect(days[0]).toBe(days[1]);
+    expect(days[2]).toBe(days[3]);
+    expect(new Date(plan.items[0].startAt).getDate()).toBe(24);
+    expect(new Date(plan.items[2].startAt).getDate()).toBe(25);
+  });
+
+  it('spreads the listings of a day through the hour rather than all at once', async () => {
+    sheets.getAllParts.mockResolvedValue(['A', 'B'].map((s) => part(s)));
+
+    const plan = await buildPlan(1, 2, 9, NOW);
+    const [first, second] = plan.items.map((i) => new Date(i.startAt));
+    expect(first.getHours()).toBe(9);
+    expect(first.getMinutes()).toBe(0);
+    expect(second.getMinutes()).toBe(30);
+  });
+
+  it('takes no more than the batch asked for, and says what is left', async () => {
+    sheets.getAllParts.mockResolvedValue(['A', 'B', 'C', 'D', 'E'].map((s) => part(s)));
+
+    const plan = await buildPlan(1, 2, 9, NOW);
+    expect(plan.items).toHaveLength(2);
+    expect(plan.remaining).toBe(3);
+  });
+
+  it('skips parts Copilot has not written up, and counts them', async () => {
+    sheets.getAllParts.mockResolvedValue([part('A'), part('B')]);
+    research.latestResearch.mockImplementation(async (sku: string) =>
+      sku === 'A' ? researched('A TITLE') : { found: false }
+    );
+
+    const plan = await buildPlan(1, 10, 9, NOW);
+    expect(plan.items.map((i) => i.sku)).toEqual(['A']);
+    expect(plan.unresearched).toBe(1);
+  });
+
+  it('leaves out parts that are not ready to list', async () => {
+    sheets.getAllParts.mockResolvedValue([
+      part('READY'),
+      part('LISTED', { itemListed: true, ebayListingId: '123' }),
+      part('NOPHOTO', { photographed: false, photos: [] as Photo[] }),
+      part('NOCOUNT', { confirmedQoh: undefined }),
+    ]);
+
+    const plan = await buildPlan(1, 10, 9, NOW);
+    expect(plan.items.map((i) => i.sku)).toEqual(['READY']);
+  });
+
+  it('lists the best-ranked stock first', async () => {
+    sheets.getAllParts.mockResolvedValue([
+      part('LOW', { revenuePriorityRank: 900 }),
+      part('TOP', { revenuePriorityRank: 2 }),
+      part('MID', { revenuePriorityRank: 50 }),
+    ]);
+
+    const plan = await buildPlan(1, 10, 9, NOW);
+    expect(plan.items.map((i) => i.sku)).toEqual(['TOP', 'MID', 'LOW']);
+  });
+
+  it('carries what the reviewer needs to judge each listing', async () => {
+    sheets.getAllParts.mockResolvedValue([part('A', { confirmedQoh: 4 })]);
+
+    const [item] = (await buildPlan(1, 10, 9, NOW)).items;
+    expect(item).toMatchObject({ sku: 'A', title: 'A TITLE', price: 120, quantity: 4, photos: 1, condition: 'New' });
+  });
+});

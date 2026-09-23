@@ -1,11 +1,12 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { KeyRound, LogOut, ShieldCheck, X } from 'lucide-react';
+import { CalendarClock, KeyRound, LogOut, ShieldCheck, X } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 import { formatDate } from '@warehouse/shared';
 import { useBodyScrollLock } from '../hooks/useBodyScrollLock';
 import { adminSetPin, changeMyPin, fetchAdminUsers, logout } from '../lib/api';
 import { useSalesStatus } from '../hooks/useSales';
 import { useUserStore } from '../state/useUserStore';
+import { ListingQueueDialog } from './ListingQueueDialog';
 import { ResearchBacklog } from './ResearchBacklog';
 import { useToastStore } from '../state/useToastStore';
 import { Button } from './ui/Button';
@@ -113,6 +114,7 @@ export function AccountDialog({ onClose }: { onClose: () => void }) {
   const [next, setNext] = useState('');
   const [again, setAgain] = useState('');
   const [busy, setBusy] = useState(false);
+  const [queueOpen, setQueueOpen] = useState(false);
 
   const switchUser = async () => {
     await logout().catch(() => undefined);
@@ -192,6 +194,22 @@ export function AccountDialog({ onClose }: { onClose: () => void }) {
           </form>
         )}
 
+        {/* Listing a steady number a day, without scheduling them one at a time. */}
+        {admin && status?.ebayPublishing && (
+          <div className="mt-6">
+            <div className="flex items-center gap-1.5 text-xs font-semibold text-textMuted">
+              <CalendarClock size={13} /> Schedule listings
+            </div>
+            <p className="mt-1 text-[11px] text-textMuted">
+              SPARE proposes a batch — so many a day, for as many days as you like. You approve it, and eBay holds
+              each listing until its day.
+            </p>
+            <Button type="button" variant="outline" onClick={() => setQueueOpen(true)} className="mt-2 w-full">
+              <CalendarClock size={14} /> Plan a batch
+            </Button>
+          </div>
+        )}
+
         {admin && status?.research && <ResearchBacklog />}
 
         {admin && (
@@ -214,6 +232,7 @@ export function AccountDialog({ onClose }: { onClose: () => void }) {
           </div>
         )}
       </div>
+      {queueOpen && <ListingQueueDialog onClose={() => setQueueOpen(false)} />}
     </div>
   );
 }
