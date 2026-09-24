@@ -239,6 +239,9 @@ export interface PlannedListing {
   listing: AgentListing;
   categoryId: string;
   categoryName: string | null;
+  /** SPARE guessed the category rather than matching it, so it is worth a look. */
+  categoryUncertain: boolean;
+  categoryAlternatives: CategorySuggestion[];
   /** Under eBay Motors, which is what decides the returns policy. */
   motors: boolean;
   shipping: 'free' | 'paid';

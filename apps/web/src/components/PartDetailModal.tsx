@@ -301,7 +301,7 @@ export function PartDetailModal() {
   };
 
   return (
-    <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 p-4 sm:p-6">
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4 sm:p-6">
       <div className="flex max-h-[85vh] w-full flex-col rounded-card bg-surface sm:w-[720px]">
         {/* Scrolled, the title line gives up its second row too: on a phone that is another
             card's worth of the screen, and the SKU alone says which part this is. */}

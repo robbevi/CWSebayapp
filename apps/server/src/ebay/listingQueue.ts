@@ -7,6 +7,7 @@ import {
   listingProblems,
   scheduleProblem,
   type AgentListing,
+  type CategorySuggestion,
   type PartGroup,
   type PolicyChoice,
   type SellerPolicy,
@@ -44,6 +45,10 @@ export interface PlannedListing {
   categoryName: string | null;
   /** True when the category sits under eBay Motors, which decides the returns policy. */
   motors: boolean;
+  /** SPARE guessed the category rather than matching it; worth a person's eye. */
+  categoryUncertain: boolean;
+  /** The other categories eBay offered, for changing it without asking again. */
+  categoryAlternatives: CategorySuggestion[];
   /** Free postage or charged, suggested from the agent's weight and the price. */
   shipping: ShippingChoice;
   policies: PolicyChoice;
@@ -151,15 +156,26 @@ function startFor(day: Date, hour: number, indexInDay: number, perDay: number): 
  * taken when it is a leaf and clearly ahead of the next, exactly the rule the screen uses
  * to pick for itself. Anything less certain is left for the reviewer to see as a problem.
  */
-async function withCategory(listing: AgentListing): Promise<AgentListing> {
-  if (listing.categoryId) return listing;
+async function withCategory(
+  listing: AgentListing
+): Promise<{ listing: AgentListing; uncertain: boolean; alternatives: CategorySuggestion[] }> {
+  if (listing.categoryId) return { listing, uncertain: false, alternatives: [] };
   const suggestions = await suggestCategories(
     listing.titleOptions[0] ?? listing.title,
     listing.categoryPath ?? ''
   ).catch(() => []);
   const [top, next] = suggestions;
-  if (!top?.leafMatch || (next?.score ?? -1) >= top.score) return listing;
-  return { ...listing, categoryId: top.id, categoryName: top.name };
+  if (!top) return { listing, uncertain: true, alternatives: [] };
+
+  // Best guess either way, because a listing held back for want of a category helps nobody
+  // — but only a clear leaf match, ahead of whatever came second, is taken as settled. The
+  // rest go through flagged, with the runners-up to hand.
+  const settled = top.leafMatch && (next?.score ?? -1) < top.score;
+  return {
+    listing: { ...listing, categoryId: top.id, categoryName: top.name },
+    uncertain: !settled,
+    alternatives: suggestions.slice(0, 4),
+  };
 }
 
 /**
@@ -211,7 +227,7 @@ export async function buildPlan(
     // empty. Not a candidate, and not worth stopping the plan for.
     const found = research?.listing ? coerceAgentListing(research.listing) : null;
     if (!found) continue;
-    const parsed = await withCategory(found);
+    const { listing: parsed, uncertain, alternatives } = await withCategory(found);
     // Motors decides the returns policy, so the category has to be resolved either way.
     const category = parsed.categoryId ? await resolveCategory(parsed.categoryId).catch(() => null) : null;
     const motors = category?.siteId === SITE_MOTORS;
@@ -237,6 +253,8 @@ export async function buildPlan(
       listing: parsed,
       categoryId: parsed.categoryId,
       categoryName: category?.name ?? parsed.categoryName ?? null,
+      categoryUncertain: uncertain,
+      categoryAlternatives: alternatives,
       motors,
       shipping,
       policies: policiesFor(policies, motors, shipping),

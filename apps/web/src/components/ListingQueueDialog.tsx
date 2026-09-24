@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { AlertTriangle, CalendarClock, Check, X } from 'lucide-react';
 import { useState } from 'react';
+import { useUIStore } from '../state/useUIStore';
 import { listingProblems, type AgentListing, type CategorySuggestion } from '@warehouse/shared';
 import { useBodyScrollLock } from '../hooks/useBodyScrollLock';
 import {
@@ -108,6 +109,7 @@ export function ListingQueueDialog({ onClose }: { onClose: () => void }) {
   const [dropped, setDropped] = useState<Set<string>>(new Set());
   // Changes the reviewer has made to a row, kept apart from what the server proposed.
   const [edits, setEdits] = useState<Record<string, Partial<PlannedListing>>>({});
+  const setUI = useUIStore((s) => s.set);
 
   const plan = useQuery<QueuePlan>({
     queryKey: ['listing-queue-plan', days, perDay, hour],
@@ -137,6 +139,7 @@ export function ListingQueueDialog({ onClose }: { onClose: () => void }) {
       listing,
       categoryId: s.id,
       categoryName: s.name,
+      categoryUncertain: false,
       motors,
       problems: listingProblems(listing),
       policies: { ...item.policies, returns: returns?.id ?? item.policies.returns },
@@ -173,6 +176,7 @@ export function ListingQueueDialog({ onClose }: { onClose: () => void }) {
     byDay.set(key, [...(byDay.get(key) ?? []), item]);
   }
   const blocked = items.filter((i) => i.problems.length > 0);
+  const unsure = planned.filter((i) => i.categoryUncertain);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-3 sm:p-6">
@@ -241,6 +245,7 @@ export function ListingQueueDialog({ onClose }: { onClose: () => void }) {
             <>
               <p className="mt-4 text-[11px] text-textMuted">
                 {planned.length} to schedule
+                {unsure.length > 0 && `, ${unsure.length} with a guessed category`}
                 {blocked.length > 0 && `, ${blocked.length} needing a fix`}
                 {plan.data.remaining > 0 && `, ${plan.data.remaining} more ready for another batch`}
                 {plan.data.unresearched > 0 && `, ${plan.data.unresearched} waiting on research`}.
@@ -255,13 +260,18 @@ export function ListingQueueDialog({ onClose }: { onClose: () => void }) {
                     {dayItems.map((item) => (
                       <li key={item.partId} className="border-b border-border py-2 last:border-0">
                         <div className="flex items-start gap-2">
-                          <div className="min-w-0 flex-1">
+                          <button
+                            type="button"
+                            onClick={() => setUI({ selectedId: item.partId, modalOpen: true })}
+                            title="Open the part"
+                            className="min-h-0 min-w-0 flex-1 text-left hover:underline"
+                          >
                             <div className="truncate text-xs font-semibold text-textPri">{item.title}</div>
                             <div className="mt-0.5 text-[11px] text-textMuted">
                               {item.sku} · {item.condition} · qty {item.quantity} · {item.photos} photos ·{' '}
                               {time(item.startAt)}
                             </div>
-                          </div>
+                          </button>
                           <div className="shrink-0 text-right text-xs font-bold tabular-nums text-textPri">
                             {money(item.price)}
                           </div>
@@ -283,6 +293,11 @@ export function ListingQueueDialog({ onClose }: { onClose: () => void }) {
                           <span className="rounded-pill border border-border px-2 py-0.5 text-textMuted">
                             {item.motors ? 'Returns accepted' : 'No returns'}
                           </span>
+                          {item.categoryUncertain && (
+                            <span className="flex items-center gap-1 rounded-pill border border-amber-200 bg-amber-100 px-2 py-0.5 font-semibold text-amber-700">
+                              <AlertTriangle size={10} /> Category guessed
+                            </span>
+                          )}
                           {(['free', 'paid'] as const).map((choice) => (
                             <button
                               key={choice}
@@ -299,6 +314,26 @@ export function ListingQueueDialog({ onClose }: { onClose: () => void }) {
                             </button>
                           ))}
                         </div>
+
+                        {item.categoryUncertain && item.categoryAlternatives.length > 1 && (
+                          <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[11px]">
+                            <span className="text-textMuted">Or:</span>
+                            {item.categoryAlternatives
+                              .filter((s) => s.id !== item.categoryId)
+                              .slice(0, 3)
+                              .map((s) => (
+                                <button
+                                  key={s.id}
+                                  type="button"
+                                  onClick={() => setCategory(item, s)}
+                                  title={s.path}
+                                  className="min-h-0 rounded-pill border border-border px-2 py-0.5 text-textMuted hover:bg-surfaceMuted hover:text-textPri"
+                                >
+                                  {s.name}
+                                </button>
+                              ))}
+                          </div>
+                        )}
                       </li>
                     ))}
                   </ul>
