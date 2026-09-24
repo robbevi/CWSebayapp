@@ -267,6 +267,30 @@ describe('buildPlan', () => {
     expect(new Date(plan.items[0].startAt).getDate()).toBe(23);
   });
 
+  it('goes as soon as eBay allows when asked, ignoring the hour', async () => {
+    sheets.getAllParts.mockResolvedValue([part('A'), part('B')]);
+    const at = new Date(2026, 8, 24, 16, 0);
+
+    const plan = await buildPlan(1, 10, 9, at, undefined, true);
+    const [first, second] = plan.items.map((i) => new Date(i.startAt));
+    // An hour and ten minutes of notice, then a few minutes between listings.
+    expect(first.getTime() - at.getTime()).toBe(70 * 60_000);
+    expect(second.getTime() - first.getTime()).toBe(6 * 60_000);
+    expect(first.getDate()).toBe(24);
+  });
+
+  it('spills an asap batch into the following hours rather than the next day', async () => {
+    sheets.getAllParts.mockResolvedValue(['A', 'B', 'C'].map((s) => part(s)));
+    const at = new Date(2026, 8, 24, 16, 0);
+
+    // Two a day over two days, taken as three listings half an hour apart from the off.
+    const plan = await buildPlan(2, 2, 9, at, undefined, true);
+    const times = plan.items.map((i) => new Date(i.startAt).getTime());
+    expect(plan.items).toHaveLength(3);
+    expect(times[2] - times[0]).toBe(60 * 60_000);
+    expect(new Date(times[2]).getDate()).toBe(24);
+  });
+
   it('carries what the reviewer needs to judge each listing', async () => {
     sheets.getAllParts.mockResolvedValue([part('A', { confirmedQoh: 4 })]);
 

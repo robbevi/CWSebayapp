@@ -220,9 +220,14 @@ export async function buildPlan(
   hour: number,
   now: Date = new Date(),
   /** The day to start on, as YYYY-MM-DD. Defaults to the first day eBay would accept. */
-  startDate?: string
+  startDate?: string,
+  /**
+   * Ignore the hour and go as soon as eBay allows. For a batch decided on the spot, where
+   * waiting until tomorrow morning is the only thing standing between stock and a buyer.
+   */
+  asap = false
 ): Promise<QueuePlan> {
-  const start = firstDay(hour, now, startDate);
+  const start = asap ? new Date(now.getTime() + NOTICE_MS) : firstDay(hour, now, startDate);
   const [all, researched, policies] = await Promise.all([
     getAllParts().then((parts) => candidates(groupPartsBySku(parts))),
     researchedSkus(),
@@ -255,9 +260,15 @@ export async function buildPlan(
     const shipping = suggestShipping(parsed);
 
     const index = items.length;
-    const day = new Date(start);
-    day.setDate(day.getDate() + Math.floor(index / perDay));
-    const startAt = startFor(day, hour, index % perDay, perDay);
+    let startAt: Date;
+    if (asap) {
+      // Straight off the first slot, minutes apart, rather than anchored to an hour.
+      startAt = new Date(start.getTime() + index * Math.max(Math.floor(60 / perDay), 2) * 60_000);
+    } else {
+      const day = new Date(start);
+      day.setDate(day.getDate() + Math.floor(index / perDay));
+      startAt = startFor(day, hour, index % perDay, perDay);
+    }
 
     items.push({
       partId: group.primary.id,

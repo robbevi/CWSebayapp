@@ -109,14 +109,17 @@ export function ListingQueueDialog({ onClose }: { onClose: () => void }) {
   // Empty means the first day eBay would accept, which is today when the hour is still
   // far enough off and tomorrow when it isn't.
   const [startDate, setStartDate] = useState('');
+  // Set, the batch goes at the first moment eBay will take it, and the day and hour above
+  // stop mattering.
+  const [asap, setAsap] = useState(false);
   const [dropped, setDropped] = useState<Set<string>>(new Set());
   // Changes the reviewer has made to a row, kept apart from what the server proposed.
   const [edits, setEdits] = useState<Record<string, Partial<PlannedListing>>>({});
   const setUI = useUIStore((s) => s.set);
 
   const plan = useQuery<QueuePlan>({
-    queryKey: ['listing-queue-plan', days, perDay, hour, startDate],
-    queryFn: () => fetchQueuePlan(days, perDay, hour, startDate || undefined),
+    queryKey: ['listing-queue-plan', days, perDay, hour, startDate, asap],
+    queryFn: () => fetchQueuePlan(days, perDay, hour, startDate || undefined, asap),
   });
   const status = useQuery({
     queryKey: ['listing-queue-status'],
@@ -212,8 +215,12 @@ export function ListingQueueDialog({ onClose }: { onClose: () => void }) {
                 aria-label="First day of the batch"
                 value={startDate}
                 min={new Date().toISOString().slice(0, 10)}
-                onChange={(e) => setStartDate(e.target.value)}
-                className="h-11 w-full rounded-btn border border-border bg-surface px-2 text-xs text-textPri"
+                disabled={asap}
+                onChange={(e) => {
+                  setAsap(false);
+                  setStartDate(e.target.value);
+                }}
+                className="h-11 w-full rounded-btn border border-border bg-surface px-2 text-xs text-textPri disabled:opacity-50"
               />
             </div>
             <div>
@@ -246,10 +253,26 @@ export function ListingQueueDialog({ onClose }: { onClose: () => void }) {
             </div>
           </div>
 
+          <button
+            type="button"
+            onClick={() => {
+              setAsap((v) => !v);
+              setStartDate('');
+            }}
+            aria-pressed={asap}
+            className={cn(
+              'mt-2 min-h-0 rounded-pill border px-3 py-1 text-[11px] font-semibold',
+              asap ? 'border-primary bg-primary/10 text-primary' : 'border-border text-textMuted hover:bg-surfaceMuted'
+            )}
+          >
+            {asap ? 'Listing as soon as eBay allows' : 'List today, as soon as eBay allows'}
+          </button>
+
           {plan.data && (
             <p className="mt-2 text-[11px] text-textMuted">
               First listing {new Date(plan.data.startsOn).toLocaleString([], { dateStyle: 'full', timeStyle: 'short' })}
-              {startDate && plan.data.startsOn.slice(0, 10) !== startDate && ' — eBay needs an hour of notice'}.
+              {!asap && startDate && plan.data.startsOn.slice(0, 10) !== startDate && ' — eBay needs an hour of notice'}
+              {asap && ' — the soonest eBay accepts'}.
               {options?.payment && ` Paid through ${options.payment.name}.`}
             </p>
           )}
