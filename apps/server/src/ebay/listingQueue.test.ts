@@ -17,7 +17,7 @@ const publish = vi.hoisted(() => ({
 }));
 vi.mock('./publishService.js', () => publish);
 
-const { buildPlan, policiesFor, queuePolicies } = await import('./listingQueue.js');
+const { buildPlan, firstDay, policiesFor, queuePolicies } = await import('./listingQueue.js');
 
 /** The account's policies as SPARE reads them, copies and all. */
 const SETUP = {
@@ -86,6 +86,37 @@ beforeEach(() => {
   });
 });
 
+describe('firstDay', () => {
+  // 3pm on the 23rd, local to whoever is running this.
+  const afternoon = new Date(2026, 8, 23, 15, 0, 0);
+
+  it('goes out today when the hour is still ahead', () => {
+    const day = firstDay(18, afternoon);
+    expect(day.getDate()).toBe(23);
+    expect(day.getHours()).toBe(18);
+  });
+
+  it('waits for tomorrow when today no longer leaves eBay its notice', () => {
+    // 3:30pm is under the hour eBay wants, so a 4pm batch belongs to tomorrow.
+    expect(firstDay(16, new Date(2026, 8, 23, 15, 30)).getDate()).toBe(24);
+    expect(firstDay(9, afternoon).getDate()).toBe(24);
+  });
+
+  it('honors a day that was asked for', () => {
+    const day = firstDay(9, afternoon, '2026-09-28');
+    expect(day.getDate()).toBe(28);
+    expect(day.getHours()).toBe(9);
+  });
+
+  it('moves a day that has already gone by to one that works', () => {
+    expect(firstDay(9, afternoon, '2026-09-20').getDate()).toBe(24);
+  });
+
+  it('falls back when the date makes no sense', () => {
+    expect(firstDay(9, afternoon, 'not-a-day').getDate()).toBe(24);
+  });
+});
+
 describe('queuePolicies', () => {
   it('ignores the copies nobody meant to list under', async () => {
     publish.getSellerSetup.mockResolvedValue(SETUP);
@@ -127,6 +158,7 @@ describe('buildPlan', () => {
   it('fills each day before starting the next, beginning tomorrow', async () => {
     sheets.getAllParts.mockResolvedValue(['A', 'B', 'C', 'D'].map((s) => part(s)));
 
+    // NOW is mid-afternoon, so a 9am batch starts tomorrow.
     const plan = await buildPlan(2, 2, 9, NOW);
     const days = plan.items.map((i) => new Date(i.startAt).toDateString());
     expect(new Set(days).size).toBe(2);
@@ -217,6 +249,22 @@ describe('buildPlan', () => {
 
     const plan = await buildPlan(1, 10, 9, NOW);
     expect(plan.items[0]).toMatchObject({ motors: true, policies: { returns: 'ret-motors' } });
+  });
+
+  it('starts on the day it was given', async () => {
+    sheets.getAllParts.mockResolvedValue([part('A'), part('B')]);
+
+    const plan = await buildPlan(1, 2, 9, NOW, '2026-09-30');
+    expect(new Date(plan.items[0].startAt).getDate()).toBe(30);
+    expect(new Date(plan.startsOn).getDate()).toBe(30);
+  });
+
+  it('can go out later the same day, when the hour is still ahead', async () => {
+    sheets.getAllParts.mockResolvedValue([part('A')]);
+
+    // NOW is 3pm local; a 6pm batch has the notice eBay wants.
+    const plan = await buildPlan(1, 1, 18, new Date(2026, 8, 23, 15, 0));
+    expect(new Date(plan.items[0].startAt).getDate()).toBe(23);
   });
 
   it('carries what the reviewer needs to judge each listing', async () => {

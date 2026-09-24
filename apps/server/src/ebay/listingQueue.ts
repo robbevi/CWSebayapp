@@ -102,6 +102,8 @@ export function policiesFor(all: QueuePolicies, motors: boolean, shipping: Shipp
 
 export interface QueuePlan {
   items: PlannedListing[];
+  /** The day the batch starts, which may be later than asked if eBay's notice ruled it out. */
+  startsOn: string;
   /** The policies a reviewer can switch between, so the screen can relabel without asking. */
   policyOptions: QueuePolicies;
   /** Ready to list and researched, but beyond what this plan covers. */
@@ -148,6 +150,22 @@ function startFor(day: Date, hour: number, indexInDay: number, perDay: number): 
   const gap = Math.floor(60 / Math.max(perDay, 1));
   at.setMinutes(indexInDay * gap);
   return at;
+}
+
+/** eBay wants an hour's notice; a few minutes more, so a slow batch doesn't miss the window. */
+const NOTICE_MS = 70 * 60_000;
+
+/**
+ * The first day a batch can run. Today when its hour is still far enough off — a batch
+ * decided this morning should be able to go out this afternoon — and otherwise tomorrow.
+ * An explicit date is honored, moved on only if it has already passed.
+ */
+export function firstDay(hour: number, now: Date, requested?: string): Date {
+  const day = requested ? new Date(`${requested}T00:00:00`) : new Date(now);
+  if (Number.isNaN(day.getTime())) return firstDay(hour, now);
+  day.setHours(hour, 0, 0, 0);
+  while (day.getTime() - now.getTime() < NOTICE_MS) day.setDate(day.getDate() + 1);
+  return day;
 }
 
 /**
@@ -200,8 +218,11 @@ export async function buildPlan(
   days: number,
   perDay: number,
   hour: number,
-  now: Date = new Date()
+  now: Date = new Date(),
+  /** The day to start on, as YYYY-MM-DD. Defaults to the first day eBay would accept. */
+  startDate?: string
 ): Promise<QueuePlan> {
+  const start = firstDay(hour, now, startDate);
   const [all, researched, policies] = await Promise.all([
     getAllParts().then((parts) => candidates(groupPartsBySku(parts))),
     researchedSkus(),
@@ -234,10 +255,8 @@ export async function buildPlan(
     const shipping = suggestShipping(parsed);
 
     const index = items.length;
-    const day = new Date(now);
-    // Tomorrow at the earliest: today's hour may already have passed, and eBay wants an
-    // hour's notice regardless.
-    day.setDate(day.getDate() + 1 + Math.floor(index / perDay));
+    const day = new Date(start);
+    day.setDate(day.getDate() + Math.floor(index / perDay));
     const startAt = startFor(day, hour, index % perDay, perDay);
 
     items.push({
@@ -261,7 +280,13 @@ export async function buildPlan(
     });
   }
 
-  return { items, policyOptions: policies, remaining: Math.max(0, groups.length - seen), unresearched };
+  return {
+    items,
+    policyOptions: policies,
+    startsOn: start.toISOString(),
+    remaining: Math.max(0, groups.length - seen),
+    unresearched,
+  };
 }
 
 export interface QueueItem {

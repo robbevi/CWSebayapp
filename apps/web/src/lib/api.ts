@@ -260,6 +260,8 @@ export interface QueuePolicies {
 export interface QueuePlan {
   items: PlannedListing[];
   policyOptions: QueuePolicies;
+  /** The day the batch starts, later than asked when eBay's hour of notice ruled it out. */
+  startsOn: string;
   remaining: number;
   unresearched: number;
 }
@@ -275,11 +277,16 @@ export interface QueueStatus {
   startedBy: string | null;
 }
 
-export async function fetchQueuePlan(days: number, perDay: number, hour: number): Promise<QueuePlan> {
+export async function fetchQueuePlan(
+  days: number,
+  perDay: number,
+  hour: number,
+  startDate?: string
+): Promise<QueuePlan> {
   const res = await fetch('/api/listing-queue/plan', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ days, perDay, hour }),
+    body: JSON.stringify({ days, perDay, hour, startDate }),
   });
   return parseJson(res);
 }

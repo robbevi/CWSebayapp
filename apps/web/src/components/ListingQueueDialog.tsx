@@ -106,14 +106,17 @@ export function ListingQueueDialog({ onClose }: { onClose: () => void }) {
   const [perDay, setPerDay] = useState(10);
   const [hour, setHour] = useState(9);
   const [focus, setFocus] = useState<FocusKey>('priority');
+  // Empty means the first day eBay would accept, which is today when the hour is still
+  // far enough off and tomorrow when it isn't.
+  const [startDate, setStartDate] = useState('');
   const [dropped, setDropped] = useState<Set<string>>(new Set());
   // Changes the reviewer has made to a row, kept apart from what the server proposed.
   const [edits, setEdits] = useState<Record<string, Partial<PlannedListing>>>({});
   const setUI = useUIStore((s) => s.set);
 
   const plan = useQuery<QueuePlan>({
-    queryKey: ['listing-queue-plan', days, perDay, hour],
-    queryFn: () => fetchQueuePlan(days, perDay, hour),
+    queryKey: ['listing-queue-plan', days, perDay, hour, startDate],
+    queryFn: () => fetchQueuePlan(days, perDay, hour, startDate || undefined),
   });
   const status = useQuery({
     queryKey: ['listing-queue-status'],
@@ -201,7 +204,18 @@ export function ListingQueueDialog({ onClose }: { onClose: () => void }) {
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4">
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
+            <div>
+              <div className="mb-1 text-[11px] font-semibold text-textMuted">Starting</div>
+              <input
+                type="date"
+                aria-label="First day of the batch"
+                value={startDate}
+                min={new Date().toISOString().slice(0, 10)}
+                onChange={(e) => setStartDate(e.target.value)}
+                className="h-11 w-full rounded-btn border border-border bg-surface px-2 text-xs text-textPri"
+              />
+            </div>
             <div>
               <div className="mb-1 text-[11px] font-semibold text-textMuted">Listings a day</div>
               <SelectDropdown
@@ -232,9 +246,11 @@ export function ListingQueueDialog({ onClose }: { onClose: () => void }) {
             </div>
           </div>
 
-          {options?.payment && (
+          {plan.data && (
             <p className="mt-2 text-[11px] text-textMuted">
-              Paid through {options.payment.name}. Postage and returns are set on each listing below.
+              First listing {new Date(plan.data.startsOn).toLocaleString([], { dateStyle: 'full', timeStyle: 'short' })}
+              {startDate && plan.data.startsOn.slice(0, 10) !== startDate && ' — eBay needs an hour of notice'}.
+              {options?.payment && ` Paid through ${options.payment.name}.`}
             </p>
           )}
 
