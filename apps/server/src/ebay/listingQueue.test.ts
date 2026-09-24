@@ -349,6 +349,24 @@ describe('scheduling an approved batch', () => {
     expect(prep.prepareListing.mock.calls[0][1].listing).toMatchObject({ categoryId: '99999' });
   });
 
+  it('takes a price and title edited on the part over what was researched', async () => {
+    await startQueue(
+      [{ partId: 'id-A', startAt: '2026-09-25T09:00:00.000Z', policies, price: 125, title: 'A BETTER TITLE' }],
+      'Rob Bevilacqua'
+    );
+    await settled();
+    expect(prep.prepareListing.mock.calls[0][1].listing).toMatchObject({ price: 125, title: 'A BETTER TITLE' });
+  });
+
+  it('ignores an edit that says nothing, rather than blanking the research', async () => {
+    await startQueue(
+      [{ partId: 'id-A', startAt: '2026-09-25T09:00:00.000Z', policies, price: 0, title: '   ' }],
+      'Rob Bevilacqua'
+    );
+    await settled();
+    expect(prep.prepareListing.mock.calls[0][1].listing).toMatchObject({ price: 120, title: 'A TITLE' });
+  });
+
   it('records the failure and carries on when research cannot be read', async () => {
     research.latestResearch.mockResolvedValue({ found: false });
     await startQueue([{ partId: 'id-A', startAt: '2026-09-25T09:00:00.000Z', policies }], 'Rob Bevilacqua');

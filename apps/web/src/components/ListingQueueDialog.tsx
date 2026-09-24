@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { AlertTriangle, CalendarClock, Check, X } from 'lucide-react';
+import { AlertTriangle, CalendarClock, Check, Eye, X } from 'lucide-react';
 import { useState } from 'react';
 import { useUIStore } from '../state/useUIStore';
 import { listingProblems, type AgentListing, type CategorySuggestion } from '@warehouse/shared';
@@ -16,6 +16,19 @@ import { cn } from '../lib/cn';
 import { useToastStore } from '../state/useToastStore';
 import { Button } from './ui/Button';
 import { SelectDropdown } from './ui/SelectDropdown';
+
+/** A planned listing, plus whether what is shown came from an edit made on the part. */
+type Row = PlannedListing & { edited?: boolean };
+
+/** A listing someone has been editing on the part itself, saved by the browser it was edited in. */
+function savedDraft(sku: string): { listing?: { title?: string; price?: number | null } } | null {
+  try {
+    const raw = localStorage.getItem(`spare.listing.${sku}`);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
 
 const money = (v: number | null) => (v == null ? '—' : v.toLocaleString('en-US', { style: 'currency', currency: 'USD' }));
 const day = (iso: string) => new Date(iso).toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' });
@@ -152,8 +165,21 @@ export function ListingQueueDialog({ onClose }: { onClose: () => void }) {
     });
   };
 
+  // A price or title changed on the part wins over what was researched: it is the later
+  // decision, and the person who made it expects to see it here.
+  const withDrafts = (i: Row): Row => {
+    const draft = savedDraft(i.sku)?.listing;
+    if (!draft) return i;
+    return {
+      ...i,
+      title: draft.title?.trim() || i.title,
+      price: draft.price ?? i.price,
+      edited: !!draft.title?.trim() || draft.price != null,
+    };
+  };
+
   const items = focusSort(plan.data?.items ?? [], focus)
-    .map((i) => ({ ...i, ...edits[i.partId] }) as PlannedListing)
+    .map((i) => ({ ...withDrafts(i), ...edits[i.partId] }) as Row)
     .filter((i) => !dropped.has(i.partId));
   const ready = items.filter((i) => i.problems.length === 0);
 
@@ -171,6 +197,8 @@ export function ListingQueueDialog({ onClose }: { onClose: () => void }) {
           startAt: i.startAt,
           policies: i.policies,
           categoryId: i.categoryId || undefined,
+          price: i.price ?? undefined,
+          title: i.title,
         }))
       ),
     onSuccess: () => {
@@ -181,7 +209,7 @@ export function ListingQueueDialog({ onClose }: { onClose: () => void }) {
   });
 
   const running = status.data?.running;
-  const byDay = new Map<string, PlannedListing[]>();
+  const byDay = new Map<string, Row[]>();
   for (const item of planned) {
     const key = day(item.startAt);
     byDay.set(key, [...(byDay.get(key) ?? []), item]);
@@ -337,9 +365,14 @@ export function ListingQueueDialog({ onClose }: { onClose: () => void }) {
                           <span className="rounded-pill border border-border px-2 py-0.5 text-textMuted">
                             {item.motors ? 'Returns accepted' : 'No returns'}
                           </span>
+                          {item.edited && (
+                            <span className="rounded-pill border border-primary/30 bg-primary/10 px-2 py-0.5 font-semibold text-primary">
+                              Your edit
+                            </span>
+                          )}
                           {item.categoryUncertain && (
-                            <span className="flex items-center gap-1 rounded-pill border border-amber-200 bg-amber-100 px-2 py-0.5 font-semibold text-amber-700">
-                              <AlertTriangle size={10} /> Category guessed
+                            <span className="flex items-center gap-1 rounded-pill border border-sky-200 bg-sky-50 px-2 py-0.5 font-semibold text-sky-700">
+                              <Eye size={10} /> Category review suggested
                             </span>
                           )}
                           {(['free', 'paid'] as const).map((choice) => (
@@ -360,22 +393,16 @@ export function ListingQueueDialog({ onClose }: { onClose: () => void }) {
                         </div>
 
                         {item.categoryUncertain && item.categoryAlternatives.length > 1 && (
-                          <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[11px]">
-                            <span className="text-textMuted">Or:</span>
-                            {item.categoryAlternatives
-                              .filter((s) => s.id !== item.categoryId)
-                              .slice(0, 3)
-                              .map((s) => (
-                                <button
-                                  key={s.id}
-                                  type="button"
-                                  onClick={() => setCategory(item, s)}
-                                  title={s.path}
-                                  className="min-h-0 rounded-pill border border-border px-2 py-0.5 text-textMuted hover:bg-surfaceMuted hover:text-textPri"
-                                >
-                                  {s.name}
-                                </button>
-                              ))}
+                          <div className="mt-1.5 max-w-xs">
+                            <SelectDropdown
+                              options={item.categoryAlternatives.map((s) => s.name)}
+                              value={item.categoryAlternatives.find((s) => s.id === item.categoryId)?.name ?? ''}
+                              placeholder="Change the category"
+                              onChange={(name) => {
+                                const picked = item.categoryAlternatives.find((s) => s.name === name);
+                                if (picked) setCategory(item, picked);
+                              }}
+                            />
                           </div>
                         )}
                       </li>

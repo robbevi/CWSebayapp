@@ -299,7 +299,14 @@ export async function fetchQueueStatus(): Promise<QueueStatus> {
 }
 
 export async function scheduleQueue(
-  items: { partId: string; startAt: string; policies: PolicyChoice; categoryId?: string }[]
+  items: {
+    partId: string;
+    startAt: string;
+    policies: PolicyChoice;
+    categoryId?: string;
+    price?: number;
+    title?: string;
+  }[]
 ): Promise<QueueStatus> {
   const res = await fetch('/api/listing-queue/schedule', {
     method: 'POST',

@@ -307,6 +307,12 @@ export interface QueueItem {
   policies: PolicyChoice;
   /** A category the reviewer picked, which replaces whatever the research suggested. */
   categoryId?: string;
+  /**
+   * Edits made on the part itself, which the research file doesn't carry. Only the fields
+   * worth changing in a batch: a price haggled up, a title tightened.
+   */
+  price?: number;
+  title?: string;
 }
 
 async function run(items: QueueItem[]): Promise<void> {
@@ -326,6 +332,8 @@ async function run(items: QueueItem[]): Promise<void> {
       const research = await latestResearch(group0.sku);
       if (!research?.listing) throw new HttpError(422, 'The research for this part could not be read.');
       const listing = coerceAgentListing(research.listing);
+      if (typeof item.price === 'number' && item.price > 0) listing.price = item.price;
+      if (item.title?.trim()) listing.title = item.title.trim();
       if (item.categoryId) {
         listing.categoryId = item.categoryId;
         listing.categoryName = undefined;
