@@ -23,7 +23,8 @@ for (const item of plan.items) {
   }
   const price = item.price == null ? '—' : `$${item.price.toFixed(2)}`;
   const problems = item.problems.length ? `  !! ${item.problems.join(' ')}` : '';
+  const policy = `${item.motors ? 'Motors/returns' : 'no returns'}, ${item.shipping === 'free' ? 'free post' : 'buyer pays'}`;
   console.log(
-    `  ${when.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}  ${item.sku.padEnd(18)} ${price.padStart(9)}  qty ${item.quantity}  ${item.photos}ph  ${item.title.slice(0, 60)}${problems}`
+    `  ${when.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}  ${item.sku.padEnd(18)} ${price.padStart(9)}  qty ${item.quantity}  ${item.photos}ph  ${policy.padEnd(28)} ${item.title.slice(0, 40)}${problems}`
   );
 }

@@ -1,16 +1,20 @@
 import {
   coerceAgentListing,
   draftReadiness,
+  suggestShipping,
+  type ShippingChoice,
   groupPartsBySku,
   listingProblems,
   scheduleProblem,
   type AgentListing,
   type PartGroup,
   type PolicyChoice,
+  type SellerPolicy,
 } from '@warehouse/shared';
 import { getAllParts, updatePart } from '../google/sheetsService.js';
 import { HttpError, prepareListing } from './listingPrep.js';
-import { publishListing, suggestCategories, verifyListing } from './publishService.js';
+import { getSellerSetup, publishListing, resolveCategory, suggestCategories, verifyListing } from './publishService.js';
+import { SITE_MOTORS } from './trading.js';
 import { researchedSkus } from './researchBatch.js';
 import { latestResearch } from './researchService.js';
 
@@ -35,10 +39,66 @@ export interface PlannedListing {
   /** Anything about the listing that would stop it, for the person reviewing. */
   problems: string[];
   listing: AgentListing;
+  /** The category as resolved, so a reviewer can see and change it here. */
+  categoryId: string;
+  categoryName: string | null;
+  /** True when the category sits under eBay Motors, which decides the returns policy. */
+  motors: boolean;
+  /** Free postage or charged, suggested from the agent's weight and the price. */
+  shipping: ShippingChoice;
+  policies: PolicyChoice;
+}
+
+/** The account's policies as the queue uses them: named once, chosen per listing. */
+export interface QueuePolicies {
+  freeShipping: SellerPolicy | null;
+  paidShipping: SellerPolicy | null;
+  motorsReturns: SellerPolicy | null;
+  noReturns: SellerPolicy | null;
+  payment: SellerPolicy | null;
+}
+
+const byName = (list: SellerPolicy[], match: RegExp) => list.find((p) => match.test(p.name)) ?? null;
+
+/**
+ * Which of the account's policies the queue picks from. Matched by name rather than
+ * configured, so the team can rename or replace one in Seller Hub and SPARE follows —
+ * the same reason the rest of the seller setup is read from their live listings.
+ *
+ * Copies are ignored: "Free Shipping Copy" is a duplicate nobody meant to list under.
+ */
+export async function queuePolicies(): Promise<QueuePolicies> {
+  const setup = await getSellerSetup();
+  const original = (list: SellerPolicy[]) => list.filter((p) => !/\bcopy\b/i.test(p.name));
+  const shipping = original(setup.shipping);
+  const returns = original(setup.returns);
+  const payment = original(setup.payment);
+  const paidDefault = shipping.find((p) => p.id === setup.defaults.shipping);
+
+  return {
+    freeShipping: byName(shipping, /^free shipping/i),
+    // Whatever the team's listings already use, as long as it isn't the free one.
+    paidShipping: paidDefault && !/^free shipping/i.test(paidDefault.name) ? paidDefault : byName(shipping, /calculated|fedex|ups|usps/i),
+    motorsReturns: byName(returns, /motors/i),
+    noReturns: byName(returns, /^no returns/i),
+    payment: payment.find((p) => p.id === setup.defaults.payment) ?? payment[0] ?? null,
+  };
+}
+
+/**
+ * The policies for one listing: Motors parts take returns because eBay Motors buyers
+ * expect them, everything else goes out as no returns, and postage follows the weight.
+ */
+export function policiesFor(all: QueuePolicies, motors: boolean, shipping: ShippingChoice): PolicyChoice {
+  const ship = shipping === 'free' ? all.freeShipping ?? all.paidShipping : all.paidShipping ?? all.freeShipping;
+  const back = motors ? all.motorsReturns ?? all.noReturns : all.noReturns ?? all.motorsReturns;
+  return { shipping: ship?.id ?? '', returns: back?.id ?? '', payment: all.payment?.id ?? '' };
 }
 
 export interface QueuePlan {
   items: PlannedListing[];
+  /** The policies a reviewer can switch between, so the screen can relabel without asking. */
+  policyOptions: QueuePolicies;
   /** Ready to list and researched, but beyond what this plan covers. */
   remaining: number;
   /** Ready to list with no research yet, so not eligible. */
@@ -126,9 +186,10 @@ export async function buildPlan(
   hour: number,
   now: Date = new Date()
 ): Promise<QueuePlan> {
-  const [all, researched] = await Promise.all([
+  const [all, researched, policies] = await Promise.all([
     getAllParts().then((parts) => candidates(groupPartsBySku(parts))),
     researchedSkus(),
+    queuePolicies(),
   ]);
   // One listing of the research folder decides who is eligible, rather than a Drive lookup
   // for every part in the catalogue: with a long backlog that was hundreds of calls to
@@ -151,6 +212,10 @@ export async function buildPlan(
     const found = research?.listing ? coerceAgentListing(research.listing) : null;
     if (!found) continue;
     const parsed = await withCategory(found);
+    // Motors decides the returns policy, so the category has to be resolved either way.
+    const category = parsed.categoryId ? await resolveCategory(parsed.categoryId).catch(() => null) : null;
+    const motors = category?.siteId === SITE_MOTORS;
+    const shipping = suggestShipping(parsed);
 
     const index = items.length;
     const day = new Date(now);
@@ -170,19 +235,26 @@ export async function buildPlan(
       startAt: startAt.toISOString(),
       problems: listingProblems(parsed),
       listing: parsed,
+      categoryId: parsed.categoryId,
+      categoryName: category?.name ?? parsed.categoryName ?? null,
+      motors,
+      shipping,
+      policies: policiesFor(policies, motors, shipping),
     });
   }
 
-  return { items, remaining: Math.max(0, groups.length - seen), unresearched };
+  return { items, policyOptions: policies, remaining: Math.max(0, groups.length - seen), unresearched };
 }
 
 export interface QueueItem {
   partId: string;
   startAt: string;
   listing: AgentListing;
+  /** Chosen per listing, since returns follow the category and postage the weight. */
+  policies: PolicyChoice;
 }
 
-async function run(items: QueueItem[], policies: PolicyChoice): Promise<void> {
+async function run(items: QueueItem[]): Promise<void> {
   // One read of the sheet for the whole batch rather than one per listing.
   const groups = groupPartsBySku(await getAllParts());
 
@@ -192,7 +264,7 @@ async function run(items: QueueItem[], policies: PolicyChoice): Promise<void> {
     try {
       const { group, input, problems } = await prepareListing(
         item.partId,
-        { listing: item.listing, policies, scheduleTime: item.startAt },
+        { listing: item.listing, policies: item.policies, scheduleTime: item.startAt },
         groups
       );
       if (problems.length) throw new HttpError(422, problems.join(' '));
@@ -225,7 +297,7 @@ async function run(items: QueueItem[], policies: PolicyChoice): Promise<void> {
 }
 
 /** Schedules an approved batch. Returns once the run has started, not when it finishes. */
-export async function startQueue(items: QueueItem[], policies: PolicyChoice, who: string): Promise<QueueStatus> {
+export async function startQueue(items: QueueItem[], who: string): Promise<QueueStatus> {
   if (state.running) throw new HttpError(409, 'A batch is already being scheduled.');
   if (!items.length) throw new HttpError(400, 'Nothing to schedule.');
   for (const item of items) {
@@ -244,7 +316,7 @@ export async function startQueue(items: QueueItem[], policies: PolicyChoice, who
     startedBy: who,
   } satisfies QueueStatus);
 
-  void run(items, policies);
+  void run(items);
   return queueStatus();
 }
 

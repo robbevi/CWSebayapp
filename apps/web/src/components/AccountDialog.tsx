@@ -115,6 +115,7 @@ export function AccountDialog({ onClose }: { onClose: () => void }) {
   const [again, setAgain] = useState('');
   const [busy, setBusy] = useState(false);
   const [queueOpen, setQueueOpen] = useState(false);
+  const [changingPin, setChangingPin] = useState(false);
 
   const switchUser = async () => {
     await logout().catch(() => undefined);
@@ -173,10 +174,31 @@ export function AccountDialog({ onClose }: { onClose: () => void }) {
           <LogOut size={14} /> Switch user
         </Button>
 
-        {admin && (
+        {/* Changing a PIN is a once-in-a-while job, so it waits behind its own button
+            rather than taking three fields of the panel every time it is opened. */}
+        {admin && !changingPin && (
+          <button
+            type="button"
+            onClick={() => setChangingPin(true)}
+            className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-btn border border-border px-3 py-2 text-xs font-semibold text-textMuted hover:bg-surfaceMuted hover:text-textPri"
+          >
+            <KeyRound size={13} /> Change my PIN
+          </button>
+        )}
+
+        {admin && changingPin && (
           <form onSubmit={change} className="mt-5 space-y-2">
-            <div className="flex items-center gap-1.5 text-xs font-semibold text-textMuted">
-              <KeyRound size={13} /> Change my PIN
+            <div className="flex items-center justify-between gap-1.5 text-xs font-semibold text-textMuted">
+              <span className="flex items-center gap-1.5">
+                <KeyRound size={13} /> Change my PIN
+              </span>
+              <button
+                type="button"
+                onClick={() => setChangingPin(false)}
+                className="min-h-0 rounded-btn px-2 py-1 font-semibold text-primary hover:bg-surfaceMuted"
+              >
+                Cancel
+              </button>
             </div>
             {pinInput(current, setCurrent, 'Current PIN')}
             <div className="grid grid-cols-2 gap-2">
@@ -200,10 +222,6 @@ export function AccountDialog({ onClose }: { onClose: () => void }) {
             <div className="flex items-center gap-1.5 text-xs font-semibold text-textMuted">
               <CalendarClock size={13} /> Schedule listings
             </div>
-            <p className="mt-1 text-[11px] text-textMuted">
-              SPARE proposes a batch — so many a day, for as many days as you like. You approve it, and eBay holds
-              each listing until its day.
-            </p>
             <Button type="button" variant="outline" onClick={() => setQueueOpen(true)} className="mt-2 w-full">
               <CalendarClock size={14} /> Plan a batch
             </Button>

@@ -8,9 +8,35 @@ const batch = vi.hoisted(() => ({ researchedSkus: vi.fn() }));
 vi.mock('../google/sheetsService.js', () => sheets);
 vi.mock('./researchService.js', () => research);
 vi.mock('./researchBatch.js', () => batch);
-vi.mock('./publishService.js', () => ({ publishListing: vi.fn(), verifyListing: vi.fn(), getSellerSetup: vi.fn() }));
+const publish = vi.hoisted(() => ({
+  publishListing: vi.fn(),
+  verifyListing: vi.fn(),
+  getSellerSetup: vi.fn(),
+  resolveCategory: vi.fn(),
+  suggestCategories: vi.fn(),
+}));
+vi.mock('./publishService.js', () => publish);
 
-const { buildPlan } = await import('./listingQueue.js');
+const { buildPlan, policiesFor, queuePolicies } = await import('./listingQueue.js');
+
+/** The account's policies as SPARE reads them, copies and all. */
+const SETUP = {
+  shipping: [
+    { id: 'ship-free', name: 'Free Shipping' },
+    { id: 'ship-free-copy', name: 'Free Shipping Copy' },
+    { id: 'ship-fedex', name: 'FedEx Preferrred' },
+  ],
+  returns: [
+    { id: 'ret-none', name: 'No Returns' },
+    { id: 'ret-motors', name: 'eBay Motors Returns Accepted' },
+  ],
+  payment: [
+    { id: 'pay', name: 'eBay Managed Payments (Default)' },
+    { id: 'pay-copy', name: 'eBay Managed Payments (Default) Copy' },
+  ],
+  defaults: { shipping: 'ship-fedex', returns: 'ret-motors', payment: 'pay' },
+  shipFrom: { location: 'Williston, ND', postalCode: '58801', country: 'US' },
+};
 
 const NOW = new Date('2026-09-23T15:00:00.000Z');
 
@@ -52,9 +78,48 @@ function folderHolds(...skus: string[]) {
 beforeEach(() => {
   vi.clearAllMocks();
   research.latestResearch.mockResolvedValue(researched('A TITLE'));
+  publish.getSellerSetup.mockResolvedValue(SETUP);
+  publish.resolveCategory.mockResolvedValue({ id: '170141', name: 'Truck Parts', siteId: '0', leaf: true, required: [], recommended: [] });
   batch.researchedSkus.mockImplementation(async () => {
     const parts = (await sheets.getAllParts()) as { sku: string }[];
     return new Set(parts.map((p) => p.sku.toLowerCase()));
+  });
+});
+
+describe('queuePolicies', () => {
+  it('ignores the copies nobody meant to list under', async () => {
+    publish.getSellerSetup.mockResolvedValue(SETUP);
+    const p = await queuePolicies();
+    expect(p.freeShipping?.id).toBe('ship-free');
+    expect(p.paidShipping?.id).toBe('ship-fedex');
+    expect(p.payment?.id).toBe('pay');
+    expect(p.motorsReturns?.id).toBe('ret-motors');
+    expect(p.noReturns?.id).toBe('ret-none');
+  });
+});
+
+describe('policiesFor', () => {
+  const all = {
+    freeShipping: { id: 'ship-free', name: 'Free Shipping' },
+    paidShipping: { id: 'ship-fedex', name: 'FedEx Preferrred' },
+    motorsReturns: { id: 'ret-motors', name: 'eBay Motors Returns Accepted' },
+    noReturns: { id: 'ret-none', name: 'No Returns' },
+    payment: { id: 'pay', name: 'eBay Managed Payments (Default)' },
+  };
+
+  it('pairs Motors with returns and everything else with none', () => {
+    expect(policiesFor(all, true, 'paid')).toMatchObject({ returns: 'ret-motors' });
+    expect(policiesFor(all, false, 'paid')).toMatchObject({ returns: 'ret-none' });
+  });
+
+  it('follows the shipping choice it is given', () => {
+    expect(policiesFor(all, false, 'free')).toMatchObject({ shipping: 'ship-free' });
+    expect(policiesFor(all, false, 'paid')).toMatchObject({ shipping: 'ship-fedex' });
+  });
+
+  it('falls back rather than leaving a listing without a policy', () => {
+    expect(policiesFor({ ...all, freeShipping: null }, false, 'free')).toMatchObject({ shipping: 'ship-fedex' });
+    expect(policiesFor({ ...all, noReturns: null }, false, 'paid')).toMatchObject({ returns: 'ret-motors' });
   });
 });
 
@@ -129,6 +194,29 @@ describe('buildPlan', () => {
 
     const plan = await buildPlan(1, 10, 9, NOW);
     expect(plan.items.map((i) => i.sku)).toEqual(['TOP', 'MID', 'LOW']);
+  });
+
+  it('picks the policies for each listing: returns by category, postage by weight', async () => {
+    sheets.getAllParts.mockResolvedValue([part('A')]);
+    research.latestResearch.mockResolvedValue({
+      ...researched('A TITLE'),
+      listing: { title: 'A TITLE', price: 120, categoryId: '170141', weightLb: 2, titleOptions: [], priceOptions: [], specifics: [] },
+    });
+
+    const plan = await buildPlan(1, 10, 9, NOW);
+    expect(plan.items[0]).toMatchObject({
+      motors: false,
+      shipping: 'free',
+      policies: { shipping: 'ship-free', returns: 'ret-none', payment: 'pay' },
+    });
+  });
+
+  it('takes returns on a Motors part, where buyers expect them', async () => {
+    sheets.getAllParts.mockResolvedValue([part('A')]);
+    publish.resolveCategory.mockResolvedValue({ id: '33615', name: 'Air Dryers', siteId: '100', leaf: true, required: [], recommended: [] });
+
+    const plan = await buildPlan(1, 10, 9, NOW);
+    expect(plan.items[0]).toMatchObject({ motors: true, policies: { returns: 'ret-motors' } });
   });
 
   it('carries what the reviewer needs to judge each listing', async () => {

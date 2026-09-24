@@ -1,10 +1,17 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { AlertTriangle, CalendarClock, Check, X } from 'lucide-react';
-import { useEffect, useState } from 'react';
-import type { PolicyChoice, SellerPolicy } from '@warehouse/shared';
-import { useSellerSetup } from '../hooks/useEbayListing';
+import { useState } from 'react';
+import { listingProblems, type AgentListing, type CategorySuggestion } from '@warehouse/shared';
 import { useBodyScrollLock } from '../hooks/useBodyScrollLock';
-import { fetchQueuePlan, fetchQueueStatus, scheduleQueue, type PlannedListing } from '../lib/api';
+import {
+  fetchCategorySuggestions,
+  fetchQueuePlan,
+  fetchQueueStatus,
+  scheduleQueue,
+  type PlannedListing,
+  type QueuePlan,
+} from '../lib/api';
+import { cn } from '../lib/cn';
 import { useToastStore } from '../state/useToastStore';
 import { Button } from './ui/Button';
 import { SelectDropdown } from './ui/SelectDropdown';
@@ -17,26 +24,65 @@ const HOURS = Array.from({ length: 24 }, (_, h) =>
   new Date(2026, 0, 1, h).toLocaleTimeString([], { hour: 'numeric' })
 );
 
-function Policy({
-  label,
-  list,
-  value,
-  onChange,
-}: {
-  label: string;
-  list: SellerPolicy[];
-  value: string;
-  onChange: (id: string) => void;
-}) {
+/** What SPARE should reach for first when filling a batch. */
+const FOCUS = {
+  'Revenue priority': 'priority',
+  'Highest value first': 'value',
+  'Longest waiting': 'oldest',
+  'Quickest wins': 'quick',
+} as const;
+type FocusKey = (typeof FOCUS)[keyof typeof FOCUS];
+
+/** Ordering happens here rather than on the server, so changing it costs no round trip. */
+function focusSort(items: PlannedListing[], focus: FocusKey): PlannedListing[] {
+  const value = (i: PlannedListing) => (i.price ?? 0) * i.quantity;
+  if (focus === 'value') return [...items].sort((a, b) => value(b) - value(a));
+  if (focus === 'quick') return [...items].sort((a, b) => b.photos - a.photos || (b.price ?? 0) - (a.price ?? 0));
+  if (focus === 'oldest') return items;
+  return items;
+}
+
+/** One listing's category, fixed in place when eBay's match was too uncertain to pick. */
+function CategoryFix({ item, onPick }: { item: PlannedListing; onPick: (s: CategorySuggestion) => void }) {
+  const [open, setOpen] = useState(false);
+  const suggestions = useQuery({
+    queryKey: ['queue-category', item.partId, item.listing.title],
+    queryFn: () => fetchCategorySuggestions(item.listing.titleOptions[0] ?? item.listing.title, item.listing.categoryPath ?? ''),
+    enabled: open,
+  });
+
   return (
-    <div>
-      <div className="mb-1 text-[11px] font-semibold text-textMuted">{label}</div>
-      <SelectDropdown
-        options={list.map((p) => p.name)}
-        value={list.find((p) => p.id === value)?.name ?? ''}
-        placeholder="Choose a policy"
-        onChange={(name) => onChange(list.find((p) => p.name === name)?.id ?? '')}
-      />
+    <div className="mt-1">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="min-h-0 rounded-btn border border-border px-2 py-0.5 text-[11px] font-semibold text-primary hover:bg-surfaceMuted"
+      >
+        {open ? 'Hide categories' : 'Choose a category'}
+      </button>
+      {open && (
+        <div className="mt-1 space-y-1">
+          {suggestions.isLoading && <p className="text-[11px] text-textMuted">Asking eBay…</p>}
+          {suggestions.data?.length === 0 && (
+            <p className="text-[11px] text-textMuted">eBay suggested nothing for this title.</p>
+          )}
+          {suggestions.data?.map((s) => (
+            <button
+              key={s.id}
+              type="button"
+              onClick={() => {
+                onPick(s);
+                setOpen(false);
+              }}
+              className="block w-full rounded-btn border border-border px-2 py-1 text-left text-[11px] hover:bg-surfaceMuted"
+            >
+              <span className="font-semibold text-textPri">{s.name}</span>
+              <span className="text-textMuted"> · {s.id}</span>
+              <span className="block text-textMuted">{s.path}</span>
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -45,6 +91,10 @@ function Policy({
  * A week of listings in one sitting: SPARE proposes the parts, day by day, and nothing is
  * sent until an admin approves the batch. eBay then holds each listing until its start
  * time, so SPARE has no part to play once the batch is away.
+ *
+ * Policies are decided per listing rather than once for the batch: returns follow the
+ * category, since Motors buyers expect them and industrial buyers do not, and postage
+ * follows the agent's weight. Both can be changed on any row before it goes.
  */
 export function ListingQueueDialog({ onClose }: { onClose: () => void }) {
   useBodyScrollLock(true);
@@ -54,12 +104,12 @@ export function ListingQueueDialog({ onClose }: { onClose: () => void }) {
   const [days, setDays] = useState(7);
   const [perDay, setPerDay] = useState(10);
   const [hour, setHour] = useState(9);
-  // Parts the reviewer has taken out of the batch.
+  const [focus, setFocus] = useState<FocusKey>('priority');
   const [dropped, setDropped] = useState<Set<string>>(new Set());
-  const [policies, setPolicies] = useState<PolicyChoice | null>(null);
+  // Changes the reviewer has made to a row, kept apart from what the server proposed.
+  const [edits, setEdits] = useState<Record<string, Partial<PlannedListing>>>({});
 
-  const setup = useSellerSetup(true);
-  const plan = useQuery({
+  const plan = useQuery<QueuePlan>({
     queryKey: ['listing-queue-plan', days, perDay, hour],
     queryFn: () => fetchQueuePlan(days, perDay, hour),
   });
@@ -69,27 +119,48 @@ export function ListingQueueDialog({ onClose }: { onClose: () => void }) {
     refetchInterval: (q) => (q.state.data?.running ? 4000 : false),
   });
 
-  useEffect(() => {
-    const s = setup.data;
-    if (!s) return;
-    setPolicies((prev) => ({
-      shipping: prev?.shipping || s.defaults.shipping || s.shipping[0]?.id || '',
-      returns: prev?.returns || s.defaults.returns || s.returns[0]?.id || '',
-      payment: prev?.payment || s.defaults.payment || s.payment[0]?.id || '',
-    }));
-  }, [setup.data]);
+  const options = plan.data?.policyOptions;
+  const edit = (partId: string, patch: Partial<PlannedListing>) =>
+    setEdits((e) => ({ ...e, [partId]: { ...e[partId], ...patch } }));
 
-  const keeping = (plan.data?.items ?? []).filter((i) => !dropped.has(i.partId));
-  const ready = keeping.filter((i) => i.problems.length === 0);
+  /** Switching postage swaps the shipping policy and leaves returns and payment alone. */
+  const setShipping = (item: PlannedListing, shipping: 'free' | 'paid') => {
+    const policy = shipping === 'free' ? options?.freeShipping : options?.paidShipping;
+    edit(item.partId, { shipping, policies: { ...item.policies, shipping: policy?.id ?? item.policies.shipping } });
+  };
+
+  const setCategory = (item: PlannedListing, s: CategorySuggestion) => {
+    const listing: AgentListing = { ...item.listing, categoryId: s.id, categoryName: s.name };
+    const motors = s.siteId === '100';
+    const returns = motors ? options?.motorsReturns : options?.noReturns;
+    edit(item.partId, {
+      listing,
+      categoryId: s.id,
+      categoryName: s.name,
+      motors,
+      problems: listingProblems(listing),
+      policies: { ...item.policies, returns: returns?.id ?? item.policies.returns },
+    });
+  };
+
+  const items = focusSort(plan.data?.items ?? [], focus)
+    .map((i) => ({ ...i, ...edits[i.partId] }) as PlannedListing)
+    .filter((i) => !dropped.has(i.partId));
+  const ready = items.filter((i) => i.problems.length === 0);
+
+  // Re-dated after ordering, so the days read in the order the batch will actually go out.
+  const planned = ready.map((item, index) => {
+    const source = plan.data!.items[index];
+    return { ...item, startAt: source ? source.startAt : item.startAt };
+  });
 
   const schedule = useMutation({
     mutationFn: () =>
       scheduleQueue(
-        ready.map((i) => ({ partId: i.partId, startAt: i.startAt, listing: i.listing })),
-        policies!
+        planned.map((i) => ({ partId: i.partId, startAt: i.startAt, listing: i.listing, policies: i.policies }))
       ),
     onSuccess: () => {
-      toast(`Scheduling ${ready.length} listings. eBay holds each until its day.`);
+      toast(`Scheduling ${planned.length} listings. eBay holds each until its day.`);
       void qc.invalidateQueries({ queryKey: ['listing-queue-status'] });
     },
     onError: (err) => toast(err instanceof Error ? err.message : 'Could not schedule the batch', 'error'),
@@ -97,13 +168,14 @@ export function ListingQueueDialog({ onClose }: { onClose: () => void }) {
 
   const running = status.data?.running;
   const byDay = new Map<string, PlannedListing[]>();
-  for (const item of keeping) {
+  for (const item of planned) {
     const key = day(item.startAt);
     byDay.set(key, [...(byDay.get(key) ?? []), item]);
   }
+  const blocked = items.filter((i) => i.problems.length > 0);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-3 sm:p-6">
       <div className="flex max-h-[88vh] w-full max-w-3xl flex-col overflow-hidden rounded-card bg-surface">
         <div className="flex shrink-0 items-start justify-between gap-3 border-b border-border bg-surfaceMuted p-4">
           <div>
@@ -111,7 +183,7 @@ export function ListingQueueDialog({ onClose }: { onClose: () => void }) {
               <CalendarClock size={16} /> Schedule a batch
             </h2>
             <p className="mt-0.5 text-[11px] text-textMuted">
-              SPARE picks the best-ranked parts that are researched and ready. Nothing is sent until you approve.
+              Nothing is sent until you approve. Returns follow the category; postage follows the weight.
             </p>
           </div>
           <button
@@ -125,7 +197,7 @@ export function ListingQueueDialog({ onClose }: { onClose: () => void }) {
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4">
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
             <div>
               <div className="mb-1 text-[11px] font-semibold text-textMuted">Listings a day</div>
               <SelectDropdown
@@ -146,29 +218,20 @@ export function ListingQueueDialog({ onClose }: { onClose: () => void }) {
               <div className="mb-1 text-[11px] font-semibold text-textMuted">Each day at</div>
               <SelectDropdown options={HOURS} value={HOURS[hour]} onChange={(v) => setHour(HOURS.indexOf(v))} />
             </div>
-          </div>
-
-          {setup.data && policies && (
-            <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
-              <Policy
-                label="Shipping"
-                list={setup.data.shipping}
-                value={policies.shipping}
-                onChange={(shipping) => setPolicies({ ...policies, shipping })}
-              />
-              <Policy
-                label="Returns"
-                list={setup.data.returns}
-                value={policies.returns}
-                onChange={(returns) => setPolicies({ ...policies, returns })}
-              />
-              <Policy
-                label="Payment"
-                list={setup.data.payment}
-                value={policies.payment}
-                onChange={(payment) => setPolicies({ ...policies, payment })}
+            <div>
+              <div className="mb-1 text-[11px] font-semibold text-textMuted">List first</div>
+              <SelectDropdown
+                options={Object.keys(FOCUS)}
+                value={Object.keys(FOCUS).find((k) => FOCUS[k as keyof typeof FOCUS] === focus) ?? 'Revenue priority'}
+                onChange={(v) => setFocus(FOCUS[v as keyof typeof FOCUS])}
               />
             </div>
+          </div>
+
+          {options?.payment && (
+            <p className="mt-2 text-[11px] text-textMuted">
+              Paid through {options.payment.name}. Postage and returns are set on each listing below.
+            </p>
           )}
 
           {plan.isFetching && <p className="mt-4 text-xs text-textMuted">Working out what to list…</p>}
@@ -177,49 +240,93 @@ export function ListingQueueDialog({ onClose }: { onClose: () => void }) {
           {plan.data && !plan.isFetching && (
             <>
               <p className="mt-4 text-[11px] text-textMuted">
-                {plan.data.items.length} to schedule
+                {planned.length} to schedule
+                {blocked.length > 0 && `, ${blocked.length} needing a fix`}
                 {plan.data.remaining > 0 && `, ${plan.data.remaining} more ready for another batch`}
                 {plan.data.unresearched > 0 && `, ${plan.data.unresearched} waiting on research`}.
               </p>
 
-              {[...byDay.entries()].map(([label, items]) => (
+              {[...byDay.entries()].map(([label, dayItems]) => (
                 <section key={label} className="mt-4">
                   <h3 className="text-[11px] font-bold uppercase tracking-wide text-textMuted">
-                    {label} — {items.length} {items.length === 1 ? 'listing' : 'listings'}
+                    {label} — {dayItems.length} {dayItems.length === 1 ? 'listing' : 'listings'}
                   </h3>
                   <ul className="mt-1">
-                    {items.map((item) => (
-                      <li key={item.partId} className="flex items-start gap-2 border-b border-border py-2 last:border-0">
-                        <div className="min-w-0 flex-1">
-                          <div className="truncate text-xs font-semibold text-textPri">{item.title}</div>
-                          <div className="mt-0.5 text-[11px] text-textMuted">
-                            {item.sku} · {item.condition} · qty {item.quantity} · {item.photos} photos ·{' '}
-                            {time(item.startAt)}
-                          </div>
-                          {item.problems.length > 0 && (
-                            <div className="mt-1 flex items-start gap-1 text-[11px] font-semibold text-amber-600">
-                              <AlertTriangle size={11} className="mt-0.5 shrink-0" />
-                              {item.problems.join(' ')}
+                    {dayItems.map((item) => (
+                      <li key={item.partId} className="border-b border-border py-2 last:border-0">
+                        <div className="flex items-start gap-2">
+                          <div className="min-w-0 flex-1">
+                            <div className="truncate text-xs font-semibold text-textPri">{item.title}</div>
+                            <div className="mt-0.5 text-[11px] text-textMuted">
+                              {item.sku} · {item.condition} · qty {item.quantity} · {item.photos} photos ·{' '}
+                              {time(item.startAt)}
                             </div>
-                          )}
+                          </div>
+                          <div className="shrink-0 text-right text-xs font-bold tabular-nums text-textPri">
+                            {money(item.price)}
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setDropped(new Set(dropped).add(item.partId))}
+                            className="min-h-0 shrink-0 rounded-btn p-1 text-textMuted hover:bg-surfaceMuted hover:text-textPri"
+                            title="Leave this one out of the batch"
+                            aria-label={`Leave ${item.sku} out`}
+                          >
+                            <X size={14} />
+                          </button>
                         </div>
-                        <div className="shrink-0 text-right text-xs font-bold tabular-nums text-textPri">
-                          {money(item.price)}
+
+                        <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[11px]">
+                          <span className="rounded-pill border border-border px-2 py-0.5 text-textMuted">
+                            {item.categoryName ?? item.categoryId}
+                          </span>
+                          <span className="rounded-pill border border-border px-2 py-0.5 text-textMuted">
+                            {item.motors ? 'Returns accepted' : 'No returns'}
+                          </span>
+                          {(['free', 'paid'] as const).map((choice) => (
+                            <button
+                              key={choice}
+                              type="button"
+                              onClick={() => setShipping(item, choice)}
+                              className={cn(
+                                'min-h-0 rounded-pill border px-2 py-0.5 font-semibold',
+                                item.shipping === choice
+                                  ? 'border-primary bg-primary/10 text-primary'
+                                  : 'border-border text-textMuted hover:bg-surfaceMuted'
+                              )}
+                            >
+                              {choice === 'free' ? 'Free shipping' : 'Buyer pays'}
+                            </button>
+                          ))}
                         </div>
-                        <button
-                          type="button"
-                          onClick={() => setDropped(new Set(dropped).add(item.partId))}
-                          className="min-h-0 shrink-0 rounded-btn p-1 text-textMuted hover:bg-surfaceMuted hover:text-textPri"
-                          title="Leave this one out of the batch"
-                          aria-label={`Leave ${item.sku} out`}
-                        >
-                          <X size={14} />
-                        </button>
                       </li>
                     ))}
                   </ul>
                 </section>
               ))}
+
+              {blocked.length > 0 && (
+                <section className="mt-5">
+                  <h3 className="text-[11px] font-bold uppercase tracking-wide text-amber-600">
+                    Needs a fix before it can go
+                  </h3>
+                  <ul className="mt-1">
+                    {blocked.map((item) => (
+                      <li key={item.partId} className="border-b border-border py-2 last:border-0">
+                        <div className="text-xs font-semibold text-textPri">{item.title}</div>
+                        <div className="text-[11px] text-textMuted">
+                          {item.sku} · {money(item.price)}
+                        </div>
+                        <div className="mt-1 flex items-start gap-1 text-[11px] font-semibold text-amber-600">
+                          <AlertTriangle size={11} className="mt-0.5 shrink-0" />
+                          {item.problems.join(' ')}
+                        </div>
+                        <CategoryFix item={item} onPick={(s) => setCategory(item, s)} />
+                      </li>
+                    ))}
+                  </ul>
+                </section>
+              )}
             </>
           )}
 
@@ -243,17 +350,17 @@ export function ListingQueueDialog({ onClose }: { onClose: () => void }) {
 
         <div className="flex shrink-0 items-center gap-2 border-t border-border p-4">
           <span className="text-[11px] text-textMuted">
-            {ready.length} of {keeping.length} will be scheduled
-            {keeping.length !== ready.length && ' — the rest need fixing first'}
+            {planned.length} will be scheduled
+            {blocked.length > 0 && ` — ${blocked.length} still needs a category or a price`}
           </span>
           <Button
             type="button"
             onClick={() => schedule.mutate()}
-            disabled={!ready.length || !policies || schedule.isPending || running}
+            disabled={!planned.length || schedule.isPending || running}
             className="ml-auto"
           >
             <Check size={14} />
-            {schedule.isPending || running ? 'Scheduling…' : `Schedule ${ready.length}`}
+            {schedule.isPending || running ? 'Scheduling…' : `Schedule ${planned.length}`}
           </Button>
         </div>
       </div>

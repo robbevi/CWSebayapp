@@ -13,6 +13,7 @@ import type {
   PolicyChoice,
   PublishResult,
   ResearchResult,
+  SellerPolicy,
   SellerSetup,
   TradingMessage,
   Photo,
@@ -236,10 +237,26 @@ export interface PlannedListing {
   startAt: string;
   problems: string[];
   listing: AgentListing;
+  categoryId: string;
+  categoryName: string | null;
+  /** Under eBay Motors, which is what decides the returns policy. */
+  motors: boolean;
+  shipping: 'free' | 'paid';
+  policies: PolicyChoice;
+}
+
+/** The policies a reviewer can switch a listing between. */
+export interface QueuePolicies {
+  freeShipping: SellerPolicy | null;
+  paidShipping: SellerPolicy | null;
+  motorsReturns: SellerPolicy | null;
+  noReturns: SellerPolicy | null;
+  payment: SellerPolicy | null;
 }
 
 export interface QueuePlan {
   items: PlannedListing[];
+  policyOptions: QueuePolicies;
   remaining: number;
   unresearched: number;
 }
@@ -270,13 +287,12 @@ export async function fetchQueueStatus(): Promise<QueueStatus> {
 }
 
 export async function scheduleQueue(
-  items: { partId: string; startAt: string; listing: AgentListing }[],
-  policies: PolicyChoice
+  items: { partId: string; startAt: string; listing: AgentListing; policies: PolicyChoice }[]
 ): Promise<QueueStatus> {
   const res = await fetch('/api/listing-queue/schedule', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ items, policies }),
+    body: JSON.stringify({ items }),
   });
   return parseJson(res);
 }

@@ -1,5 +1,4 @@
 import { Router } from 'express';
-import type { PolicyChoice } from '@warehouse/shared';
 import { env } from '../config/env.js';
 import { HttpError } from '../ebay/listingPrep.js';
 import {
@@ -46,10 +45,11 @@ listingQueueRouter.get('/listing-queue/status', requireAdmin, (_req, res) => {
 listingQueueRouter.post('/listing-queue/schedule', requireAdmin, async (req, res, next) => {
   try {
     const items = (req.body?.items ?? []) as QueueItem[];
-    const policies = req.body?.policies as PolicyChoice | undefined;
     if (!Array.isArray(items) || !items.length) throw new HttpError(400, 'Nothing to schedule.');
-    if (!policies) throw new HttpError(400, 'Choose a shipping, return and payment policy.');
-    res.json(await startQueue(items, policies, req.user!.name));
+    if (items.some((i) => !i.policies?.shipping || !i.policies?.returns || !i.policies?.payment)) {
+      throw new HttpError(400, 'Every listing needs a shipping, return and payment policy.');
+    }
+    res.json(await startQueue(items, req.user!.name));
   } catch (err) {
     if (err instanceof HttpError) res.status(err.status).json({ error: err.message });
     else next(err);
