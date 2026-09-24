@@ -166,7 +166,12 @@ export function ListingQueueDialog({ onClose }: { onClose: () => void }) {
   const schedule = useMutation({
     mutationFn: () =>
       scheduleQueue(
-        planned.map((i) => ({ partId: i.partId, startAt: i.startAt, listing: i.listing, policies: i.policies }))
+        planned.map((i) => ({
+          partId: i.partId,
+          startAt: i.startAt,
+          policies: i.policies,
+          categoryId: i.categoryId || undefined,
+        }))
       ),
     onSuccess: () => {
       toast(`Scheduling ${planned.length} listings. eBay holds each until its day.`);

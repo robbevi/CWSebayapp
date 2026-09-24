@@ -303,9 +303,10 @@ export async function buildPlan(
 export interface QueueItem {
   partId: string;
   startAt: string;
-  listing: AgentListing;
   /** Chosen per listing, since returns follow the category and postage the weight. */
   policies: PolicyChoice;
+  /** A category the reviewer picked, which replaces whatever the research suggested. */
+  categoryId?: string;
 }
 
 async function run(items: QueueItem[]): Promise<void> {
@@ -316,9 +317,27 @@ async function run(items: QueueItem[]): Promise<void> {
     if (!state.running) break;
     state.current = item.partId;
     try {
+      const group0 = groups.find((g) => g.records.some((r) => r.id === item.partId));
+      if (!group0) throw new HttpError(404, 'Part not found.');
+
+      // Read back from the research file rather than taken from the browser: it is the
+      // same listing the batch was planned from, and a week of descriptions is far too
+      // much to post back through a form.
+      const research = await latestResearch(group0.sku);
+      if (!research?.listing) throw new HttpError(422, 'The research for this part could not be read.');
+      const listing = coerceAgentListing(research.listing);
+      if (item.categoryId) {
+        listing.categoryId = item.categoryId;
+        listing.categoryName = undefined;
+      } else if (!listing.categoryId) {
+        const { listing: guessed } = await withCategory(listing);
+        listing.categoryId = guessed.categoryId;
+        listing.categoryName = guessed.categoryName;
+      }
+
       const { group, input, problems } = await prepareListing(
         item.partId,
-        { listing: item.listing, policies: item.policies, scheduleTime: item.startAt },
+        { listing, policies: item.policies, scheduleTime: item.startAt },
         groups
       );
       if (problems.length) throw new HttpError(422, problems.join(' '));

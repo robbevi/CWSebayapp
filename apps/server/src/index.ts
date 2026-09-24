@@ -24,7 +24,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const app = express();
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '2mb' }));
 
 // Sign-in first, then the gate: every API route after it needs a signed-in person,
 // apart from the few requireUser lets through (health, photo images for eBay).

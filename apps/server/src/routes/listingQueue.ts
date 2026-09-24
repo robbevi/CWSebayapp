@@ -48,6 +48,7 @@ listingQueueRouter.post('/listing-queue/schedule', requireAdmin, async (req, res
   try {
     const items = (req.body?.items ?? []) as QueueItem[];
     if (!Array.isArray(items) || !items.length) throw new HttpError(400, 'Nothing to schedule.');
+    if (items.some((i) => !i.partId || !i.startAt)) throw new HttpError(400, 'Every listing needs a part and a time.');
     if (items.some((i) => !i.policies?.shipping || !i.policies?.returns || !i.policies?.payment)) {
       throw new HttpError(400, 'Every listing needs a shipping, return and payment policy.');
     }

@@ -17,7 +17,19 @@ const publish = vi.hoisted(() => ({
 }));
 vi.mock('./publishService.js', () => publish);
 
-const { buildPlan, firstDay, policiesFor, queuePolicies } = await import('./listingQueue.js');
+const prep = vi.hoisted(() => ({
+  prepareListing: vi.fn(),
+  HttpError: class extends Error {
+    status: number;
+    constructor(status: number, message: string) {
+      super(message);
+      this.status = status;
+    }
+  },
+}));
+vi.mock('./listingPrep.js', () => prep);
+
+const { buildPlan, firstDay, policiesFor, queuePolicies, queueStatus, startQueue } = await import('./listingQueue.js');
 
 /** The account's policies as SPARE reads them, copies and all. */
 const SETUP = {
@@ -296,5 +308,51 @@ describe('buildPlan', () => {
 
     const [item] = (await buildPlan(1, 10, 9, NOW)).items;
     expect(item).toMatchObject({ sku: 'A', title: 'A TITLE', price: 120, quantity: 4, photos: 1, condition: 'New' });
+  });
+});
+
+describe('scheduling an approved batch', () => {
+  const policies = { shipping: 'ship-free', returns: 'ret-none', payment: 'pay' };
+
+  beforeEach(() => {
+    sheets.getAllParts.mockResolvedValue([part('A')]);
+    sheets.updatePart.mockResolvedValue(undefined);
+    publish.verifyListing.mockResolvedValue({ ok: true, messages: [], fees: [], missingSpecifics: [] });
+    publish.publishListing.mockResolvedValue({ itemId: '123', url: 'https://ebay/123', fees: [], messages: [] });
+    prep.prepareListing.mockImplementation(async (_partId: string, body: { listing: unknown }) => ({
+      group: { primary: { id: 'id-A' }, sku: 'A' },
+      input: { listing: body.listing },
+      problems: [],
+      conditionLabel: 'New',
+    }));
+  });
+
+  /** The run outlives the request that starts it, so tests wait for it to settle. */
+  const settled = async () => {
+    await vi.waitFor(() => expect(queueStatus().running).toBe(false));
+    return queueStatus();
+  };
+
+  it('reads the listing back from the research file rather than the request', async () => {
+    await startQueue([{ partId: 'id-A', startAt: '2026-09-25T09:00:00.000Z', policies }], 'Rob Bevilacqua');
+    expect(await settled()).toMatchObject({ scheduled: 1, failed: [] });
+    expect(research.latestResearch).toHaveBeenCalledWith('A');
+    expect(prep.prepareListing.mock.calls[0][1].listing).toMatchObject({ title: 'A TITLE' });
+  });
+
+  it('uses the category the reviewer picked over the one researched', async () => {
+    await startQueue(
+      [{ partId: 'id-A', startAt: '2026-09-25T09:00:00.000Z', policies, categoryId: '99999' }],
+      'Rob Bevilacqua'
+    );
+    await settled();
+    expect(prep.prepareListing.mock.calls[0][1].listing).toMatchObject({ categoryId: '99999' });
+  });
+
+  it('records the failure and carries on when research cannot be read', async () => {
+    research.latestResearch.mockResolvedValue({ found: false });
+    await startQueue([{ partId: 'id-A', startAt: '2026-09-25T09:00:00.000Z', policies }], 'Rob Bevilacqua');
+    expect(await settled()).toMatchObject({ scheduled: 0, failed: [{ sku: 'A' }] });
+    expect(publish.publishListing).not.toHaveBeenCalled();
   });
 });
