@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { AlertTriangle, CalendarClock, Check, Eye, X } from 'lucide-react';
+import { AlertTriangle, CalendarClock, Check, ChevronDown, Eye, X } from 'lucide-react';
 import { useState } from 'react';
 import { useUIStore } from '../state/useUIStore';
 import { listingProblems, type AgentListing, type CategorySuggestion } from '@warehouse/shared';
@@ -16,6 +16,12 @@ import { cn } from '../lib/cn';
 import { useToastStore } from '../state/useToastStore';
 import { Button } from './ui/Button';
 import { SelectDropdown } from './ui/SelectDropdown';
+
+/** Where eBay will file it, as far as SPARE knows: eBay's own path, or the agent's. */
+function pathOf(item: PlannedListing): string {
+  const match = item.categoryAlternatives.find((s) => s.id === item.categoryId);
+  return match?.path ?? item.listing.categoryPath ?? item.categoryName ?? item.categoryId;
+}
 
 /** A planned listing, plus whether what is shown came from an edit made on the part. */
 type Row = PlannedListing & { edited?: boolean };
@@ -54,6 +60,44 @@ function focusSort(items: PlannedListing[], focus: FocusKey): PlannedListing[] {
   if (focus === 'quick') return [...items].sort((a, b) => b.photos - a.photos || (b.price ?? 0) - (a.price ?? 0));
   if (focus === 'oldest') return items;
   return items;
+}
+
+/**
+ * eBay's categories for a listing, full paths shown. A guessed category arrives with its
+ * runners-up already; a matched one has none on hand, so eBay is asked when it is opened.
+ */
+function CategoryChoices({ item, onPick }: { item: PlannedListing; onPick: (s: CategorySuggestion) => void }) {
+  const have = item.categoryAlternatives.length > 0;
+  const asked = useQuery({
+    queryKey: ['queue-category', item.partId, item.listing.title],
+    queryFn: () => fetchCategorySuggestions(item.listing.titleOptions[0] ?? item.listing.title, item.listing.categoryPath ?? ''),
+    enabled: !have,
+  });
+  const choices = have ? item.categoryAlternatives : asked.data ?? [];
+
+  return (
+    <div className="mt-1.5 space-y-1">
+      {!have && asked.isLoading && <p className="text-[11px] text-textMuted">Asking eBay…</p>}
+      {!asked.isLoading && choices.length === 0 && (
+        <p className="text-[11px] text-textMuted">eBay offered no other categories for this title.</p>
+      )}
+      {choices.map((s) => (
+        <button
+          key={s.id}
+          type="button"
+          onClick={() => onPick(s)}
+          className={cn(
+            'block w-full min-h-0 rounded-btn border px-2 py-1 text-left text-[11px]',
+            s.id === item.categoryId ? 'border-primary bg-primary/10' : 'border-border hover:bg-surfaceMuted'
+          )}
+        >
+          <span className="font-semibold text-textPri">{s.name}</span>
+          <span className="text-textMuted"> · {s.id}</span>
+          <span className="block text-textMuted">{s.path}</span>
+        </button>
+      ))}
+    </div>
+  );
 }
 
 /** One listing's category, fixed in place when eBay's match was too uncertain to pick. */
@@ -129,6 +173,8 @@ export function ListingQueueDialog({ onClose }: { onClose: () => void }) {
   // Changes the reviewer has made to a row, kept apart from what the server proposed.
   const [edits, setEdits] = useState<Record<string, Partial<PlannedListing>>>({});
   const setUI = useUIStore((s) => s.set);
+  // One row's category choices open at a time, under that row.
+  const [openCategory, setOpenCategory] = useState<string | null>(null);
 
   const plan = useQuery<QueuePlan>({
     queryKey: ['listing-queue-plan', days, perDay, hour, startDate, asap],
@@ -359,9 +405,24 @@ export function ListingQueueDialog({ onClose }: { onClose: () => void }) {
                         </div>
 
                         <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[11px]">
-                          <span className="rounded-pill border border-border px-2 py-0.5 text-textMuted">
+                          <button
+                            type="button"
+                            onClick={() => setOpenCategory((c) => (c === item.partId ? null : item.partId))}
+                            aria-expanded={openCategory === item.partId}
+                            title={pathOf(item)}
+                            className={cn(
+                              'flex min-h-0 items-center gap-1 rounded-pill border px-2 py-0.5 font-semibold',
+                              openCategory === item.partId
+                                ? 'border-primary bg-primary/10 text-primary'
+                                : 'border-border text-textMuted hover:bg-surfaceMuted'
+                            )}
+                          >
                             {item.categoryName ?? item.categoryId}
-                          </span>
+                            <ChevronDown
+                              size={11}
+                              className={cn('transition-transform', openCategory === item.partId && 'rotate-180')}
+                            />
+                          </button>
                           <span className="rounded-pill border border-border px-2 py-0.5 text-textMuted">
                             {item.motors ? 'Returns accepted' : 'No returns'}
                           </span>
@@ -392,18 +453,18 @@ export function ListingQueueDialog({ onClose }: { onClose: () => void }) {
                           ))}
                         </div>
 
-                        {item.categoryUncertain && item.categoryAlternatives.length > 1 && (
-                          <div className="mt-1.5 max-w-xs">
-                            <SelectDropdown
-                              options={item.categoryAlternatives.map((s) => s.name)}
-                              value={item.categoryAlternatives.find((s) => s.id === item.categoryId)?.name ?? ''}
-                              placeholder="Change the category"
-                              onChange={(name) => {
-                                const picked = item.categoryAlternatives.find((s) => s.name === name);
-                                if (picked) setCategory(item, picked);
-                              }}
-                            />
-                          </div>
+                        {/* The full path, because the last level alone rarely says where eBay
+                            will file it: "Other" sits under a dozen different trees. */}
+                        <div className="mt-1 text-[11px] text-textMuted">{pathOf(item)}</div>
+
+                        {openCategory === item.partId && (
+                          <CategoryChoices
+                            item={item}
+                            onPick={(s) => {
+                              setCategory(item, s);
+                              setOpenCategory(null);
+                            }}
+                          />
                         )}
                       </li>
                     ))}
