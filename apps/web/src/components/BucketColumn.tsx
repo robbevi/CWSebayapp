@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactElement } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactElement } from 'react';
 import { ChevronDown, ClipboardList, Tag, Wrench } from 'lucide-react';
 import {
   extendedValue,
@@ -14,6 +14,9 @@ import { ColumnSummaryDialog, type FilterPatch } from './ColumnSummaryDialog';
 import { useUIStore } from '../state/useUIStore';
 import { PartCard } from './PartCard';
 import { SelectDropdown } from './ui/SelectDropdown';
+
+/** Cards drawn at a time: a screenful or two ahead of wherever the column is scrolled. */
+const PAGE = 40;
 
 const BUCKET_META: Record<WorkflowStatus, { label: string; icon: ReactElement; badgeBg: string; iconColor: string }> = {
   NotStarted: { label: 'Not Started', icon: <ClipboardList size={18} />, badgeBg: 'bg-blue-500', iconColor: 'text-white' },
@@ -83,6 +86,35 @@ export function BucketColumn({
 
   const shown = split && ebayView !== 'all' ? (ebayView === 'sold' ? split.sold : split.listed) : parts;
   const [summaryOpen, setSummaryOpen] = useState(false);
+
+  /**
+   * Cards are drawn a page at a time as the column is scrolled, not all 1,600 of Not Started
+   * at once. Drawing every card was most of the time the board took to appear, and on a
+   * tablet it was spent on columns that were not even open.
+   */
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const sentinelRef = useRef<HTMLDivElement>(null);
+  const [rendered, setRendered] = useState(PAGE);
+
+  // A new filter or sort starts back at the top, with the first page.
+  useEffect(() => {
+    setRendered(PAGE);
+    scrollRef.current?.scrollTo({ top: 0 });
+  }, [shown]);
+
+  useEffect(() => {
+    const sentinel = sentinelRef.current;
+    if (!sentinel) return;
+    const seen = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((e) => e.isIntersecting)) setRendered((n) => n + PAGE);
+      },
+      // Start drawing the next page a little before the last card is reached.
+      { root: scrollRef.current, rootMargin: '600px 0px' }
+    );
+    seen.observe(sentinel);
+    return () => seen.disconnect();
+  }, [rendered, shown.length, expanded]);
   const setFilters = useUIStore((s) => s.set);
 
   // A count on its own can't say whether a column is small or merely filtered.
@@ -192,6 +224,7 @@ export function BucketColumn({
       </div>
 
       <div
+        ref={scrollRef}
         className={cn(
           'column-scroll min-h-0 max-h-[calc(100vh-15rem)] flex-1 flex-col gap-3 overflow-y-auto overscroll-contain p-4 lg:flex lg:max-h-none',
           expanded ? 'flex' : 'hidden'
@@ -202,9 +235,17 @@ export function BucketColumn({
             No parts match the selected filters in this bucket.
           </div>
         ) : (
-          shown.map((p) => (
-            <PartCard key={p.id} part={p} salesIndex={salesIndex} listingsIndex={listingsIndex} />
-          ))
+          <>
+            {shown.slice(0, rendered).map((p) => (
+              <PartCard key={p.id} part={p} salesIndex={salesIndex} listingsIndex={listingsIndex} />
+            ))}
+            {/* Reaching this draws the next page of cards. */}
+            {rendered < shown.length && (
+              <div ref={sentinelRef} className="py-3 text-center text-[11px] text-textMuted">
+                Showing {rendered} of {shown.length}…
+              </div>
+            )}
+          </>
         )}
       </div>
 

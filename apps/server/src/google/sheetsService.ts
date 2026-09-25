@@ -328,8 +328,7 @@ function photosFor(
 }
 
 export async function getAllParts(): Promise<InventoryPart[]> {
-  const { headers, rows } = await readSheet();
-  const grouped = await listPhotosGrouped();
+  const [{ headers, rows }, grouped] = await Promise.all([readSheet(), listPhotosGrouped()]);
   const claimed = new Set<string>();
   const live = rows.filter((row) => row.some((cell) => cellToString(cell) !== undefined));
   // Every id the sheet actually holds, so a photo can be told whether its partId is stale.
@@ -343,10 +342,9 @@ export async function getAllParts(): Promise<InventoryPart[]> {
 }
 
 export async function getPartById(id: string): Promise<InventoryPart> {
-  const { headers, rows } = await readSheet();
+  const [{ headers, rows }, grouped] = await Promise.all([readSheet(), listPhotosGrouped()]);
   const found = findRow(headers, rows, id);
   if (!found) throw new Error(`Part "${id}" was not found in the Google Sheet.`);
-  const grouped = await listPhotosGrouped();
   const bare = mapRowToPart(headers, found.row, []);
   const knownPartIds = new Set(
     rows.filter((r) => r.some((c) => cellToString(c) !== undefined)).map((r) => mapRowToPart(headers, r, []).id)

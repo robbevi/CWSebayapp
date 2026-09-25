@@ -34,7 +34,32 @@ export interface GroupedPhotos {
   bySku: Map<string, Photo[]>;
 }
 
-export async function listPhotosGrouped(): Promise<GroupedPhotos> {
+/**
+ * The photo folder is the slowest thing SPARE reads — 1,400 files and growing, most of
+ * every board load — and it only changes when someone takes or deletes a photo here. So
+ * it is held for a short while, and dropped the moment this server changes it. A photo
+ * added straight in Drive shows within the minute.
+ */
+const PHOTO_CACHE_MS = 60_000;
+let photoCache: { at: number; value: Promise<GroupedPhotos> } | undefined;
+
+export function forgetPhotoListing(): void {
+  photoCache = undefined;
+}
+
+export function listPhotosGrouped(): Promise<GroupedPhotos> {
+  if (photoCache && Date.now() - photoCache.at < PHOTO_CACHE_MS) return photoCache.value;
+  // The promise itself is cached, so a burst of requests shares one listing rather than
+  // each starting its own.
+  const value = readPhotoListing().catch((err) => {
+    photoCache = undefined;
+    throw err;
+  });
+  photoCache = { at: Date.now(), value };
+  return value;
+}
+
+async function readPhotoListing(): Promise<GroupedPhotos> {
   const drive = getDriveClient();
   const byPartId = new Map<string, Photo[]>();
   const legacyBySku = new Map<string, Photo[]>();
@@ -45,7 +70,7 @@ export async function listPhotosGrouped(): Promise<GroupedPhotos> {
     const res = await drive.files.list({
       q: `'${env.googleDriveFolderId}' in parents and trashed = false`,
       fields: 'nextPageToken, files(id, name, createdTime, properties)',
-      pageSize: 200,
+      pageSize: 1000,
       pageToken,
     });
 
@@ -107,6 +132,7 @@ export async function uploadPhoto(sku: string, buffer: Buffer, partId?: string, 
   if (partId) properties.partId = partId;
   if (site) properties.site = site.trim().toUpperCase();
 
+  forgetPhotoListing();
   const created = await drive.files.create({
     requestBody: { name: fileName, parents: [env.googleDriveFolderId!], properties },
     media: { mimeType: 'image/jpeg', body: Readable.from(buffer) },
@@ -119,6 +145,8 @@ export async function uploadPhoto(sku: string, buffer: Buffer, partId?: string, 
   // Photos are shared "anyone with the link" so they can be displayed via <img src>
   // without a private-proxy route — acceptable for parts destined for a public eBay listing.
   await drive.permissions.create({ fileId, requestBody: { role: 'reader', type: 'anyone' } });
+  // Again after, so a board read that began mid-upload doesn't keep the stale list.
+  forgetPhotoListing();
 
   return {
     fileId,
@@ -135,4 +163,5 @@ export async function uploadPhoto(sku: string, buffer: Buffer, partId?: string, 
 export async function deletePhoto(fileId: string): Promise<void> {
   const drive = getDriveUploadClient();
   await drive.files.update({ fileId, requestBody: { trashed: true } });
+  forgetPhotoListing();
 }
