@@ -1,5 +1,6 @@
 import { Router, type NextFunction, type Response } from 'express';
-import { type ListingCheck, type PublishResult } from '@warehouse/shared';
+import { coerceAgentListing, groupPartsBySku, type ListingCheck, type PublishResult } from '@warehouse/shared';
+import { clearDraft, DraftTooLargeError, getDraft, saveDraft } from '../ebay/draftStore.js';
 import { env } from '../config/env.js';
 import { isEbayConfigured } from '../ebay/ordersService.js';
 import { requireAdmin } from '../middleware/auth.js';
@@ -11,7 +12,7 @@ import {
   suggestCategories,
   verifyListing,
 } from '../ebay/publishService.js';
-import { updatePart } from '../google/sheetsService.js';
+import { getAllParts, updatePart } from '../google/sheetsService.js';
 
 export const ebayListingRouter = Router();
 
@@ -69,6 +70,46 @@ ebayListingRouter.get('/ebay/category-suggestions', async (req, res, next) => {
   }
 });
 
+async function skuOf(partId: string): Promise<string> {
+  const group = groupPartsBySku(await getAllParts()).find((g) => g.records.some((r) => r.id === partId));
+  if (!group) throw new HttpError(404, 'Part not found.');
+  return group.sku;
+}
+
+/**
+ * The listing someone is working on for this part, wherever they started it. Saved as
+ * they go, so the tablet and the desk see the same price, and a batch plans from it.
+ */
+ebayListingRouter.get('/parts/:id/listing/draft', async (req, res, next) => {
+  try {
+    res.json((await getDraft(await skuOf(String(req.params.id)))) ?? null);
+  } catch (err) {
+    fail(err, res, next);
+  }
+});
+
+ebayListingRouter.put('/parts/:id/listing/draft', async (req, res, next) => {
+  try {
+    const body = (req.body ?? {}) as { listing?: unknown; notes?: unknown };
+    if (!body.listing) throw new HttpError(400, 'No listing was sent.');
+    const notes = Array.isArray(body.notes) ? body.notes.filter((n): n is string => typeof n === 'string') : [];
+    const sku = await skuOf(String(req.params.id));
+    res.json(await saveDraft(sku, coerceAgentListing(body.listing), notes, req.user?.name ?? ''));
+  } catch (err) {
+    if (err instanceof DraftTooLargeError) res.status(413).json({ error: err.message });
+    else fail(err, res, next);
+  }
+});
+
+ebayListingRouter.delete('/parts/:id/listing/draft', async (req, res, next) => {
+  try {
+    await clearDraft(await skuOf(String(req.params.id)));
+    res.json({ ok: true });
+  } catch (err) {
+    fail(err, res, next);
+  }
+});
+
 /** eBay's verdict on the listing as it stands, with fees. Nothing is listed. */
 ebayListingRouter.post('/parts/:id/listing/verify', async (req, res, next) => {
   try {
@@ -108,6 +149,8 @@ ebayListingRouter.post('/parts/:id/listing/publish', requireAdmin, async (req, r
     const listed = await publishListing(input);
     const scheduledFor = input.scheduleTime;
     recentlyPublished.set(group.sku, Date.now());
+    // Listed now, so the draft has done its job; left behind, it would be planned again.
+    await clearDraft(group.sku).catch(() => undefined);
     const submittedBy = req.user?.name;
 
     // The listing is live whatever happens next, so a failed write must not read as a

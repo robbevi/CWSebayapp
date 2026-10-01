@@ -216,6 +216,34 @@ export async function fetchResearch(partId: string): Promise<ResearchResult> {
   return parseJson(res);
 }
 
+/** A listing being worked on for a part, saved on the server so every device sees it. */
+export interface ServerDraft {
+  sku: string;
+  listing: AgentListing;
+  notes: string[];
+  updatedAt: string;
+  updatedBy: string;
+}
+
+export async function fetchListingDraft(partId: string): Promise<ServerDraft | null> {
+  const res = await fetch(`/api/parts/${encodeURIComponent(partId)}/listing/draft`);
+  return parseJson(res);
+}
+
+export async function saveListingDraft(partId: string, listing: AgentListing, notes: string[]): Promise<ServerDraft> {
+  const res = await fetch(`/api/parts/${encodeURIComponent(partId)}/listing/draft`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ listing, notes }),
+  });
+  return parseJson(res);
+}
+
+export async function clearListingDraft(partId: string): Promise<void> {
+  const res = await fetch(`/api/parts/${encodeURIComponent(partId)}/listing/draft`, { method: 'DELETE' });
+  await parseJson(res);
+}
+
 /** The SKUs Copilot has researched, lowercased, for the board's badge and filter. */
 export async function fetchResearchedSkus(): Promise<string[]> {
   const res = await fetch('/api/research/skus');
@@ -242,6 +270,8 @@ export interface PlannedListing {
   /** SPARE guessed the category rather than matching it, so it is worth a look. */
   categoryUncertain: boolean;
   categoryAlternatives: CategorySuggestion[];
+  /** Planned from a draft someone edited on the part, not the research as written. */
+  edited: boolean;
   /** Under eBay Motors, which is what decides the returns policy. */
   motors: boolean;
   shipping: 'free' | 'paid';

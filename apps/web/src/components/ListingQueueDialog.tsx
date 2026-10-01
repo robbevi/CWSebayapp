@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { AlertTriangle, CalendarClock, Check, ChevronDown, Eye, X } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useUIStore } from '../state/useUIStore';
 import { listingProblems, type AgentListing, type CategorySuggestion } from '@warehouse/shared';
 import { useBodyScrollLock } from '../hooks/useBodyScrollLock';
@@ -23,20 +23,8 @@ function pathOf(item: PlannedListing): string {
   return match?.path ?? item.listing.categoryPath ?? item.categoryName ?? item.categoryId;
 }
 
-/** A planned listing, plus whether what is shown came from an edit made on the part. */
-type Row = PlannedListing & { edited?: boolean };
-
-/** A listing someone has been editing on the part itself, saved by the browser it was edited in. */
-function savedDraft(
-  sku: string
-): { listing?: { title?: string; price?: number | null; categoryId?: string; categoryName?: string } } | null {
-  try {
-    const raw = localStorage.getItem(`spare.listing.${sku}`);
-    return raw ? JSON.parse(raw) : null;
-  } catch {
-    return null;
-  }
-}
+/** A planned listing as shown; the server says whether it came from an edited draft. */
+type Row = PlannedListing;
 
 const money = (v: number | null) => (v == null ? '—' : v.toLocaleString('en-US', { style: 'currency', currency: 'USD' }));
 const day = (iso: string) => new Date(iso).toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' });
@@ -178,9 +166,7 @@ export function ListingQueueDialog({ onClose }: { onClose: () => void }) {
   // Changes the reviewer has made to a row, kept apart from what the server proposed.
   const [edits, setEdits] = useState<Record<string, Partial<PlannedListing>>>({});
   const setUI = useUIStore((s) => s.set);
-  // Read so the batch redraws when a part opened from it is closed, picking up whatever
-  // price or category was put right there.
-  useUIStore((s) => s.modalOpen);
+  const partOpen = useUIStore((s) => s.modalOpen);
   // One row's category choices open at a time, under that row.
   const [openCategory, setOpenCategory] = useState<string | null>(null);
 
@@ -196,6 +182,22 @@ export function ListingQueueDialog({ onClose }: { onClose: () => void }) {
     queryFn: fetchQueueStatus,
     refetchInterval: (q) => (q.state.data?.running ? 4000 : false),
   });
+
+  // A part opened from here and closed again may have had its price or category put
+  // right; that edit is saved to the server a moment after typing stops, so the batch is
+  // planned again once it has had time to land.
+  const wasOpen = useRef(false);
+  const { refetch } = plan;
+  useEffect(() => {
+    if (partOpen) {
+      wasOpen.current = true;
+      return;
+    }
+    if (!wasOpen.current) return;
+    wasOpen.current = false;
+    const timer = setTimeout(() => void refetch(), 1800);
+    return () => clearTimeout(timer);
+  }, [partOpen, refetch]);
 
   const options = plan.data?.policyOptions;
   const edit = (partId: string, patch: Partial<PlannedListing>) =>
@@ -222,39 +224,8 @@ export function ListingQueueDialog({ onClose }: { onClose: () => void }) {
     });
   };
 
-  // A price or title changed on the part wins over what was researched: it is the later
-  // decision, and the person who made it expects to see it here.
-  const withDrafts = (i: Row): Row => {
-    const draft = savedDraft(i.sku)?.listing;
-    if (!draft) return i;
-    const title = draft.title?.trim() || i.title;
-    const price = draft.price != null && draft.price > 0 ? draft.price : i.price;
-    const categoryId = draft.categoryId?.trim() || i.categoryId;
-    const listing: AgentListing = {
-      ...i.listing,
-      title,
-      price,
-      categoryId,
-      categoryName: categoryId === i.categoryId ? i.listing.categoryName : draft.categoryName,
-    };
-    return {
-      ...i,
-      title,
-      price,
-      categoryId,
-      categoryName: categoryId === i.categoryId ? i.categoryName : (draft.categoryName ?? categoryId),
-      // A category chosen on the part is a decision, not a guess.
-      categoryUncertain: categoryId === i.categoryId ? i.categoryUncertain : false,
-      listing,
-      // Worked out again: the research's own problems were about the research, and an
-      // edit that supplies the missing price or category settles them.
-      problems: listingProblems(listing),
-      edited: title !== i.title || price !== i.price || categoryId !== i.categoryId,
-    };
-  };
-
   const items = focusSort(plan.data?.items ?? [], focus)
-    .map((i) => ({ ...withDrafts(i), ...edits[i.partId] }) as Row)
+    .map((i) => ({ ...i, ...edits[i.partId] }) as Row)
     .filter((i) => !skipped.includes(i.partId));
   const ready = items.filter((i) => i.problems.length === 0);
 

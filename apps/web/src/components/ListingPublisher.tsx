@@ -45,7 +45,7 @@ import {
   useSellerSetup,
 } from '../hooks/useEbayListing';
 import { useSalesStatus } from '../hooks/useSales';
-import { ListingRequestError } from '../lib/api';
+import { clearListingDraft, fetchListingDraft, ListingRequestError, saveListingDraft } from '../lib/api';
 import { cn } from '../lib/cn';
 import { useUserStore } from '../state/useUserStore';
 import { Button } from './ui/Button';
@@ -328,6 +328,52 @@ export function ListingPublisher({ group, onPublished }: { group: PartGroup; onP
     store(draftKey(group.sku), text || listing ? { text, listing, notes } : null);
   }, [group.sku, text, listing, notes]);
 
+  /**
+   * The draft also lives on the server, so a price set on the warehouse tablet is the price
+   * at the desk, and the batch plans from it. The server's copy is fetched when the panel
+   * opens and wins over this browser's; edits are sent back a moment after typing stops.
+   */
+  const [serverLoaded, setServerLoaded] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!open || serverLoaded || !status?.ebayPublishing) return;
+    let cancelled = false;
+    fetchListingDraft(group.primary.id)
+      .then((remote) => {
+        if (cancelled) return;
+        if (remote?.listing) {
+          setListing(remote.listing);
+          setNotes(remote.notes ?? []);
+          setCheck(null);
+        } else if (listing) {
+          // A draft made in this browser before drafts were shared: hand it to the server.
+          void saveListingDraft(group.primary.id, listing, notes).catch(() => undefined);
+        }
+      })
+      .catch(() => undefined)
+      .finally(() => {
+        if (!cancelled) setServerLoaded(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+    // Once per opening; the listing it reads is only for handing an old local draft over.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, serverLoaded, status?.ebayPublishing, group.primary.id]);
+
+  useEffect(() => {
+    // Nothing is sent until the server's copy has been read, or an old browser draft could
+    // overwrite a newer one made elsewhere.
+    if (!serverLoaded || !listing) return;
+    const timer = setTimeout(() => {
+      saveListingDraft(group.primary.id, listing, notes)
+        .then(() => setSaveError(null))
+        .catch((err) => setSaveError(err instanceof Error ? err.message : 'Could not save the draft'));
+    }, 1200);
+    return () => clearTimeout(timer);
+  }, [serverLoaded, listing, notes, group.primary.id]);
+
   useEffect(() => {
     if (policies) store(POLICY_KEY, policies);
   }, [policies]);
@@ -398,6 +444,9 @@ export function ListingPublisher({ group, onPublished }: { group: PartGroup; onP
   };
 
   const startOver = () => {
+    // Everywhere, not just here: a draft left on the server would come back on the next
+    // device to open the part, and would keep being planned into batches.
+    void clearListingDraft(group.primary.id).catch(() => undefined);
     setText('');
     setListing(null);
     setNotes([]);
@@ -845,6 +894,10 @@ export function ListingPublisher({ group, onPublished }: { group: PartGroup; onP
             {scheduleAt && !scheduleError && <span>Waits under Scheduled in Seller Hub until then.</span>}
             {scheduleError && <span className="font-semibold text-red-600">{scheduleError}</span>}
           </div>
+
+          {saveError && (
+            <p className="text-[11px] font-semibold text-red-600">Not saved for other devices: {saveError}</p>
+          )}
 
           <div className="flex flex-wrap gap-2">
             <Button type="button" variant="ghost" onClick={startOver} disabled={busy}>

@@ -18,6 +18,7 @@ import { getSellerSetup, publishListing, resolveCategory, suggestCategories, ver
 import { SITE_MOTORS } from './trading.js';
 import { researchedSkus } from './researchBatch.js';
 import { latestResearch } from './researchService.js';
+import { clearDraft, getDrafts, type ListingDraft } from './draftStore.js';
 
 /**
  * Listing a steady number of parts a day without anyone scheduling them one at a time.
@@ -47,6 +48,8 @@ export interface PlannedListing {
   motors: boolean;
   /** SPARE guessed the category rather than matching it; worth a person's eye. */
   categoryUncertain: boolean;
+  /** Planned from a draft someone edited on the part, rather than the research as written. */
+  edited: boolean;
   /** The other categories eBay offered, for changing it without asking again. */
   categoryAlternatives: CategorySuggestion[];
   /** Free postage or charged, suggested from the agent's weight and the price. */
@@ -230,15 +233,18 @@ export async function buildPlan(
   exclude: string[] = []
 ): Promise<QueuePlan> {
   const start = asap ? new Date(now.getTime() + NOTICE_MS) : firstDay(hour, now, startDate);
-  const [all, researched, policies] = await Promise.all([
+  const [all, researched, policies, drafts] = await Promise.all([
     getAllParts().then((parts) => candidates(groupPartsBySku(parts))),
     researchedSkus(),
     queuePolicies(),
+    getDrafts().catch(() => new Map<string, ListingDraft>()),
   ]);
   // One listing of the research folder decides who is eligible, rather than a Drive lookup
   // for every part in the catalogue: with a long backlog that was hundreds of calls to
-  // find a handful of listings.
-  const has = (g: PartGroup) => researched.has(g.sku.trim().toLowerCase());
+  // find a handful of listings. A part with a draft is eligible too: someone has written
+  // its listing by hand, which is research enough.
+  const draftOf = (g: PartGroup) => drafts.get(g.sku.trim().toUpperCase());
+  const has = (g: PartGroup) => researched.has(g.sku.trim().toLowerCase()) || !!draftOf(g);
   const skipped = new Set(exclude);
   const groups = all.filter(has).filter((g) => !g.records.some((r) => skipped.has(r.id)));
   const unresearched = all.length - groups.length;
@@ -249,12 +255,15 @@ export async function buildPlan(
   for (const group of groups) {
     if (items.length >= wanted) break;
     seen += 1;
-    const research = await latestResearch(group.sku).catch(() => null);
+    // An edited draft wins over the research it started from: it is the later decision.
+    const draft = draftOf(group);
+    const research = draft ? null : await latestResearch(group.sku).catch(() => null);
     // Coerced, because a research file is whatever the agent wrote: a missing field should
     // show up as a problem to fix, not throw while the plan is being built.
     // Listed in the folder but unreadable — a half-written file, or one the agent left
     // empty. Not a candidate, and not worth stopping the plan for.
-    const found = research?.listing ? coerceAgentListing(research.listing) : null;
+    const source = draft?.listing ?? research?.listing;
+    const found = source ? coerceAgentListing(source) : null;
     if (!found) continue;
     const { listing: parsed, uncertain, alternatives } = await withCategory(found);
     // Motors decides the returns policy, so the category has to be resolved either way.
@@ -288,6 +297,7 @@ export async function buildPlan(
       categoryName: category?.name ?? parsed.categoryName ?? null,
       categoryUncertain: uncertain,
       categoryAlternatives: alternatives,
+      edited: !!draft,
       motors,
       shipping,
       policies: policiesFor(policies, motors, shipping),
@@ -319,8 +329,11 @@ export interface QueueItem {
 }
 
 async function run(items: QueueItem[]): Promise<void> {
-  // One read of the sheet for the whole batch rather than one per listing.
-  const groups = groupPartsBySku(await getAllParts());
+  // One read of the sheet, and of the drafts, for the whole batch rather than per listing.
+  const [groups, drafts] = await Promise.all([
+    getAllParts().then(groupPartsBySku),
+    getDrafts().catch(() => new Map<string, ListingDraft>()),
+  ]);
 
   for (const item of items) {
     if (!state.running) break;
@@ -329,12 +342,18 @@ async function run(items: QueueItem[]): Promise<void> {
       const group0 = groups.find((g) => g.records.some((r) => r.id === item.partId));
       if (!group0) throw new HttpError(404, 'Part not found.');
 
-      // Read back from the research file rather than taken from the browser: it is the
-      // same listing the batch was planned from, and a week of descriptions is far too
-      // much to post back through a form.
-      const research = await latestResearch(group0.sku);
-      if (!research?.listing) throw new HttpError(422, 'The research for this part could not be read.');
-      const listing = coerceAgentListing(research.listing);
+      // Read back from the draft or the research file rather than taken from the browser:
+      // it is the same listing the batch was planned from, and a week of descriptions is
+      // far too much to post back through a form.
+      const draft = drafts.get(group0.sku.trim().toUpperCase());
+      let listing: AgentListing;
+      if (draft) {
+        listing = coerceAgentListing(draft.listing);
+      } else {
+        const research = await latestResearch(group0.sku);
+        if (!research?.listing) throw new HttpError(422, 'The research for this part could not be read.');
+        listing = coerceAgentListing(research.listing);
+      }
       if (typeof item.price === 'number' && item.price > 0) listing.price = item.price;
       if (item.title?.trim()) listing.title = item.title.trim();
       if (item.categoryId) {
@@ -362,6 +381,8 @@ async function run(items: QueueItem[]): Promise<void> {
 
       const listed = await publishListing(input);
       state.scheduled += 1;
+      // Scheduled, so its draft is done with; left behind, the next batch would plan it again.
+      if (draft) await clearDraft(group0.sku).catch(() => undefined);
       await updatePart(
         group.primary.id,
         { ebayListingId: listed.itemId, itemListed: true, itemListedDate: item.startAt },

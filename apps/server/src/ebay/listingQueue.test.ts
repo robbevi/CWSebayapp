@@ -29,6 +29,9 @@ const prep = vi.hoisted(() => ({
 }));
 vi.mock('./listingPrep.js', () => prep);
 
+const drafts = vi.hoisted(() => ({ getDrafts: vi.fn(), clearDraft: vi.fn() }));
+vi.mock('./draftStore.js', () => drafts);
+
 const { buildPlan, firstDay, policiesFor, queuePolicies, queueStatus, startQueue } = await import('./listingQueue.js');
 
 /** The account's policies as SPARE reads them, copies and all. */
@@ -91,6 +94,8 @@ beforeEach(() => {
   vi.clearAllMocks();
   research.latestResearch.mockResolvedValue(researched('A TITLE'));
   publish.getSellerSetup.mockResolvedValue(SETUP);
+  drafts.getDrafts.mockResolvedValue(new Map());
+  drafts.clearDraft.mockResolvedValue(undefined);
   publish.resolveCategory.mockResolvedValue({ id: '170141', name: 'Truck Parts', siteId: '0', leaf: true, required: [], recommended: [] });
   batch.researchedSkus.mockImplementation(async () => {
     const parts = (await sheets.getAllParts()) as { sku: string }[];
@@ -310,6 +315,26 @@ describe('buildPlan', () => {
     expect(plan.items.map((i) => i.sku)).toEqual(['B', 'C']);
   });
 
+  it('plans from a draft edited on the part, over the research', async () => {
+    sheets.getAllParts.mockResolvedValue([part('A')]);
+    drafts.getDrafts.mockResolvedValue(
+      new Map([['A', { sku: 'A', listing: { ...researched('EDITED').listing, price: 125 }, notes: [] }]])
+    );
+
+    const [item] = (await buildPlan(1, 10, 9, NOW)).items;
+    expect(item).toMatchObject({ title: 'EDITED', price: 125, edited: true });
+    expect(research.latestResearch).not.toHaveBeenCalled();
+  });
+
+  it('counts a part with a draft as ready, even without a research file', async () => {
+    sheets.getAllParts.mockResolvedValue([part('A')]);
+    folderHolds();
+    drafts.getDrafts.mockResolvedValue(new Map([['A', { sku: 'A', listing: researched('BY HAND').listing, notes: [] }]]));
+
+    const plan = await buildPlan(1, 10, 9, NOW);
+    expect(plan.items.map((i) => i.title)).toEqual(['BY HAND']);
+  });
+
   it('carries what the reviewer needs to judge each listing', async () => {
     sheets.getAllParts.mockResolvedValue([part('A', { confirmedQoh: 4 })]);
 
@@ -375,6 +400,16 @@ describe('scheduling an approved batch', () => {
     );
     await settled();
     expect(prep.prepareListing.mock.calls[0][1].listing).toMatchObject({ price: 120, title: 'A TITLE' });
+  });
+
+  it('schedules from the draft, and clears the draft once scheduled', async () => {
+    drafts.getDrafts.mockResolvedValue(
+      new Map([['A', { sku: 'A', listing: { ...researched('DRAFTED').listing, price: 140 }, notes: [] }]])
+    );
+    await startQueue([{ partId: 'id-A', startAt: LATER, policies }], 'Rob Bevilacqua');
+    expect(await settled()).toMatchObject({ scheduled: 1 });
+    expect(prep.prepareListing.mock.calls[0][1].listing).toMatchObject({ title: 'DRAFTED', price: 140 });
+    expect(drafts.clearDraft).toHaveBeenCalledWith('A');
   });
 
   it('records the failure and carries on when research cannot be read', async () => {
