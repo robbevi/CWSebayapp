@@ -283,12 +283,14 @@ export async function fetchQueuePlan(
   hour: number,
   startDate?: string,
   /** Go as soon as eBay allows, ignoring the hour and the date. */
-  asap = false
+  asap = false,
+  /** Parts skipped for this batch; others are planned in their place. */
+  exclude: string[] = []
 ): Promise<QueuePlan> {
   const res = await fetch('/api/listing-queue/plan', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ days, perDay, hour, startDate, asap }),
+    body: JSON.stringify({ days, perDay, hour, startDate, asap, exclude }),
   });
   return parseJson(res);
 }

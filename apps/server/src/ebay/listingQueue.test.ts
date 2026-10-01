@@ -303,6 +303,13 @@ describe('buildPlan', () => {
     expect(new Date(times[2]).getDate()).toBe(24);
   });
 
+  it('fills the place of a skipped part with the next candidate', async () => {
+    sheets.getAllParts.mockResolvedValue(['A', 'B', 'C'].map((s) => part(s)));
+
+    const plan = await buildPlan(1, 2, 9, NOW, undefined, false, ['id-A']);
+    expect(plan.items.map((i) => i.sku)).toEqual(['B', 'C']);
+  });
+
   it('carries what the reviewer needs to judge each listing', async () => {
     sheets.getAllParts.mockResolvedValue([part('A', { confirmedQoh: 4 })]);
 
@@ -313,6 +320,9 @@ describe('buildPlan', () => {
 
 describe('scheduling an approved batch', () => {
   const policies = { shipping: 'ship-free', returns: 'ret-none', payment: 'pay' };
+  // Two days out from whenever the tests run: a fixed date eventually falls inside eBay's
+  // hour of notice and the batch is refused before it starts.
+  const LATER = new Date(Date.now() + 2 * 86_400_000).toISOString();
 
   beforeEach(() => {
     sheets.getAllParts.mockResolvedValue([part('A')]);
@@ -334,7 +344,7 @@ describe('scheduling an approved batch', () => {
   };
 
   it('reads the listing back from the research file rather than the request', async () => {
-    await startQueue([{ partId: 'id-A', startAt: '2026-09-25T09:00:00.000Z', policies }], 'Rob Bevilacqua');
+    await startQueue([{ partId: 'id-A', startAt: LATER, policies }], 'Rob Bevilacqua');
     expect(await settled()).toMatchObject({ scheduled: 1, failed: [] });
     expect(research.latestResearch).toHaveBeenCalledWith('A');
     expect(prep.prepareListing.mock.calls[0][1].listing).toMatchObject({ title: 'A TITLE' });
@@ -342,7 +352,7 @@ describe('scheduling an approved batch', () => {
 
   it('uses the category the reviewer picked over the one researched', async () => {
     await startQueue(
-      [{ partId: 'id-A', startAt: '2026-09-25T09:00:00.000Z', policies, categoryId: '99999' }],
+      [{ partId: 'id-A', startAt: LATER, policies, categoryId: '99999' }],
       'Rob Bevilacqua'
     );
     await settled();
@@ -351,7 +361,7 @@ describe('scheduling an approved batch', () => {
 
   it('takes a price and title edited on the part over what was researched', async () => {
     await startQueue(
-      [{ partId: 'id-A', startAt: '2026-09-25T09:00:00.000Z', policies, price: 125, title: 'A BETTER TITLE' }],
+      [{ partId: 'id-A', startAt: LATER, policies, price: 125, title: 'A BETTER TITLE' }],
       'Rob Bevilacqua'
     );
     await settled();
@@ -360,7 +370,7 @@ describe('scheduling an approved batch', () => {
 
   it('ignores an edit that says nothing, rather than blanking the research', async () => {
     await startQueue(
-      [{ partId: 'id-A', startAt: '2026-09-25T09:00:00.000Z', policies, price: 0, title: '   ' }],
+      [{ partId: 'id-A', startAt: LATER, policies, price: 0, title: '   ' }],
       'Rob Bevilacqua'
     );
     await settled();
@@ -369,7 +379,7 @@ describe('scheduling an approved batch', () => {
 
   it('records the failure and carries on when research cannot be read', async () => {
     research.latestResearch.mockResolvedValue({ found: false });
-    await startQueue([{ partId: 'id-A', startAt: '2026-09-25T09:00:00.000Z', policies }], 'Rob Bevilacqua');
+    await startQueue([{ partId: 'id-A', startAt: LATER, policies }], 'Rob Bevilacqua');
     expect(await settled()).toMatchObject({ scheduled: 0, failed: [{ sku: 'A' }] });
     expect(publish.publishListing).not.toHaveBeenCalled();
   });

@@ -33,7 +33,10 @@ listingQueueRouter.post('/listing-queue/plan', requireAdmin, async (req, res, ne
     const hour = clamp(req.body?.hour, 9, 0, 23);
     const startDate = typeof req.body?.startDate === 'string' ? req.body.startDate : undefined;
     const asap = req.body?.asap === true;
-    res.json(await buildPlan(days, perDay, hour, new Date(), startDate, asap));
+    const exclude = Array.isArray(req.body?.exclude)
+      ? (req.body.exclude as unknown[]).filter((x): x is string => typeof x === 'string').slice(0, 500)
+      : [];
+    res.json(await buildPlan(days, perDay, hour, new Date(), startDate, asap, exclude));
   } catch (err) {
     next(err);
   }

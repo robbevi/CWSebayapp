@@ -27,7 +27,9 @@ function pathOf(item: PlannedListing): string {
 type Row = PlannedListing & { edited?: boolean };
 
 /** A listing someone has been editing on the part itself, saved by the browser it was edited in. */
-function savedDraft(sku: string): { listing?: { title?: string; price?: number | null } } | null {
+function savedDraft(
+  sku: string
+): { listing?: { title?: string; price?: number | null; categoryId?: string; categoryName?: string } } | null {
   try {
     const raw = localStorage.getItem(`spare.listing.${sku}`);
     return raw ? JSON.parse(raw) : null;
@@ -169,16 +171,25 @@ export function ListingQueueDialog({ onClose }: { onClose: () => void }) {
   // Set, the batch goes at the first moment eBay will take it, and the day and hour above
   // stop mattering.
   const [asap, setAsap] = useState(false);
-  const [dropped, setDropped] = useState<Set<string>>(new Set());
+  // Parts skipped for this batch. The plan is asked for again without them, so the next
+  // candidates take their places rather than the batch running short.
+  const [skipped, setSkipped] = useState<string[]>([]);
+  const skip = (partId: string) => setSkipped((s) => (s.includes(partId) ? s : [...s, partId]));
   // Changes the reviewer has made to a row, kept apart from what the server proposed.
   const [edits, setEdits] = useState<Record<string, Partial<PlannedListing>>>({});
   const setUI = useUIStore((s) => s.set);
+  // Read so the batch redraws when a part opened from it is closed, picking up whatever
+  // price or category was put right there.
+  useUIStore((s) => s.modalOpen);
   // One row's category choices open at a time, under that row.
   const [openCategory, setOpenCategory] = useState<string | null>(null);
 
   const plan = useQuery<QueuePlan>({
-    queryKey: ['listing-queue-plan', days, perDay, hour, startDate, asap],
-    queryFn: () => fetchQueuePlan(days, perDay, hour, startDate || undefined, asap),
+    queryKey: ['listing-queue-plan', days, perDay, hour, startDate, asap, skipped],
+    queryFn: () => fetchQueuePlan(days, perDay, hour, startDate || undefined, asap, skipped),
+    // Keep showing the last plan while the next is fetched, so skipping a part doesn't
+    // blank the whole list.
+    placeholderData: (previous) => previous,
   });
   const status = useQuery({
     queryKey: ['listing-queue-status'],
@@ -216,17 +227,35 @@ export function ListingQueueDialog({ onClose }: { onClose: () => void }) {
   const withDrafts = (i: Row): Row => {
     const draft = savedDraft(i.sku)?.listing;
     if (!draft) return i;
+    const title = draft.title?.trim() || i.title;
+    const price = draft.price != null && draft.price > 0 ? draft.price : i.price;
+    const categoryId = draft.categoryId?.trim() || i.categoryId;
+    const listing: AgentListing = {
+      ...i.listing,
+      title,
+      price,
+      categoryId,
+      categoryName: categoryId === i.categoryId ? i.listing.categoryName : draft.categoryName,
+    };
     return {
       ...i,
-      title: draft.title?.trim() || i.title,
-      price: draft.price ?? i.price,
-      edited: !!draft.title?.trim() || draft.price != null,
+      title,
+      price,
+      categoryId,
+      categoryName: categoryId === i.categoryId ? i.categoryName : (draft.categoryName ?? categoryId),
+      // A category chosen on the part is a decision, not a guess.
+      categoryUncertain: categoryId === i.categoryId ? i.categoryUncertain : false,
+      listing,
+      // Worked out again: the research's own problems were about the research, and an
+      // edit that supplies the missing price or category settles them.
+      problems: listingProblems(listing),
+      edited: title !== i.title || price !== i.price || categoryId !== i.categoryId,
     };
   };
 
   const items = focusSort(plan.data?.items ?? [], focus)
     .map((i) => ({ ...withDrafts(i), ...edits[i.partId] }) as Row)
-    .filter((i) => !dropped.has(i.partId));
+    .filter((i) => !skipped.includes(i.partId));
   const ready = items.filter((i) => i.problems.length === 0);
 
   // Re-dated after ordering, so the days read in the order the batch will actually go out.
@@ -395,12 +424,11 @@ export function ListingQueueDialog({ onClose }: { onClose: () => void }) {
                           </div>
                           <button
                             type="button"
-                            onClick={() => setDropped(new Set(dropped).add(item.partId))}
-                            className="min-h-0 shrink-0 rounded-btn p-1 text-textMuted hover:bg-surfaceMuted hover:text-textPri"
-                            title="Leave this one out of the batch"
-                            aria-label={`Leave ${item.sku} out`}
+                            onClick={() => skip(item.partId)}
+                            className="min-h-0 shrink-0 rounded-btn border border-border px-2 py-0.5 text-[11px] font-semibold text-textMuted hover:bg-surfaceMuted hover:text-textPri"
+                            title="Skip this part; the next one takes its place"
                           >
-                            <X size={14} />
+                            Skip
                           </button>
                         </div>
 
@@ -480,9 +508,27 @@ export function ListingQueueDialog({ onClose }: { onClose: () => void }) {
                   <ul className="mt-1">
                     {blocked.map((item) => (
                       <li key={item.partId} className="border-b border-border py-2 last:border-0">
-                        <div className="text-xs font-semibold text-textPri">{item.title}</div>
-                        <div className="text-[11px] text-textMuted">
-                          {item.sku} · {money(item.price)}
+                        <div className="flex items-start gap-2">
+                          {/* Opens the part, where the price and category can be put right. */}
+                          <button
+                            type="button"
+                            onClick={() => setUI({ selectedId: item.partId, modalOpen: true })}
+                            title="Open the part"
+                            className="min-h-0 min-w-0 flex-1 text-left hover:underline"
+                          >
+                            <div className="text-xs font-semibold text-textPri">{item.title}</div>
+                            <div className="text-[11px] text-textMuted">
+                              {item.sku} · {money(item.price)}
+                            </div>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => skip(item.partId)}
+                            className="min-h-0 shrink-0 rounded-btn border border-border px-2 py-0.5 text-[11px] font-semibold text-textMuted hover:bg-surfaceMuted hover:text-textPri"
+                            title="Skip this part; the next one takes its place"
+                          >
+                            Skip
+                          </button>
                         </div>
                         <div className="mt-1 flex items-start gap-1 text-[11px] font-semibold text-amber-600">
                           <AlertTriangle size={11} className="mt-0.5 shrink-0" />
@@ -495,6 +541,20 @@ export function ListingQueueDialog({ onClose }: { onClose: () => void }) {
                 </section>
               )}
             </>
+          )}
+
+          {skipped.length > 0 && (
+            <p className="mt-4 text-[11px] text-textMuted">
+              Skipped {skipped.length} {skipped.length === 1 ? 'part' : 'parts'} for this batch; others took their
+              places.{' '}
+              <button
+                type="button"
+                onClick={() => setSkipped([])}
+                className="min-h-0 font-semibold text-primary hover:underline"
+              >
+                Undo
+              </button>
+            </p>
           )}
 
           {status.data && (status.data.running || status.data.startedAt) && (

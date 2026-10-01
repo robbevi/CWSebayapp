@@ -225,7 +225,9 @@ export async function buildPlan(
    * Ignore the hour and go as soon as eBay allows. For a batch decided on the spot, where
    * waiting until tomorrow morning is the only thing standing between stock and a buyer.
    */
-  asap = false
+  asap = false,
+  /** Parts the reviewer skipped; the next candidates fill their places. */
+  exclude: string[] = []
 ): Promise<QueuePlan> {
   const start = asap ? new Date(now.getTime() + NOTICE_MS) : firstDay(hour, now, startDate);
   const [all, researched, policies] = await Promise.all([
@@ -237,7 +239,8 @@ export async function buildPlan(
   // for every part in the catalogue: with a long backlog that was hundreds of calls to
   // find a handful of listings.
   const has = (g: PartGroup) => researched.has(g.sku.trim().toLowerCase());
-  const groups = all.filter(has);
+  const skipped = new Set(exclude);
+  const groups = all.filter(has).filter((g) => !g.records.some((r) => skipped.has(r.id)));
   const unresearched = all.length - groups.length;
   const wanted = days * perDay;
   const items: PlannedListing[] = [];
