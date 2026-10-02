@@ -344,14 +344,15 @@ export function ListingQueueDialog({ onClose }: { onClose: () => void }) {
               asap ? 'border-primary bg-primary/10 text-primary' : 'border-border text-textMuted hover:bg-surfaceMuted'
             )}
           >
-            {asap ? 'Listing as soon as eBay allows' : 'List today, as soon as eBay allows'}
+            {asap ? 'Starting today, as soon as eBay allows' : 'Start today, as soon as eBay allows'}
           </button>
 
           {plan.data && (
             <p className="mt-2 text-[11px] text-textMuted">
               First listing {new Date(plan.data.startsOn).toLocaleString([], { dateStyle: 'full', timeStyle: 'short' })}
               {!asap && startDate && plan.data.startsOn.slice(0, 10) !== startDate && ' — eBay needs an hour of notice'}
-              {asap && ' — the soonest eBay accepts'}.
+              {asap && ' — the soonest eBay accepts'}
+              {asap && days > 1 && `, then ${perDay} a day at ${HOURS[hour]} for the ${days - 1} days after`}.
               {options?.payment && ` Paid through ${options.payment.name}.`}
             </p>
           )}

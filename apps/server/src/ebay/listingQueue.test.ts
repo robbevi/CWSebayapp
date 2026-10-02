@@ -296,16 +296,18 @@ describe('buildPlan', () => {
     expect(first.getDate()).toBe(24);
   });
 
-  it('spills an asap batch into the following hours rather than the next day', async () => {
-    sheets.getAllParts.mockResolvedValue(['A', 'B', 'C'].map((s) => part(s)));
-    const at = new Date(2026, 8, 24, 16, 0);
+  it('lists the first day now and keeps the following days on schedule', async () => {
+    sheets.getAllParts.mockResolvedValue(['A', 'B', 'C', 'D', 'E', 'F'].map((s) => part(s)));
+    const at = new Date(2026, 9, 1, 13, 35);
 
-    // Two a day over two days, taken as three listings half an hour apart from the off.
-    const plan = await buildPlan(2, 2, 9, at, undefined, true);
-    const times = plan.items.map((i) => new Date(i.startAt).getTime());
-    expect(plan.items).toHaveLength(3);
-    expect(times[2] - times[0]).toBe(60 * 60_000);
-    expect(new Date(times[2]).getDate()).toBe(24);
+    // "List today" on a batch of two a day for three days: two this afternoon, then two at
+    // 9am on each of the next two days, not all six this afternoon.
+    const plan = await buildPlan(3, 2, 9, at, undefined, true);
+    const starts = plan.items.map((i) => new Date(i.startAt));
+    expect(starts.map((d) => d.getDate())).toEqual([1, 1, 2, 2, 3, 3]);
+    expect(starts[0].getTime() - at.getTime()).toBe(70 * 60_000);
+    expect(starts[2].getHours()).toBe(9);
+    expect(starts[4].getHours()).toBe(9);
   });
 
   it('fills the place of a skipped part with the next candidate', async () => {

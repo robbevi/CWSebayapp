@@ -273,9 +273,17 @@ export async function buildPlan(
 
     const index = items.length;
     let startAt: Date;
-    if (asap) {
-      // Straight off the first slot, minutes apart, rather than anchored to an hour.
+    const dayIndex = Math.floor(index / perDay);
+    if (asap && dayIndex === 0) {
+      // The first day goes as soon as eBay allows, minutes apart, rather than waiting for
+      // an hour on the clock.
       startAt = new Date(start.getTime() + index * Math.max(Math.floor(60 / perDay), 2) * 60_000);
+    } else if (asap) {
+      // The days after keep to the batch's pace: "list today" starts the batch now, it does
+      // not pull the rest of the week into this afternoon.
+      const day = new Date(now);
+      day.setDate(day.getDate() + dayIndex);
+      startAt = startFor(day, hour, index % perDay, perDay);
     } else {
       const day = new Date(start);
       day.setDate(day.getDate() + Math.floor(index / perDay));
