@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ReactElement } from 'react';
-import { ChevronDown, ClipboardList, Tag, Wrench } from 'lucide-react';
+import { ChevronDown, ClipboardCheck, ClipboardList, Tag, Wrench } from 'lucide-react';
 import {
   extendedValue,
   listingFor,
@@ -10,6 +10,8 @@ import {
   type WorkflowStatus,
 } from '@warehouse/shared';
 import { cn } from '../lib/cn';
+import { useSales } from '../hooks/useSales';
+import { CetarisDialog } from './CetarisDialog';
 import { ColumnSummaryDialog, type FilterPatch } from './ColumnSummaryDialog';
 import { useUIStore } from '../state/useUIStore';
 import { PartCard } from './PartCard';
@@ -86,6 +88,11 @@ export function BucketColumn({
 
   const shown = split && ebayView !== 'all' ? (ebayView === 'sold' ? split.sold : split.listed) : parts;
   const [summaryOpen, setSummaryOpen] = useState(false);
+  const [cetarisOpen, setCetarisOpen] = useState(false);
+  // Every sale, not only those on screen: the Part Sale backlog doesn't shrink because a
+  // filter hides some of it.
+  const { data: allSales } = useSales();
+  const awaitingCetaris = status === 'Listed' ? (allSales ?? []).filter((s) => !s.cetarisSaleNumber).length : 0;
 
   /**
    * Cards are drawn a page at a time as the column is scrolled, not all 1,600 of Not Started
@@ -148,6 +155,19 @@ export function BucketColumn({
             </span>
           </span>
         </button>
+
+        {status === 'Listed' && awaitingCetaris > 0 && (
+          <button
+            type="button"
+            onClick={() => setCetarisOpen(true)}
+            title="Sales still waiting on their Cetaris Part Sale"
+            className="flex min-h-0 shrink-0 items-center gap-1 rounded-pill border border-border bg-surface px-2.5 py-1 text-xs font-semibold text-textPri hover:bg-surfaceMuted"
+          >
+            <ClipboardCheck size={12} />
+            {awaitingCetaris}
+            <span className="hidden font-normal text-textMuted sm:inline">to log</span>
+          </button>
+        )}
 
         {split ? (
           /* The count is the control. Clicking it offers All / Listed / Sold, so nothing
@@ -248,6 +268,8 @@ export function BucketColumn({
           </>
         )}
       </div>
+
+      {cetarisOpen && <CetarisDialog onClose={() => setCetarisOpen(false)} />}
 
       {summaryOpen && (
         <ColumnSummaryDialog

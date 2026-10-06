@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { fetchSales, fetchSalesStatus, syncSales } from '../lib/api';
+import { clearCetarisSale, fetchSales, fetchSalesStatus, logCetarisSale, syncSales } from '../lib/api';
 import { useToastStore } from '../state/useToastStore';
 
 export const SALES_QUERY_KEY = ['sales'];
@@ -9,6 +9,30 @@ export function useSales() {
     queryKey: SALES_QUERY_KEY,
     queryFn: fetchSales,
     refetchInterval: 60_000,
+  });
+}
+
+/** Logs a Cetaris Part Sale number against a group of eBay sales. */
+export function useLogCetaris() {
+  const qc = useQueryClient();
+  const toast = useToastStore((s) => s.show);
+  return useMutation({
+    mutationFn: (v: { lineItemIds: string[]; number: string }) => logCetarisSale(v.lineItemIds, v.number),
+    onSuccess: (result, v) => {
+      void qc.invalidateQueries({ queryKey: SALES_QUERY_KEY });
+      toast(`Part Sale ${v.number} logged against ${result.logged} ${result.logged === 1 ? 'sale' : 'sales'}`);
+    },
+    onError: (err) => toast(err instanceof Error ? err.message : 'Could not log the Part Sale', 'error'),
+  });
+}
+
+export function useClearCetaris() {
+  const qc = useQueryClient();
+  const toast = useToastStore((s) => s.show);
+  return useMutation({
+    mutationFn: (lineItemId: string) => clearCetarisSale(lineItemId),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: SALES_QUERY_KEY }),
+    onError: (err) => toast(err instanceof Error ? err.message : 'Could not take the number back', 'error'),
   });
 }
 

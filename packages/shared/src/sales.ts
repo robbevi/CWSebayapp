@@ -26,6 +26,10 @@ export interface Sale {
   /** True when fees were estimated rather than read from eBay's finance records. */
   feesEstimated: boolean;
   syncedAt: string;
+  /** The Cetaris Part Sale that closed this sale out, once someone has logged it. */
+  cetarisSaleNumber?: string;
+  cetarisLoggedAt?: string;
+  cetarisLoggedBy?: string;
 }
 
 export interface SaleTotals {
@@ -131,3 +135,26 @@ export function isSaleTracked(sale: Sale, keys: TrackedKeys): boolean {
   if (sale.ebayListingId && keys.listingIds.has(sale.ebayListingId)) return true;
   return !!sale.sku && keys.skus.has(sale.sku.toUpperCase());
 }
+
+/**
+ * The Cetaris side of a sale. Selling on eBay is half of it: the part also has to be sold
+ * out of Cetaris with a Part Sale, whose seven-digit number is the receipt that the job is
+ * finished. One Part Sale can cover several eBay sales, even of different SKUs, so the same
+ * number is often logged against many sales.
+ */
+export interface CetarisLog {
+  lineItemId: string;
+  cetarisSaleNumber: string;
+  loggedAt: string;
+  loggedBy: string;
+}
+
+/** Cetaris Part Sale numbers are seven digits; anything else is a typo. */
+export const CETARIS_SALE_NUMBER = /^\d{7}$/;
+
+export function isCetarisSaleNumber(value: unknown): value is string {
+  return typeof value === 'string' && CETARIS_SALE_NUMBER.test(value.trim());
+}
+
+/** A sale is finished once it carries its Cetaris number. */
+export const cetarisDone = (sale: Pick<Sale, 'cetarisSaleNumber'>) => !!sale.cetarisSaleNumber;

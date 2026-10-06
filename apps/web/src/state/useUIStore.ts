@@ -29,7 +29,7 @@ export type DiscrepancyFilter = 'shortage' | 'overage' | 'notFound';
 export type ResearchFilter = 'researched' | 'ready' | 'notReady';
 
 /** Whether anything has sold. Sold parts stay on the board, in the Listed / Sold column. */
-export type SaleFilter = 'sold' | 'unsold';
+export type SaleFilter = 'sold' | 'unsold' | 'awaitingCetaris' | 'complete';
 
 interface UIState {
   search: string;

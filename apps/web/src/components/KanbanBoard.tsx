@@ -61,7 +61,12 @@ function matchesResearch(g: PartGroup, filters: ResearchFilter[], researched: Se
 
 function matchesSales(g: PartGroup, filters: SaleFilter[], salesIndex: SalesIndex): boolean {
   if (filters.length === 0) return true;
-  return filters.includes(salesForGroup(g, salesIndex).length > 0 ? 'sold' : 'unsold');
+  const sales = salesForGroup(g, salesIndex);
+  const states: SaleFilter[] = [sales.length > 0 ? 'sold' : 'unsold'];
+  // Finished in Cetaris once every sale has its Part Sale; waiting while any one doesn't.
+  if (sales.some((s) => !s.cetarisSaleNumber)) states.push('awaitingCetaris');
+  else if (sales.length > 0) states.push('complete');
+  return filters.some((f) => states.includes(f));
 }
 
 function matchesCompletedTasks(g: PartGroup, completedTasks: TaskKey[]): boolean {

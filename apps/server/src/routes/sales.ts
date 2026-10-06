@@ -1,5 +1,7 @@
 import { Router } from 'express';
+import { isCetarisSaleNumber } from '@warehouse/shared';
 import { env, isGoogleConfigured } from '../config/env.js';
+import { clearCetaris, getCetarisLogs, logCetaris } from '../google/cetarisStore.js';
 import { fetchListings } from '../ebay/listingsService.js';
 import { fetchSales, isEbayConfigured } from '../ebay/ordersService.js';
 import {
@@ -58,7 +60,61 @@ salesRouter.get('/sales', async (_req, res, next) => {
       res.json([]);
       return;
     }
-    res.json(await getSales());
+    // Each sale carries its Cetaris number, when one has been logged, so the board and the
+    // part both know which sales are finished.
+    const [sales, logs] = await Promise.all([getSales(), getCetarisLogs()]);
+    res.json(
+      sales.map((sale) => {
+        const log = logs.get(sale.lineItemId);
+        return log
+          ? { ...sale, cetarisSaleNumber: log.cetarisSaleNumber, cetarisLoggedAt: log.loggedAt, cetarisLoggedBy: log.loggedBy }
+          : sale;
+      })
+    );
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * Logs a Cetaris Part Sale number against one or more eBay sales. Anyone signed in: it is
+ * logged by whoever did the Part Sale, and the log records who that was.
+ */
+salesRouter.post('/sales/cetaris', async (req, res, next) => {
+  try {
+    const number = String(req.body?.cetarisSaleNumber ?? '').trim();
+    const ids = Array.isArray(req.body?.lineItemIds)
+      ? (req.body.lineItemIds as unknown[]).filter((x): x is string => typeof x === 'string')
+      : [];
+    if (!isCetarisSaleNumber(number)) {
+      res.status(400).json({ error: 'A Cetaris Part Sale number is seven digits.' });
+      return;
+    }
+    if (!ids.length) {
+      res.status(400).json({ error: 'Choose the sales this Part Sale covers.' });
+      return;
+    }
+    const known = new Map((await getSales()).map((s) => [s.lineItemId, s]));
+    const sales = ids.map((id) => known.get(id)).filter((s): s is NonNullable<typeof s> => !!s);
+    if (sales.length !== ids.length) {
+      res.status(404).json({ error: 'One of those sales is no longer on record. Refresh and try again.' });
+      return;
+    }
+    const logged = await logCetaris(
+      sales.map((s) => ({ lineItemId: s.lineItemId, sku: s.sku })),
+      number,
+      req.user?.name ?? ''
+    );
+    res.json({ logged, cetarisSaleNumber: number });
+  } catch (err) {
+    next(err);
+  }
+});
+
+salesRouter.delete('/sales/:lineItemId/cetaris', async (req, res, next) => {
+  try {
+    await clearCetaris(String(req.params.lineItemId));
+    res.json({ ok: true });
   } catch (err) {
     next(err);
   }

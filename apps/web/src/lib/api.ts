@@ -146,6 +146,21 @@ export async function fetchSalesStatus(): Promise<{ ebayConfigured: boolean; eba
   return parseJson(res);
 }
 
+/** Logs one Cetaris Part Sale number against the eBay sales it covers. */
+export async function logCetarisSale(lineItemIds: string[], cetarisSaleNumber: string): Promise<{ logged: number }> {
+  const res = await fetch('/api/sales/cetaris', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ lineItemIds, cetarisSaleNumber }),
+  });
+  return parseJson(res);
+}
+
+export async function clearCetarisSale(lineItemId: string): Promise<void> {
+  const res = await fetch(`/api/sales/${encodeURIComponent(lineItemId)}/cetaris`, { method: 'DELETE' });
+  await parseJson(res);
+}
+
 export async function syncSales(days?: number): Promise<SalesSyncResult> {
   const res = await fetch('/api/sales/sync', {
     method: 'POST',

@@ -1,5 +1,6 @@
 import {
   AlertTriangle,
+  Check,
   ArrowRight,
   DollarSign,
   ExternalLink,
@@ -58,7 +59,10 @@ export function PartCard({
 }) {
   const set = useUIStore((s) => s.set);
   const researched = useResearchedSkus();
-  const sold = soldPosition(part, salesForGroup(part, salesIndex));
+  const partSales = salesForGroup(part, salesIndex);
+  const sold = soldPosition(part, partSales);
+  // A sale is only finished once its Part Sale is logged in Cetaris.
+  const cetarisPending = partSales.filter((s) => !s.cetarisSaleNumber).length;
   // What eBay says it is asking, not what the spreadsheet hoped for. The two differ —
   // one belt is listed at $60 against a $44.99 basis — and the live figure is the one
   // that matches the listing.
@@ -285,6 +289,21 @@ export function PartCard({
               ? `${sold.soldQty} sold · ${sold.remainingQty} left`
               : 'Active on eBay'}
         </span>
+        {sold.soldQty > 0 && (
+          <span
+            title={
+              cetarisPending
+                ? `${cetarisPending} ${cetarisPending === 1 ? 'sale needs its' : 'sales need their'} Cetaris Part Sale logged`
+                : 'Every sale has its Cetaris Part Sale logged'
+            }
+            className={cn(
+              'ml-auto flex shrink-0 items-center gap-1 rounded-pill border px-2 py-0.5 text-[10px] font-semibold',
+              cetarisPending ? 'border-border text-textMuted' : 'border-primary/30 bg-primary/10 text-primary'
+            )}
+          >
+            {cetarisPending ? 'Part Sale to log' : <><Check size={10} /> Complete</>}
+          </span>
+        )}
         {listingUrl && (
           <a
             href={listingUrl}
@@ -292,7 +311,10 @@ export function PartCard({
             rel="noreferrer"
             // The card behind this opens the detail modal; the link must not do both.
             onClick={(e) => e.stopPropagation()}
-            className="ml-auto shrink-0 rounded-btn border border-border px-2 py-0.5 font-medium text-primary hover:bg-surfaceMuted"
+            className={cn(
+              'shrink-0 rounded-btn border border-border px-2 py-0.5 font-medium text-primary hover:bg-surfaceMuted',
+              sold.soldQty === 0 && 'ml-auto'
+            )}
             title="Open this listing on eBay"
           >
             View <ExternalLink size={10} className="inline align-[-1px]" />
