@@ -3,6 +3,7 @@ import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { AlertTriangle, Check, ChevronDown, Flag, Pencil, ShoppingCart, Tag, Trash2, X } from 'lucide-react';
+import { PartCetaris } from './PartCetaris';
 import {
   chicagoDateString,
   daysListed,
@@ -600,6 +601,7 @@ export function PartDetailModal() {
                   </div>
                 ))}
               </div>
+              <PartCetaris sales={partSales} />
             </div>
           )}
 
