@@ -91,8 +91,8 @@ describe('the sale email', () => {
 
   it('puts the recovery bin above the bin', () => {
     const html = saleNotice(order).html;
-    expect(html).toMatch(/RECOVERY BIN<\/span>(&nbsp;)+<span[^>]*>A-1-3</);
-    expect(html).toMatch(/>BIN<\/span>(&nbsp;)+<span[^>]*>C-3-3</);
+    expect(html).toMatch(/RECOVERY BIN<\/div><div[^>]*>A-1-3</);
+    expect(html).toMatch(/>BIN<\/div><div[^>]*>C-3-3</);
     expect(html.indexOf('A-1-3')).toBeLessThan(html.indexOf('C-3-3'));
   });
 
@@ -101,13 +101,21 @@ describe('the sale email', () => {
     expect(saleNotice(plain).html).not.toContain('RECOVERY BIN');
   });
 
-  it('draws its rounded pieces as Outlook shapes too, and has no stripe under the header', () => {
+  it('draws its pills as Outlook shapes too, and everything else in table cells', () => {
     const html = saleNotice(order, { now: NOW }).html;
-    // Ship by, the days-left pill, two bins and two buttons.
-    expect(html.match(/<v:roundrect /g)).toHaveLength(6);
-    expect(html.match(/<!--\[if !mso\]><!-->/g)).toHaveLength(6);
-    expect(html).toMatch(/SHIP BY<\/span>(&nbsp;)+<span[^>]*>Tues, Oct 13</);
+    // The days-left pill and two buttons; nothing else needs a shape.
+    expect(html.match(/<v:roundrect /g)).toHaveLength(3);
+    expect(html.match(/<!--\[if !mso\]><!-->/g)).toHaveLength(3);
+    expect(html).not.toContain('v:textbox');
+    expect(html).toMatch(/SHIP BY<\/div>\s*<div[^>]*>Tues, Oct 13</);
+    expect(html).toContain('>6 DAYS LEFT<');
     expect(html).not.toContain('height:5px');
+  });
+
+  it('lays the pick list out as a ticket: qty, part, and where to pull it from', () => {
+    const html = saleNotice(order).html;
+    expect(html.indexOf('>QTY<')).toBeLessThan(html.indexOf('>PART<'));
+    expect(html.indexOf('>PART<')).toBeLessThan(html.indexOf('>PULL FROM<'));
   });
 
   it('gives the part description its own line in the pick list', () => {
@@ -125,7 +133,7 @@ describe('the sale email', () => {
     expect(n.kind).toBe('sale');
     expect(n.html).toContain('https://www.ebay.com/lbr/go?t=111-L1');
     expect(n.html).toContain('https://www.ebay.com/sh/ord/details?orderid=12-34567-89012');
-    expect(n.html).toContain('6 days left');
+    expect(n.html).toContain('6 DAYS LEFT');
     expect(n.text).toContain('• 5 × 383-0136 — SEAL, OIL — recovery bin A-1-3, bin C-3-3');
   });
 });
@@ -139,7 +147,7 @@ describe('the shipping reminder', () => {
     expect(n.kind).toBe('ship-reminder');
     expect(n.subject).toBe('[REMINDER] 2 eBay orders to ship - 1 overdue - soonest due Sun, Oct 4');
     expect(n.html.indexOf('Order Number: late')).toBeLessThan(n.html.indexOf('Order Number: later'));
-    expect(n.html).toContain('Overdue');
+    expect(n.html).toContain('OVERDUE');
   });
 
   it('names the order when there is only one', () => {

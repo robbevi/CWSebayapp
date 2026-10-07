@@ -71,61 +71,68 @@ const money = (n: number) => `$${n.toLocaleString('en-US', { minimumFractionDigi
 const VML = 'xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word"';
 
 /**
- * A rounded shape holding one line, in classic Outlook too. Outlook ignores rounded corners
- * and padding everywhere but its own shapes, so it is drawn twice: as an Outlook shape, in
- * comments only Outlook reads, and as plain styled HTML for every other client. Inside a
- * shape Outlook runs block elements together and drops text-transform, so the line is
- * written as it should read, capitals and all.
+ * A pill — a rounded shape with one centered line — as a link or a label.
+ *
+ * Classic Outlook draws mail with Word, which ignores rounded corners, and padding
+ * anywhere but a table cell. So for Outlook the pill is drawn as its own shape, in the
+ * long-standing "bulletproof button" form: the one shape whose text it reliably centers.
+ * Every other client gets a styled link or label. Everything else in these emails is
+ * built from table cells, solid fills and borders, which Outlook draws as written.
  */
-function rounded(o: {
+function pill(o: {
+  label: string;
   width: number;
   height: number;
-  radius: number;
   fill: string;
+  color: string;
+  size: number;
   stroke?: string;
   href?: string;
-  /** Space from the left edge to the line; without it the line is centered. */
-  inset?: number;
-  line: string;
 }): string {
-  const arc = Math.min(50, Math.round((o.radius / Math.min(o.width, o.height)) * 100));
-  const edge = o.stroke ? `strokecolor="${o.stroke}" strokeweight="1.5px"` : 'stroke="f"';
+  const font = text(o.size, o.color, 'font-weight:bold;');
+  const edge = o.stroke ? `strokecolor="${o.stroke}" strokeweight="2px"` : 'stroke="f"';
   const href = o.href ? ` href="${escapeHtml(o.href)}"` : '';
-  const align = o.inset === undefined ? 'center' : 'left';
-  const pad = o.inset ?? 0;
-  const outlook = `<!--[if mso]><v:roundrect ${VML}${href} style="width:${o.width}px;height:${o.height}px;v-text-anchor:middle;" arcsize="${arc}%" ${edge} fillcolor="${o.fill}"><w:anchorlock/><v:textbox inset="${pad}px,0px,${pad}px,0px"><div style="text-align:${align};">${o.line}</div></v:textbox></v:roundrect><![endif]-->`;
-  const box = `width:${o.width - 2 * pad - (o.stroke ? 3 : 0)}px;height:${o.height - (o.stroke ? 3 : 0)}px;line-height:${o.height - (o.stroke ? 3 : 0)}px;padding:0 ${pad}px;background:${o.fill};border-radius:${o.radius}px;text-align:${align};${o.stroke ? `border:1.5px solid ${o.stroke};` : ''}white-space:nowrap;text-decoration:none;display:block;`;
-  const other = o.href
-    ? `<a href="${escapeHtml(o.href)}" style="${box}">${o.line}</a>`
-    : `<div style="${box}">${o.line}</div>`;
+  const outlook = `<!--[if mso]><v:roundrect ${VML}${href} style="height:${o.height}px;v-text-anchor:middle;width:${o.width}px;" arcsize="50%" ${edge} fillcolor="${o.fill}"><w:anchorlock/><center style="${font}">${o.label}</center></v:roundrect><![endif]-->`;
+  const border = o.stroke ? 4 : 0;
+  const style = `${font}display:inline-block;width:${o.width - border}px;line-height:${o.height - border}px;text-align:center;text-decoration:none;white-space:nowrap;background:${o.fill};border-radius:${o.height / 2}px;${
+    o.stroke ? `border:2px solid ${o.stroke};` : ''
+  }`;
+  const other = o.href ? `<a href="${escapeHtml(o.href)}" style="${style}">${o.label}</a>` : `<span style="${style}">${o.label}</span>`;
   return `${outlook}<!--[if !mso]><!-->${other}<!--<![endif]-->`;
 }
 
-const DUE_FILL: Record<string, string> = { Overdue: RED, 'Due today': ORANGE, 'Due tomorrow': ORANGE };
+const URGENT: Record<string, string> = { Overdue: RED, 'Due today': '#c2410c', 'Due tomorrow': '#c2410c' };
 
-/** The days left to ship, as a small pill: red when it's late, orange when it's close. */
-function dueChip(due: string): string {
+/**
+ * The days left to ship, as a small pill. On the orange ship-by band it is white with the
+ * words in color; on white it is filled: red when late, deep orange when close, green
+ * otherwise.
+ */
+function dueChip(due: string, onOrange = false): string {
   if (!due) return '';
-  return rounded({
-    width: 132,
-    height: 32,
-    radius: 16,
-    fill: DUE_FILL[due] ?? GREEN,
-    line: `<span style="${text(14, '#ffffff', 'font-weight:700;')}">${due}</span>`,
+  const tone = URGENT[due] ?? GREEN;
+  return pill({
+    label: due.toUpperCase(),
+    width: 150,
+    height: 34,
+    size: 13,
+    fill: onOrange ? '#ffffff' : tone,
+    color: onOrange ? tone : '#ffffff',
   });
 }
 
 /** A large pill button: solid green, or outlined in navy. */
 function button(label: string, href: string, solid: boolean, size = 18): string {
   const big = size > 16;
-  return rounded({
-    width: big ? (solid ? 250 : 200) : solid ? 200 : 160,
-    height: big ? 58 : 46,
-    radius: big ? 29 : 23,
-    fill: solid ? GREEN : '#ffffff',
-    stroke: solid ? undefined : NAVY,
+  return pill({
+    label,
     href,
-    line: `<span style="${text(size, solid ? '#ffffff' : NAVY, 'font-weight:700;')}">${label}</span>`,
+    size,
+    width: big ? (solid ? 260 : 210) : solid ? 200 : 170,
+    height: big ? 56 : 44,
+    fill: solid ? GREEN : '#ffffff',
+    color: solid ? '#ffffff' : NAVY,
+    stroke: solid ? undefined : NAVY,
   });
 }
 
@@ -135,35 +142,72 @@ function buttons(...each: string[]): string {
     .join('')}</tr></table>`;
 }
 
-/**
- * Where a part is, recovery bin first — that's where it's pulled from — and its bin under
- * it, each a rounded card with its label and location on one line.
- */
-function binStack(part: NonNullable<ShipItem['part']>): string {
-  const card = (label: string, value: string, fill: string, stroke: string | undefined, labelColor: string, valueColor: string) =>
-    rounded({
-      width: 300,
-      height: 44,
-      radius: 12,
-      fill,
-      stroke,
-      inset: 16,
-      line: `<span style="${text(12, labelColor, 'font-weight:700;letter-spacing:1px;')}">${label}</span>&nbsp;&nbsp;&nbsp;<span style="${text(19, valueColor, 'font-weight:700;')}">${escapeHtml(value)}</span>`,
-    });
-  const cards = [
-    part.recoveryBin ? card('RECOVERY BIN', part.recoveryBin, GREEN, undefined, '#cdeadf', '#ffffff') : '',
-    card('BIN', part.binLocation || '—', '#eef2f6', '#c9d4e0', '#50637a', NAVY),
-  ].filter(Boolean);
-  return `<table role="presentation" cellpadding="0" cellspacing="0" border="0">
-    ${spacer(14)}
-    ${cards.map((c) => `<tr><td>${c}</td></tr>`).join(spacer(8))}
-  </table>`;
+/** The ship-by date as a full-width orange band, with the days left on the right. */
+function shipBand(shipBy: string | null, due: string): string {
+  return `<tr><td bgcolor="${ORANGE}" style="background:${ORANGE};padding:18px 28px;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
+      <td style="vertical-align:middle;">
+        <div style="${text(13, '#ffe7cc', 'font-weight:700;letter-spacing:1px;')}">SHIP BY</div>
+        <div style="${text(30, '#ffffff', 'font-weight:700;')}">${escapeHtml(shipDay(shipBy))}</div>
+      </td>
+      <td align="right" style="vertical-align:middle;">${dueChip(due, true)}</td>
+    </tr></table>
+  </td></tr>`;
 }
 
-function whereFrom(i: ShipItem): string {
-  return i.part
-    ? binStack(i.part)
-    : `<div style="${text(14, '#a15c00', 'margin-top:10px;')}">Not matched to a part in SPARE — check the listing.</div>`;
+const label = (s: string, color = MUTED) => `<div style="${text(12, color, 'font-weight:700;letter-spacing:1px;')}">${s}</div>`;
+const HEAD_BG = '#f4f6f5';
+
+/**
+ * Where to pull a part from. The recovery bin, where it is actually pulled from, leads in
+ * large type; its bin follows, smaller. The cell carries an accent down its left edge.
+ */
+function pullFrom(i: ShipItem): { accent: string; fill: string; html: string } {
+  if (!i.part) {
+    return {
+      accent: '#d97706',
+      fill: '#fff8ec',
+      html: `<div style="${text(14, '#a15c00')}">Not matched to a part in SPARE. Check the listing.</div>`,
+    };
+  }
+  const bin = escapeHtml(i.part.binLocation || '—');
+  if (!i.part.recoveryBin) {
+    return { accent: NAVY, fill: '#f3f6f9', html: `${label('BIN', '#50637a')}<div style="${text(24, NAVY, 'font-weight:700;')}">${bin}</div>` };
+  }
+  return {
+    accent: GREEN,
+    fill: '#f1f8f4',
+    html: `<table role="presentation" cellpadding="0" cellspacing="0" border="0">
+      <tr><td>${label('RECOVERY BIN', GREEN)}<div style="${text(24, '#0b4d39', 'font-weight:700;')}">${escapeHtml(i.part.recoveryBin)}</div></td></tr>
+      <tr><td style="padding-top:10px;">${label('BIN', '#50637a')}<div style="${text(16, NAVY, 'font-weight:700;')}">${bin}</div></td></tr>
+    </table>`,
+  };
+}
+
+/** The pick ticket: quantity, part, and where to pull it from, one row per item. */
+function pickTable(items: ShipItem[], framed = true): string {
+  const rows = items
+    .map((i) => {
+      const from = pullFrom(i);
+      const top = `border-top:1px solid ${LINE};`;
+      return `<tr>
+      <td width="64" align="center" style="${top}padding:16px 0;vertical-align:top;${text(32, INK, 'font-weight:700;')}">${i.quantity}</td>
+      <td style="${top}padding:16px;vertical-align:top;">
+        <div style="${text(19, INK, 'font-weight:700;')}">${escapeHtml(i.sku || 'No SKU')}</div>
+        <div style="${text(16, INK)}">${escapeHtml(i.part?.description || i.title)}</div>${
+          i.part?.condition ? `<div style="${text(14, MUTED)}">Condition: ${escapeHtml(i.part.condition)}</div>` : ''
+        }
+      </td>
+      <td width="180" bgcolor="${from.fill}" style="${top}border-left:4px solid ${from.accent};background:${from.fill};padding:14px 16px;vertical-align:top;">${from.html}</td>
+    </tr>`;
+    })
+    .join('');
+  const head = (s: string, more = '') =>
+    `<td bgcolor="${HEAD_BG}" style="background:${HEAD_BG};padding:10px 16px;${more}">${label(s)}</td>`;
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="${framed ? `border:1px solid ${LINE};` : ''}">
+    <tr>${head('QTY', 'text-align:center;padding-left:0;padding-right:0;')}${head('PART')}${head('PULL FROM')}</tr>
+    ${rows}
+  </table>`;
 }
 
 /** The frame every SPARE email shares: the green header with the logo, then a title. */
@@ -209,53 +253,18 @@ export function saleNotice(order: ShipOrder, options: NoticeOptions = {}): SaleN
   const address = [to.name, ...to.lines, place, to.country].filter(Boolean).map(escapeHtml).join('<br>');
   const count = units(order.items);
 
-  const items = order.items
-    .map(
-      (i, n) => `<tr><td style="padding:16px 18px;${n ? `border-top:1px solid ${LINE};` : ''}">
-    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
-      <td style="vertical-align:top;">
-        <div style="${text(20, INK, 'font-weight:700;')}">${escapeHtml(i.sku || 'No SKU')}</div>
-        <div style="${text(17, INK, 'padding-top:4px;')}">${escapeHtml(i.part?.description || i.title)}</div>${
-          i.part?.condition
-            ? `<div style="${text(14, MUTED, 'padding-top:2px;')}">Condition: ${escapeHtml(i.part.condition)}</div>`
-            : ''
-        }
-      </td>
-      <td width="70" align="right" style="vertical-align:top;">
-        <div style="${caps(MUTED)}">Qty</div>
-        <div style="${text(30, INK, 'font-weight:700;line-height:1.15;')}">${i.quantity}</div>
-      </td>
-    </tr></table>
-    ${whereFrom(i)}
-  </td></tr>`
-    )
-    .join('');
-
   const body = `
+  ${spacer(20)}
+  ${shipBand(order.shipBy, due)}
+  <tr><td style="padding:24px 28px 0;">${pickTable(order.items)}</td></tr>
   <tr><td style="padding:20px 28px 0;">
-    <table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>
-      <td style="vertical-align:middle;">${rounded({
-        width: 340,
-        height: 60,
-        radius: 14,
-        fill: ORANGE,
-        inset: 20,
-        line: `<span style="${text(13, '#fff1e0', 'font-weight:700;letter-spacing:1px;')}">SHIP BY</span>&nbsp;&nbsp;&nbsp;<span style="${text(24, '#ffffff', 'font-weight:700;')}">${escapeHtml(shipDay(order.shipBy))}</span>`,
-      })}</td>
-      ${due ? `<td width="14" style="width:14px;font-size:0;line-height:0;">&nbsp;</td><td style="vertical-align:middle;">${dueChip(due)}</td>` : ''}
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
+      <td bgcolor="#f7f9f8" style="background:#f7f9f8;border-left:4px solid ${NAVY};padding:14px 18px;">
+        ${label('SHIP TO')}
+        <div style="${text(16, INK, 'line-height:1.5;')}">${address}</div>
+      </td>
     </tr></table>
   </td></tr>
-
-  <tr><td style="padding:26px 28px 10px;"><div style="${caps(MUTED)}">Pick list</div></td></tr>
-  <tr><td style="padding:0 28px;">
-    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border:1px solid ${LINE};border-radius:10px;">${items}</table>
-  </td></tr>
-
-  <tr><td style="padding:26px 28px 0;">
-    <div style="${caps(MUTED)}">Ship to</div>
-    <div style="${text(16, INK, 'line-height:1.5;margin-top:6px;')}">${address}</div>
-  </td></tr>
-
   <tr><td style="padding:28px 28px 8px;">${buttons(button('Buy shipping label', labelUrl, true), button('Order details', detailsUrl, false))}</td></tr>
   <tr><td style="padding:6px 28px 28px;">
     <div style="${text(14, MUTED)}">Buying the label marks the order shipped and takes it off SPARE's to-ship list.</div>
@@ -306,30 +315,27 @@ export function shipReminder(orders: ShipOrder[], options: NoticeOptions = {}): 
   const what = `${n} eBay ${n === 1 ? 'order' : 'orders'}`;
 
   const cards = sorted
-    .map((o, k) => {
-      const lines = o.items
-        .map(
-          (i) => `<div style="${text(16, INK, 'margin-top:12px;')}"><strong>${escapeHtml(i.sku || 'No SKU')}</strong> x ${i.quantity} · <span style="color:${MUTED};">${escapeHtml(
-            i.part?.description || i.title
-          )}</span></div>${whereFrom(i)}`
-        )
-        .join('');
-      return `<tr><td style="padding:0 28px;">
-    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border:1px solid ${LINE};border-radius:10px;"><tr><td style="padding:16px 18px;">
-      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
-        <td style="vertical-align:top;">
-          <div style="${text(18, NAVY, 'font-weight:700;')}">Order Number: ${escapeHtml(o.orderId)}</div>
-          <div style="${text(15, MUTED, 'margin-top:2px;')}">Ship by ${escapeHtml(shipDay(o.shipBy))} · ordered ${escapeHtml(shipDay(o.createdAt || null))}</div>
-        </td>
-        <td align="right" style="vertical-align:top;">${dueChip(dues[k])}</td>
-      </tr></table>
-      ${lines}
-      <div style="height:16px;line-height:16px;font-size:0;">&nbsp;</div>
-      ${buttons(button('Buy shipping label', ebayLabelUrl(o), true, 15), button('Order details', sellerHubOrderUrl(o.orderId), false, 15))}
-    </td></tr></table>
-  </td></tr>`;
-    })
-    .join(spacer(14));
+    .map(
+      (o, k) => `<tr><td style="padding:0 28px;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border:1px solid ${LINE};">
+      <tr><td bgcolor="#fff4e8" style="background:#fff4e8;border-bottom:3px solid ${ORANGE};padding:14px 16px;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
+          <td style="vertical-align:middle;">
+            <div style="${text(18, NAVY, 'font-weight:700;')}">Order Number: ${escapeHtml(o.orderId)}</div>
+            <div style="${text(15, '#7a4a12')}">Ship by <strong>${escapeHtml(shipDay(o.shipBy))}</strong> · ordered ${escapeHtml(shipDay(o.createdAt || null))}</div>
+          </td>
+          <td align="right" style="vertical-align:middle;">${dueChip(dues[k])}</td>
+        </tr></table>
+      </td></tr>
+      <tr><td>${pickTable(o.items, false)}</td></tr>
+      <tr><td style="padding:16px;border-top:1px solid ${LINE};">${buttons(
+        button('Buy shipping label', ebayLabelUrl(o), true, 15),
+        button('Order details', sellerHubOrderUrl(o.orderId), false, 15)
+      )}</td></tr>
+    </table>
+  </td></tr>`
+    )
+    .join(spacer(16));
 
   return {
     kind: 'ship-reminder',
