@@ -213,9 +213,23 @@ export interface ShipItem {
     site: string;
     condition: string;
     photoUrl: string | null;
+    /** The photo's Google Drive id, for an upright thumbnail where SPARE's own URL won't do. */
+    photoFileId: string | null;
   } | null;
 }
 
 /** Seller Hub's page for an order, where eBay's own packing slip and label are printed. */
 export const sellerHubOrderUrl = (orderId: string) =>
   `https://www.ebay.com/sh/ord/details?orderid=${encodeURIComponent(orderId)}`;
+
+/**
+ * Straight to buying the order's label. eBay keys its label page by item number and
+ * transaction, and an order line's id is its transaction id; an order of several lines
+ * opens on its first, and eBay carries the rest of the order with it.
+ */
+export function ebayLabelUrl(order: Pick<ShipOrder, 'orderId' | 'items'>): string {
+  const first = order.items[0];
+  return first?.ebayListingId && first.lineItemId
+    ? `https://www.ebay.com/lbr/go?t=${encodeURIComponent(`${first.ebayListingId}-${first.lineItemId}`)}`
+    : sellerHubOrderUrl(order.orderId);
+}

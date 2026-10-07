@@ -58,8 +58,8 @@ describe('announcing new sales', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
     const body = JSON.parse(fetchMock.mock.calls[0][1].body);
     expect(body.orderId).toBe('A');
-    expect(body.subject).toMatch(/^📦 eBay Order A · SKUs 383-0136 ×5, 383-0136 ×5 · Ship by /);
-    expect(body.html).toContain('Buy shipping label in eBay');
+    expect(body.subject).toMatch(/^SALE eBay Order: A - SKUs: 383-0136 x 5, 383-0136 x 5 - Ship by /);
+    expect(body.html).toContain('src="https://spare.example/email/spare-logo.png"');
     expect(body.sellerHubUrl).toContain('orderid=A');
   });
 

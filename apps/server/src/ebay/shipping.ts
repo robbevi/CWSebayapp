@@ -90,6 +90,7 @@ export async function ordersToShip(): Promise<ShipOrder[]> {
                 site: group.inventorySite,
                 condition: group.itemCondition ?? '',
                 photoUrl: group.photos[0]?.url ?? null,
+                photoFileId: group.photos[0]?.fileId ?? null,
               }
             : null,
         };

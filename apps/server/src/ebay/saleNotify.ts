@@ -34,7 +34,7 @@ async function post(order: ShipOrder): Promise<void> {
     res = await fetch(env.saleNotifyUrl!, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(saleNotice(order, { photoBase: PHOTO_BASE })),
+      body: JSON.stringify(saleNotice(order, { publicBase: PHOTO_BASE })),
     });
   } catch {
     // fetch's own errors quote the URL, signature and all.
