@@ -172,3 +172,50 @@ export const paidOut = (sale: Pick<Sale, 'payoutId'>) => !!sale.payoutId;
 /** Both halves done: the Part Sale logged in Cetaris, and the money paid out by eBay. */
 export const saleComplete = (sale: Pick<Sale, 'cetarisSaleNumber' | 'payoutId'>) =>
   cetarisDone(sale) && paidOut(sale);
+
+/**
+ * An eBay order that still has to go out: what to pick, where it lives, and where it goes.
+ * Read live from eBay each time, so it drops off as soon as a label is bought and eBay
+ * marks it shipped.
+ */
+export interface ShipOrder {
+  orderId: string;
+  createdAt: string;
+  /** eBay's ship-by date for the order, the earliest across its lines. */
+  shipBy: string | null;
+  buyer: string;
+  shipTo: {
+    name: string;
+    lines: string[];
+    city: string;
+    state: string;
+    postalCode: string;
+    country: string;
+    phone: string;
+  };
+  /** eBay's code for the service the buyer paid for, e.g. FedExSmartPost. */
+  service: string;
+  items: ShipItem[];
+}
+
+export interface ShipItem {
+  lineItemId: string;
+  ebayListingId: string;
+  sku: string;
+  title: string;
+  quantity: number;
+  /** The part in SPARE, when it can be matched: where to find it, and what it looks like. */
+  part: {
+    id: string;
+    description: string;
+    binLocation: string;
+    recoveryBin: string;
+    site: string;
+    condition: string;
+    photoUrl: string | null;
+  } | null;
+}
+
+/** Seller Hub's page for an order, where eBay's own packing slip and label are printed. */
+export const sellerHubOrderUrl = (orderId: string) =>
+  `https://www.ebay.com/sh/ord/details?orderid=${encodeURIComponent(orderId)}`;

@@ -4,6 +4,7 @@ import { env, isGoogleConfigured } from '../config/env.js';
 import { clearCetaris, getCetarisLogs, logCetaris } from '../google/cetarisStore.js';
 import { isEbayConfigured } from '../ebay/ordersService.js';
 import { DEFAULT_LOOKBACK_DAYS, isStale, lastSync, syncSales } from '../ebay/salesSync.js';
+import { ordersToShip } from '../ebay/shipping.js';
 import { getListings, getSales } from '../google/sheetsService.js';
 
 export const salesRouter = Router();
@@ -106,6 +107,19 @@ function syncProblem(): string | null {
   return null;
 }
 
+/** Orders eBay says haven't shipped, with what to pick and where they go. */
+salesRouter.get('/orders/to-ship', async (_req, res, next) => {
+  try {
+    if (!isEbayConfigured()) {
+      res.json([]);
+      return;
+    }
+    res.json(await ordersToShip());
+  } catch (err) {
+    next(err);
+  }
+});
+
 /** The Sync button: syncs now, however recently it last ran. */
 salesRouter.post('/sales/sync', async (req, res, next) => {
   try {
@@ -122,9 +136,8 @@ salesRouter.post('/sales/sync', async (req, res, next) => {
 });
 
 /**
- * Made when someone opens the app: syncs only if the last sync is older than half an
- * hour, so whoever opens SPARE first after a quiet spell brings everyone up to date, and
- * everyone after them costs nothing.
+ * Made when someone opens the app: syncs unless one ran in the last couple of minutes,
+ * so every sign-in brings SPARE up to date and a burst of them costs one sync.
  */
 salesRouter.post('/sales/sync-if-stale', async (_req, res, next) => {
   try {

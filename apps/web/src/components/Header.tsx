@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   AlertTriangle,
   ArrowRight,
@@ -33,7 +33,8 @@ import spareWordmark from '../assets/spare-wordmark-light.png';
 
 import { useDarkMode } from '../hooks/useDarkMode';
 import { useGoalsPopupStore } from '../state/useGoalsPopupStore';
-import { useSalesStatus, useSyncSales } from '../hooks/useSales';
+import { useOrdersToShip, useSalesStatus, useSyncSales } from '../hooks/useSales';
+import { ToShipDialog } from './ToShipDialog';
 import { useUserStore } from '../state/useUserStore';
 import { AccountDialog } from './AccountDialog';
 import { Scoreboard } from './Scoreboard';
@@ -77,6 +78,24 @@ export function Header() {
   const setGoalsOpen = useGoalsPopupStore((s) => s.setOpen);
   const { data: salesStatus } = useSalesStatus();
   const syncSales = useSyncSales();
+  const toShip = useOrdersToShip(!!currentUser && !!salesStatus?.ebayConfigured);
+  const [toShipOpen, setToShipOpen] = useState(false);
+  const waiting = toShip.data?.length ?? 0;
+
+  // Opens on its own once per sign-in when something is waiting: the first thing anyone
+  // signing in should know is what has to go out. Keyed by name, so switching user shows
+  // the next person too.
+  useEffect(() => {
+    if (!currentUser || !waiting) return;
+    const key = `spare.toShip.shown.${currentUser}`;
+    try {
+      if (sessionStorage.getItem(key)) return;
+      sessionStorage.setItem(key, '1');
+    } catch {
+      // Without storage it simply shows again next time; better than not at all.
+    }
+    setToShipOpen(true);
+  }, [currentUser, waiting]);
 
   return (
     <header className="flex shrink-0 items-center gap-1 bg-primaryDeep px-3 py-4 sm:gap-3 sm:px-6 lg:py-3">
@@ -111,6 +130,23 @@ export function Header() {
             <span className="block text-[10px] leading-tight text-white/60">Logged in as</span>
             <span className="block truncate text-xs font-semibold leading-tight">{currentUser}</span>
           </span>
+        </button>
+      )}
+      {/* What has sold and still has to go out, with the count on the icon. */}
+      {currentUser && salesStatus?.ebayConfigured && (
+        <button
+          type="button"
+          onClick={() => setToShipOpen(true)}
+          className="relative flex h-9 w-8 shrink-0 items-center justify-center rounded-full text-white sm:w-9 hover:bg-white/10"
+          aria-label={waiting ? `${waiting} ${waiting === 1 ? 'order' : 'orders'} to ship` : 'Orders to ship'}
+          title={waiting ? `${waiting} to ship` : 'Nothing waiting to ship'}
+        >
+          <Truck size={20} />
+          {waiting > 0 && (
+            <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-amber-500 px-1 text-[10px] font-bold text-white">
+              {waiting}
+            </span>
+          )}
         </button>
       )}
       {currentUser && (
@@ -179,6 +215,7 @@ export function Header() {
 
       {scoreboardOpen && <Scoreboard onClose={() => setScoreboardOpen(false)} />}
       {accountOpen && <AccountDialog onClose={() => setAccountOpen(false)} />}
+      {toShipOpen && <ToShipDialog orders={toShip.data ?? []} onClose={() => setToShipOpen(false)} />}
 
       {infoOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">

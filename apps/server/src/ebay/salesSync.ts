@@ -26,8 +26,12 @@ export interface SyncResult {
 export const DEFAULT_LOOKBACK_DAYS = 30;
 /** eBay's order search won't accept an unbounded window. */
 export const MAX_LOOKBACK_DAYS = 365;
-/** Older than this and opening the app brings it up to date. */
-export const STALE_AFTER_MS = 30 * 60_000;
+/**
+ * Older than this and opening the app brings it up to date. Short, so every sign-in
+ * syncs; long enough that someone reloading, or a few people arriving together, costs
+ * eBay a single sync.
+ */
+export const STALE_AFTER_MS = 2 * 60_000;
 /** How often a running server syncs with nobody asking. */
 export const AUTO_SYNC_EVERY_MS = 60 * 60_000;
 

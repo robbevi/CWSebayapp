@@ -14,6 +14,7 @@ import type {
   PublishResult,
   ResearchResult,
   SellerPolicy,
+  ShipOrder,
   SellerSetup,
   TradingMessage,
   Photo,
@@ -161,7 +162,13 @@ export async function clearCetarisSale(lineItemId: string): Promise<void> {
   await parseJson(res);
 }
 
-/** Syncs with eBay only if the last sync is over half an hour old. Made on opening the app. */
+/** Orders eBay says haven't shipped yet, with what to pick and where they go. */
+export async function fetchOrdersToShip(): Promise<ShipOrder[]> {
+  const res = await fetch('/api/orders/to-ship');
+  return parseJson(res);
+}
+
+/** Syncs with eBay unless it just did. Made on opening the app. */
 export async function syncSalesIfStale(): Promise<{ synced: boolean; lastSyncedAt: string | null } & Partial<SalesSyncResult>> {
   const res = await fetch('/api/sales/sync-if-stale', { method: 'POST' });
   return parseJson(res);

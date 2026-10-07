@@ -1,6 +1,27 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
-import { clearCetarisSale, fetchSales, fetchSalesStatus, logCetarisSale, syncSales, syncSalesIfStale } from '../lib/api';
+import {
+  clearCetarisSale,
+  fetchOrdersToShip,
+  fetchSales,
+  fetchSalesStatus,
+  logCetarisSale,
+  syncSales,
+  syncSalesIfStale,
+} from '../lib/api';
+
+export const TO_SHIP_QUERY_KEY = ['orders-to-ship'];
+
+/** Orders waiting to go out. Read live from eBay, so it empties as labels are bought. */
+export function useOrdersToShip(enabled: boolean) {
+  return useQuery({
+    queryKey: TO_SHIP_QUERY_KEY,
+    queryFn: fetchOrdersToShip,
+    enabled,
+    staleTime: 60_000,
+    refetchInterval: 10 * 60_000,
+  });
+}
 import { useToastStore } from '../state/useToastStore';
 
 export const SALES_QUERY_KEY = ['sales'];
@@ -51,6 +72,7 @@ export function useSyncOnOpen(enabled: boolean) {
         if (!r.synced) return;
         void qc.invalidateQueries({ queryKey: SALES_QUERY_KEY });
         void qc.invalidateQueries({ queryKey: ['listings'] });
+        void qc.invalidateQueries({ queryKey: TO_SHIP_QUERY_KEY });
         if (r.added) toast(`${r.added} new ${r.added === 1 ? 'sale' : 'sales'} from eBay`);
       })
       // A failed background sync is not worth interrupting anyone for; the button is there.
@@ -71,6 +93,7 @@ export function useSyncSales() {
     onSuccess: (result) => {
       qc.invalidateQueries({ queryKey: SALES_QUERY_KEY });
       qc.invalidateQueries({ queryKey: ['listings'] });
+      qc.invalidateQueries({ queryKey: TO_SHIP_QUERY_KEY });
       const parts = [`${result.added} new`, `${result.updated} updated`];
       // Worth saying out loud: those figures will move once eBay posts the fee records.
       if (result.estimatedFees > 0) parts.push(`${result.estimatedFees} with estimated fees`);
