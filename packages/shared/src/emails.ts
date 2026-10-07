@@ -113,26 +113,25 @@ function dueChip(due: string, onOrange = false): string {
   const tone = URGENT[due] ?? GREEN;
   return pill({
     label: due.toUpperCase(),
-    width: 150,
-    height: 34,
-    size: 13,
+    width: 176,
+    height: 40,
+    size: 14,
     fill: onOrange ? '#ffffff' : tone,
     color: onOrange ? tone : '#ffffff',
   });
 }
 
-/** A large pill button: solid green, or outlined in navy. */
-function button(label: string, href: string, solid: boolean, size = 18): string {
+/** A large pill button: green for the thing to do, gray for the one beside it. */
+function button(label: string, href: string, primary: boolean, size = 18): string {
   const big = size > 16;
   return pill({
     label,
     href,
     size,
-    width: big ? (solid ? 260 : 210) : solid ? 200 : 170,
+    width: big ? (primary ? 260 : 210) : primary ? 200 : 170,
     height: big ? 56 : 44,
-    fill: solid ? GREEN : '#ffffff',
-    color: solid ? '#ffffff' : NAVY,
-    stroke: solid ? undefined : NAVY,
+    fill: primary ? GREEN : '#e3e7e5',
+    color: primary ? '#ffffff' : INK,
   });
 }
 
@@ -150,7 +149,7 @@ function shipBand(shipBy: string | null, due: string): string {
         <div style="${text(13, '#ffe7cc', 'font-weight:700;letter-spacing:1px;')}">SHIP BY</div>
         <div style="${text(30, '#ffffff', 'font-weight:700;')}">${escapeHtml(shipDay(shipBy))}</div>
       </td>
-      <td align="right" style="vertical-align:middle;">${dueChip(due, true)}</td>
+      <td width="186" align="right" style="width:186px;vertical-align:middle;">${dueChip(due, true)}</td>
     </tr></table>
   </td></tr>`;
 }
@@ -159,8 +158,8 @@ const label = (s: string, color = MUTED) => `<div style="${text(12, color, 'font
 const HEAD_BG = '#f4f6f5';
 
 /**
- * Where to pull a part from. The recovery bin, where it is actually pulled from, leads in
- * large type; its bin follows, smaller. The cell carries an accent down its left edge.
+ * Where to pull a part from: its recovery bin, in large type, with an accent down the
+ * cell's left edge. A part with no recovery bin shows its bin instead.
  */
 function pullFrom(i: ShipItem): { accent: string; fill: string; html: string } {
   if (!i.part) {
@@ -170,17 +169,17 @@ function pullFrom(i: ShipItem): { accent: string; fill: string; html: string } {
       html: `<div style="${text(14, '#a15c00')}">Not matched to a part in SPARE. Check the listing.</div>`,
     };
   }
-  const bin = escapeHtml(i.part.binLocation || '—');
   if (!i.part.recoveryBin) {
-    return { accent: NAVY, fill: '#f3f6f9', html: `${label('BIN', '#50637a')}<div style="${text(24, NAVY, 'font-weight:700;')}">${bin}</div>` };
+    return {
+      accent: NAVY,
+      fill: '#f3f6f9',
+      html: `${label('BIN', '#50637a')}<div style="${text(24, NAVY, 'font-weight:700;')}">${escapeHtml(i.part.binLocation || '—')}</div>`,
+    };
   }
   return {
     accent: GREEN,
     fill: '#f1f8f4',
-    html: `<table role="presentation" cellpadding="0" cellspacing="0" border="0">
-      <tr><td>${label('RECOVERY BIN', GREEN)}<div style="${text(24, '#0b4d39', 'font-weight:700;')}">${escapeHtml(i.part.recoveryBin)}</div></td></tr>
-      <tr><td style="padding-top:10px;">${label('BIN', '#50637a')}<div style="${text(16, NAVY, 'font-weight:700;')}">${bin}</div></td></tr>
-    </table>`,
+    html: `${label('RECOVERY BIN', GREEN)}<div style="${text(26, '#0b4d39', 'font-weight:700;')}">${escapeHtml(i.part.recoveryBin)}</div>`,
   };
 }
 
@@ -193,9 +192,14 @@ function pickTable(items: ShipItem[], framed = true): string {
       return `<tr>
       <td width="64" align="center" style="${top}padding:16px 0;vertical-align:top;${text(32, INK, 'font-weight:700;')}">${i.quantity}</td>
       <td style="${top}padding:16px;vertical-align:top;">
-        <div style="${text(19, INK, 'font-weight:700;')}">${escapeHtml(i.sku || 'No SKU')}</div>
-        <div style="${text(16, INK)}">${escapeHtml(i.part?.description || i.title)}</div>${
-          i.part?.condition ? `<div style="${text(14, MUTED)}">Condition: ${escapeHtml(i.part.condition)}</div>` : ''
+        ${label('CUSTOM LABEL (SKU)')}
+        <div style="${text(19, INK, 'font-weight:700;')}">${escapeHtml(i.sku || 'None')}</div>
+        <div style="${text(15, INK, 'padding-top:6px;')}">${escapeHtml(i.title)}</div>${
+          i.part
+            ? `<div style="${text(13, MUTED, 'padding-top:4px;')}">SPARE: ${escapeHtml(i.part.description)}${
+                i.part.condition ? ` · ${escapeHtml(i.part.condition)}` : ''
+              }</div>`
+            : ''
         }
       </td>
       <td width="180" bgcolor="${from.fill}" style="${top}border-left:4px solid ${from.accent};background:${from.fill};padding:14px 16px;vertical-align:top;">${from.html}</td>
@@ -213,7 +217,7 @@ function pickTable(items: ShipItem[], framed = true): string {
 /** The frame every SPARE email shares: the green header with the logo, then a title. */
 function shell(o: { eyebrow: string; title: string; subtitle: string; body: string; publicBase?: string }): string {
   const logo = o.publicBase
-    ? `<img src="${escapeHtml(`${o.publicBase}/email/spare-logo-light.png`)}" width="200" height="57" alt="SPARE" style="display:block;width:200px;height:57px;border:0;">`
+    ? `<img src="${escapeHtml(`${o.publicBase}/email/spare-logo-email.png`)}" width="200" height="57" alt="SPARE" style="display:block;width:200px;height:57px;border:0;">`
     : `<div style="${text(28, '#ffffff', 'font-weight:800;letter-spacing:.06em;')}">SPARE</div>`;
   return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#f1f4f3;">
 <tr><td align="center" style="padding:24px 12px;">
@@ -221,7 +225,7 @@ function shell(o: { eyebrow: string; title: string; subtitle: string; body: stri
   <tr><td bgcolor="${GREEN}" style="background:${GREEN};padding:20px 28px;border-radius:12px 12px 0 0;">
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
       <td style="vertical-align:middle;">${logo}</td>
-      <td align="right" style="vertical-align:middle;${caps('#cdeadf')}">${o.eyebrow}</td>
+      <td align="right" style="vertical-align:middle;${text(20, '#ffffff', 'font-weight:700;')}">${o.eyebrow}</td>
     </tr></table>
   </td></tr>
   <tr><td style="padding:24px 28px 0;">
@@ -265,7 +269,7 @@ export function saleNotice(order: ShipOrder, options: NoticeOptions = {}): SaleN
       </td>
     </tr></table>
   </td></tr>
-  <tr><td style="padding:28px 28px 8px;">${buttons(button('Buy shipping label', labelUrl, true), button('Order details', detailsUrl, false))}</td></tr>
+  <tr><td style="padding:28px 28px 8px;">${buttons(button('Buy Shipping Label', labelUrl, true), button('Order Details', detailsUrl, false))}</td></tr>
   <tr><td style="padding:6px 28px 28px;">
     <div style="${text(14, MUTED)}">Buying the label marks the order shipped and takes it off SPARE's to-ship list.</div>
   </td></tr>`;
@@ -277,7 +281,7 @@ export function saleNotice(order: ShipOrder, options: NoticeOptions = {}): SaleN
       order.items
     )} - Ship by ${shipDay(order.shipBy)}`,
     html: shell({
-      eyebrow: 'New eBay sale',
+      eyebrow: 'New eBay Sale!',
       title: `Order Number: ${escapeHtml(order.orderId)}`,
       subtitle: `Ordered ${escapeHtml(shipDay(order.createdAt || null))} · ${count} ${count === 1 ? 'item' : 'items'} · Buyer ${escapeHtml(order.buyer)}`,
       body,
@@ -286,7 +290,7 @@ export function saleNotice(order: ShipOrder, options: NoticeOptions = {}): SaleN
     text: [
       `[SALE] eBay Order: ${order.orderId}`,
       `Ship by ${shipDay(order.shipBy)}${due ? ` (${due})` : ''}`,
-      ...order.items.map((i) => `• ${i.quantity} × ${i.sku || 'No SKU'} — ${i.part?.description || i.title} — ${pickFrom(i)}`),
+      ...order.items.map((i) => `• ${i.quantity} × ${i.sku || 'No SKU'} — ${i.title} — ${pickFrom(i)}`),
       `To ${to.name}, ${to.city}${to.state ? `, ${to.state}` : ''}`,
       `Buy the label: ${labelUrl}`,
       `Order details: ${detailsUrl}`,
@@ -301,9 +305,7 @@ export function saleNotice(order: ShipOrder, options: NoticeOptions = {}): SaleN
 /** Where to pull an item from, in a line of text. */
 function pickFrom(i: ShipItem): string {
   if (!i.part) return 'not matched to a part in SPARE';
-  return [i.part.recoveryBin && `recovery bin ${i.part.recoveryBin}`, `bin ${i.part.binLocation || '—'}`]
-    .filter(Boolean)
-    .join(', ');
+  return i.part.recoveryBin ? `recovery bin ${i.part.recoveryBin}` : `bin ${i.part.binLocation || '—'}`;
 }
 
 /** The morning's reminder of every order still waiting on its label, soonest due first. */
@@ -324,13 +326,13 @@ export function shipReminder(orders: ShipOrder[], options: NoticeOptions = {}): 
             <div style="${text(18, NAVY, 'font-weight:700;')}">Order Number: ${escapeHtml(o.orderId)}</div>
             <div style="${text(15, '#7a4a12')}">Ship by <strong>${escapeHtml(shipDay(o.shipBy))}</strong> · ordered ${escapeHtml(shipDay(o.createdAt || null))}</div>
           </td>
-          <td align="right" style="vertical-align:middle;">${dueChip(dues[k])}</td>
+          <td width="186" align="right" style="width:186px;vertical-align:middle;">${dueChip(dues[k])}</td>
         </tr></table>
       </td></tr>
       <tr><td>${pickTable(o.items, false)}</td></tr>
       <tr><td style="padding:16px;border-top:1px solid ${LINE};">${buttons(
-        button('Buy shipping label', ebayLabelUrl(o), true, 15),
-        button('Order details', sellerHubOrderUrl(o.orderId), false, 15)
+        button('Buy Shipping Label', ebayLabelUrl(o), true, 15),
+        button('Order Details', sellerHubOrderUrl(o.orderId), false, 15)
       )}</td></tr>
     </table>
   </td></tr>`
@@ -343,7 +345,7 @@ export function shipReminder(orders: ShipOrder[], options: NoticeOptions = {}): 
       n === 1 ? `Order: ${sorted[0].orderId} - Ship by ${shipDay(sorted[0].shipBy)}` : `soonest due ${shipDay(sorted[0].shipBy)}`
     }`,
     html: shell({
-      eyebrow: 'Shipping reminder',
+      eyebrow: 'Shipping Reminder',
       title: `${what} waiting to ship`,
       subtitle: 'Sold, but no label bought yet. Soonest due first.',
       body: `${spacer(20)}${cards}${spacer(28)}`,
@@ -406,7 +408,7 @@ export function partSaleReminder(sales: Sale[], options: NoticeOptions = {}): No
     kind: 'part-sale-reminder',
     subject: `[REMINDER] Cetaris Part Sale needed for ${what}`,
     html: shell({
-      eyebrow: 'Cetaris reminder',
+      eyebrow: 'Cetaris Reminder',
       title: `${what} need a Part Sale`,
       subtitle: 'Sold on eBay, with no Cetaris Part Sale number logged yet. Oldest first.',
       body,

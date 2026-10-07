@@ -74,7 +74,7 @@ describe('the sale email', () => {
 
   it('heads the email with the light logo on green, and the order number', () => {
     const html = saleNotice(order, { publicBase: 'https://spare.example' }).html;
-    expect(html).toContain('src="https://spare.example/email/spare-logo-light.png"');
+    expect(html).toContain('src="https://spare.example/email/spare-logo-email.png"');
     expect(html).toContain('background:#0f7a5a');
     expect(html).toContain('Order Number: 12-34567-89012');
   });
@@ -89,16 +89,36 @@ describe('the sale email', () => {
     expect(html).not.toMatch(/FedEx|SmartPost|Service/);
   });
 
-  it('puts the recovery bin above the bin', () => {
+  it('shows the recovery bin alone to pull from', () => {
     const html = saleNotice(order).html;
     expect(html).toMatch(/RECOVERY BIN<\/div><div[^>]*>A-1-3</);
-    expect(html).toMatch(/>BIN<\/div><div[^>]*>C-3-3</);
-    expect(html.indexOf('A-1-3')).toBeLessThan(html.indexOf('C-3-3'));
+    expect(html).not.toContain('C-3-3');
   });
 
-  it('shows only the bin when there is no recovery bin', () => {
+  it('shows the bin instead when there is no recovery bin', () => {
     const plain = { ...order, items: [{ ...order.items[0], part: { ...order.items[0].part!, recoveryBin: '' } }] };
     expect(saleNotice(plain).html).not.toContain('RECOVERY BIN');
+    expect(saleNotice(plain).html).toMatch(/>BIN<\/div><div[^>]*>C-3-3</);
+  });
+
+  it('names the part by its Custom Label and the eBay listing title', () => {
+    const titled = { ...order, items: [{ ...order.items[0], title: 'Stemco Voyager Hub Seal 383-0136' }] };
+    const html = saleNotice(titled).html;
+    expect(html).toMatch(/CUSTOM LABEL \(SKU\)<\/div>\s*<div[^>]*>383-0136</);
+    expect(html).toContain('>Stemco Voyager Hub Seal 383-0136<');
+    expect(html).toContain('SPARE: SEAL, OIL · New');
+  });
+
+  it('heads the email with the logo and a bold white line', () => {
+    const html = saleNotice(order, { publicBase: 'https://spare.example' }).html;
+    expect(html).toContain('src="https://spare.example/email/spare-logo-email.png"');
+    expect(html).toMatch(/font-size:20px;color:#ffffff;font-weight:700;">New eBay Sale!</);
+  });
+
+  it('labels the buttons in title case, Order Details in gray', () => {
+    const html = saleNotice(order).html;
+    expect(html).toContain('>Buy Shipping Label<');
+    expect(html).toMatch(/fillcolor="#e3e7e5"><w:anchorlock\/><center[^>]*>Order Details</);
   });
 
   it('draws its pills as Outlook shapes too, and everything else in table cells', () => {
@@ -118,11 +138,6 @@ describe('the sale email', () => {
     expect(html.indexOf('>PART<')).toBeLessThan(html.indexOf('>PULL FROM<'));
   });
 
-  it('gives the part description its own line in the pick list', () => {
-    expect(saleNotice(order).html).toMatch(/>383-0136<\/div>\s*<div[^>]*>SEAL, OIL<\/div>/);
-    expect(saleNotice(order).html).toContain('Condition: New');
-  });
-
   it('escapes what the buyer typed', () => {
     expect(saleNotice(order).html).toContain('A &lt;Buyer&gt;');
     expect(saleNotice(order).html).not.toContain('<Buyer>');
@@ -134,7 +149,7 @@ describe('the sale email', () => {
     expect(n.html).toContain('https://www.ebay.com/lbr/go?t=111-L1');
     expect(n.html).toContain('https://www.ebay.com/sh/ord/details?orderid=12-34567-89012');
     expect(n.html).toContain('6 DAYS LEFT');
-    expect(n.text).toContain('• 5 × 383-0136 — SEAL, OIL — recovery bin A-1-3, bin C-3-3');
+    expect(n.text).toContain('• 5 × 383-0136 — Seal — recovery bin A-1-3');
   });
 });
 

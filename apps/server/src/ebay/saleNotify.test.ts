@@ -60,7 +60,7 @@ describe('announcing new sales', () => {
     expect(body.orderId).toBe('A');
     expect(body.subject).toMatch(/^\[SALE\] eBay Order: A - SKUs: 383-0136 x 5, 383-0136 x 5 - Ship by /);
     expect(body.kind).toBe('sale');
-    expect(body.html).toContain('src="https://spare.example/email/spare-logo-light.png"');
+    expect(body.html).toContain('src="https://spare.example/email/spare-logo-email.png"');
     expect(body.sellerHubUrl).toContain('orderid=A');
   });
 
