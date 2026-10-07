@@ -4,14 +4,16 @@ const sheets = vi.hoisted(() => ({
   getAllParts: vi.fn(async () => []),
   replaceListings: vi.fn(async () => 0),
   updatePart: vi.fn(),
-  upsertSales: vi.fn(async () => ({ added: 0, updated: 0, unchanged: 0 })),
+  upsertSales: vi.fn(async () => ({ added: 0, updated: 0, unchanged: 0, addedLineItemIds: [] as string[] })),
 }));
 const orders = vi.hoisted(() => ({ fetchSales: vi.fn(async () => []) }));
 const listings = vi.hoisted(() => ({ fetchListings: vi.fn(async () => []) }));
+const notify = vi.hoisted(() => ({ notifyNewSales: vi.fn(async (_ids: string[]) => 0) }));
 
 vi.mock('../google/sheetsService.js', () => sheets);
 vi.mock('./ordersService.js', () => orders);
 vi.mock('./listingsService.js', () => listings);
+vi.mock('./saleNotify.js', () => notify);
 
 const { isStale, lastSync, resetSyncState, STALE_AFTER_MS, syncSales } = await import('./salesSync.js');
 
@@ -55,5 +57,22 @@ describe('syncing with eBay', () => {
     await syncSales(10_000);
     const [since] = orders.fetchSales.mock.calls[0] as unknown as [Date];
     expect(Date.now() - since.getTime()).toBeLessThanOrEqual(365 * 86_400_000 + 1000);
+  });
+
+  it('announces the sales it wrote for the first time, and only those', async () => {
+    sheets.upsertSales.mockResolvedValueOnce({ added: 1, updated: 2, unchanged: 0, addedLineItemIds: ['L-new'] });
+    notify.notifyNewSales.mockResolvedValueOnce(1);
+    const result = await syncSales();
+    expect(notify.notifyNewSales).toHaveBeenCalledWith(['L-new']);
+    expect(result.notified).toBe(1);
+    expect(result).not.toHaveProperty('addedLineItemIds');
+  });
+
+  it('keeps the sync when the announcement fails', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    notify.notifyNewSales.mockRejectedValueOnce(new Error('flow down'));
+    const result = await syncSales();
+    expect(result.notified).toBe(0);
+    expect(isStale()).toBe(false);
   });
 });

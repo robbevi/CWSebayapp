@@ -12,3 +12,4 @@ export * from './programStats.js';
 export * from './sales.js';
 export * from './columnSummary.js';
 export * from './shipping.js';
+export * from './packingSlip.js';

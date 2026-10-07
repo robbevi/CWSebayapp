@@ -743,6 +743,8 @@ export interface SaleWriteResult {
   added: number;
   updated: number;
   unchanged: number;
+  /** The line items written for the first time: the sales nobody has heard about yet. */
+  addedLineItemIds: string[];
 }
 
 /**
@@ -753,7 +755,7 @@ export interface SaleWriteResult {
  * estimated fee be replaced by the real one once eBay posts the finance record.
  */
 export async function upsertSales(sales: Sale[]): Promise<SaleWriteResult> {
-  if (sales.length === 0) return { added: 0, updated: 0, unchanged: 0 };
+  if (sales.length === 0) return { added: 0, updated: 0, unchanged: 0, addedLineItemIds: [] };
   await ensureSalesSheet();
   const sheets = getSheetsClient();
   const existing = await getSales();
@@ -763,6 +765,7 @@ export async function upsertSales(sales: Sale[]): Promise<SaleWriteResult> {
 
   const updates: { range: string; values: unknown[][] }[] = [];
   const appends: unknown[][] = [];
+  const addedLineItemIds: string[] = [];
   let unchanged = 0;
   const lastCol = colLetter(SALES_HEADERS.length - 1);
 
@@ -770,6 +773,7 @@ export async function upsertSales(sales: Sale[]): Promise<SaleWriteResult> {
     const rowNumber = rowByLineItem.get(sale.lineItemId);
     if (rowNumber === undefined) {
       appends.push(saleToRow(sale));
+      addedLineItemIds.push(sale.lineItemId);
       continue;
     }
     const current = currentByLineItem.get(sale.lineItemId)!;
@@ -806,7 +810,7 @@ export async function upsertSales(sales: Sale[]): Promise<SaleWriteResult> {
     });
   }
 
-  return { added: appends.length, updated: updates.length, unchanged };
+  return { added: appends.length, updated: updates.length, unchanged, addedLineItemIds };
 }
 
 

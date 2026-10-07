@@ -1,6 +1,7 @@
 import { getAllParts, replaceListings, updatePart, upsertSales } from '../google/sheetsService.js';
 import { fetchListings } from './listingsService.js';
 import { fetchSales } from './ordersService.js';
+import { notifyNewSales } from './saleNotify.js';
 
 /**
  * Bringing SPARE up to date with eBay: sales with their real fees and payouts, and the
@@ -19,6 +20,8 @@ export interface SyncResult {
   estimatedFees: number;
   listings: number;
   linked: number;
+  /** Orders announced by email because this sync found a sale in them. */
+  notified: number;
   listingsError?: string;
   since: string;
 }
@@ -82,7 +85,7 @@ async function linkListingsToParts(active: { ebayListingId: string; sku: string 
 async function syncOnce(days: number): Promise<SyncResult> {
   const since = new Date(Date.now() - days * 86_400_000);
   const sales = await fetchSales(since);
-  const result = await upsertSales(sales);
+  const { addedLineItemIds, ...result } = await upsertSales(sales);
 
   // Listings ride along. A failure here must not lose the sales that were just written,
   // so it is reported rather than thrown.
@@ -98,6 +101,14 @@ async function syncOnce(days: number): Promise<SyncResult> {
     console.warn('[ebay] Listing sync failed:', listingsError);
   }
 
+  // Announced after they're saved, so a failure here costs an email, never a sale.
+  let notified = 0;
+  try {
+    notified = await notifyNewSales(addedLineItemIds);
+  } catch (err) {
+    console.warn('[notify] Sale notification failed:', err instanceof Error ? err.message : err);
+  }
+
   lastSyncedAt = Date.now();
   return {
     ...result,
@@ -105,6 +116,7 @@ async function syncOnce(days: number): Promise<SyncResult> {
     estimatedFees: sales.filter((s) => s.feesEstimated).length,
     listings,
     linked,
+    notified,
     listingsError,
     since: since.toISOString(),
   };

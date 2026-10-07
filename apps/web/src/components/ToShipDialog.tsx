@@ -1,62 +1,15 @@
 import { ExternalLink, Printer, Truck, X } from 'lucide-react';
-import { sellerHubOrderUrl, type ShipOrder } from '@warehouse/shared';
+import { packingSlipPage, sellerHubOrderUrl, shipService as service, type ShipOrder } from '@warehouse/shared';
 import { useBodyScrollLock } from '../hooks/useBodyScrollLock';
 
 const day = (iso: string | null) =>
   iso ? new Date(iso).toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' }) : '—';
 
-/** eBay's service codes are run together; spaced out they read as the service. */
-const service = (code: string) => code.replace(/([a-z])([A-Z])/g, '$1 $2') || '—';
-
-const escape = (s: string) =>
-  s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
-
-/**
- * A packing slip SPARE prints itself. eBay doesn't hand its own slip out through the API,
- * but it does hand out everything that goes on one — and SPARE adds what eBay's slip
- * can't: which bin the part is in.
- */
+/** The same slip the sale email carries, in a window of its own that prints as it opens. */
 function printPackingSlip(order: ShipOrder): void {
-  const to = order.shipTo;
-  const rows = order.items
-    .map(
-      (i) => `<tr>
-        <td class="qty">${i.quantity}</td>
-        <td><strong>${escape(i.sku || '—')}</strong><br>${escape(i.part?.description || i.title)}</td>
-        <td>${escape(i.part?.binLocation || '—')}${i.part?.recoveryBin ? `<br>Recovery ${escape(i.part.recoveryBin)}` : ''}</td>
-        <td>${escape(i.part?.condition || '')}</td>
-      </tr>`
-    )
-    .join('');
-  const html = `<!doctype html><html><head><title>Packing slip ${escape(order.orderId)}</title>
-<style>
-  body { font: 13px/1.4 system-ui, sans-serif; margin: 32px; color: #111; }
-  h1 { font-size: 18px; margin: 0 0 4px; }
-  .meta { color: #555; margin-bottom: 20px; }
-  .cols { display: flex; gap: 48px; margin-bottom: 20px; }
-  .label { font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: #777; }
-  table { width: 100%; border-collapse: collapse; }
-  th, td { text-align: left; padding: 8px; border-bottom: 1px solid #ddd; vertical-align: top; }
-  th { font-size: 11px; text-transform: uppercase; color: #777; }
-  .qty { font-size: 16px; font-weight: 700; width: 40px; }
-  @media print { body { margin: 12mm; } }
-</style></head><body>
-<h1>Packing slip</h1>
-<div class="meta">eBay order ${escape(order.orderId)} · ordered ${escape(day(order.createdAt))} · ship by ${escape(day(order.shipBy))}</div>
-<div class="cols">
-  <div><div class="label">Ship to</div>
-    ${escape(to.name)}<br>${to.lines.map(escape).join('<br>')}<br>
-    ${escape(`${to.city}${to.state ? `, ${to.state}` : ''} ${to.postalCode}`)}<br>${escape(to.country)}
-  </div>
-  <div><div class="label">Service</div>${escape(service(order.service))}
-    <div class="label" style="margin-top:8px">Buyer</div>${escape(order.buyer)}</div>
-</div>
-<table><thead><tr><th>Qty</th><th>Part</th><th>Bin</th><th>Condition</th></tr></thead><tbody>${rows}</tbody></table>
-<script>window.onload = () => window.print();</script>
-</body></html>`;
   const w = window.open('', '_blank', 'width=820,height=900');
   if (!w) return;
-  w.document.write(html);
+  w.document.write(packingSlipPage(order));
   w.document.close();
 }
 

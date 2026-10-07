@@ -38,6 +38,7 @@ const rawSchema = z.object({
   PUBLIC_BASE_URL: z.string().optional(),
   EBAY_PUBLISHING: z.string().optional(),
   SPARE_RESEARCH_URL: z.string().optional(),
+  SPARE_SALE_NOTIFY_URL: z.string().optional(),
   SESSION_SECRET: z.string().optional(),
   SPARE_RESEARCH_FOLDER_ID: z.string().optional(),
   PORT: z.string().optional(),
@@ -161,6 +162,9 @@ export const env = {
   // The Copilot Studio workflow's HTTP trigger. Its URL carries the access signature, so
   // it is set only in the environment.
   researchUrl: cleanUrlVar(raw.SPARE_RESEARCH_URL),
+  // The Power Automate flow that emails each new sale. Its URL carries the flow's access
+  // signature too; with none set, sales simply aren't announced.
+  saleNotifyUrl: cleanUrlVar(raw.SPARE_SALE_NOTIFY_URL),
   // Signs session cookies. Without it sessions end whenever the server restarts.
   sessionSecret: raw.SESSION_SECRET?.trim() || undefined,
   // Where the workflow saves each reply as <SKU>.md: Calfrac Files / SPARE Research.
