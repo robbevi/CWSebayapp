@@ -53,7 +53,7 @@ export const SALE_OPTIONS: { key: SaleFilter; label: string; icon: React.ReactNo
   { key: 'sold', label: 'Sold, in part or whole', icon: <ShoppingCart size={14} /> },
   { key: 'unsold', label: 'Nothing sold yet', icon: <Tag size={14} /> },
   { key: 'awaitingCetaris', label: 'Sold, Part Sale not logged', icon: <ClipboardCheck size={14} /> },
-  { key: 'complete', label: 'Complete in Cetaris', icon: <ClipboardCheck size={14} /> },
+  { key: 'complete', label: 'Complete: logged and paid out', icon: <ClipboardCheck size={14} /> },
 ];
 
 export const TASK_OPTIONS: { key: TaskKey; label: string; icon: React.ReactNode }[] = [

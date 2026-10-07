@@ -26,6 +26,13 @@ export interface Sale {
   /** True when fees were estimated rather than read from eBay's finance records. */
   feesEstimated: boolean;
   syncedAt: string;
+  /**
+   * The eBay payout this sale's money went out in, once eBay has paid it — read from eBay's
+   * finance records on each sync, not typed. Absent while the funds are still held.
+   */
+  payoutId?: string;
+  /** eBay's word for where the money stands: FUNDS_ON_HOLD, PAYOUT, and so on. */
+  payoutStatus?: string;
   /** The Cetaris Part Sale that closed this sale out, once someone has logged it. */
   cetarisSaleNumber?: string;
   cetarisLoggedAt?: string;
@@ -158,3 +165,10 @@ export function isCetarisSaleNumber(value: unknown): value is string {
 
 /** A sale is finished once it carries its Cetaris number. */
 export const cetarisDone = (sale: Pick<Sale, 'cetarisSaleNumber'>) => !!sale.cetarisSaleNumber;
+
+/** eBay has paid this sale out. */
+export const paidOut = (sale: Pick<Sale, 'payoutId'>) => !!sale.payoutId;
+
+/** Both halves done: the Part Sale logged in Cetaris, and the money paid out by eBay. */
+export const saleComplete = (sale: Pick<Sale, 'cetarisSaleNumber' | 'payoutId'>) =>
+  cetarisDone(sale) && paidOut(sale);

@@ -150,7 +150,8 @@ export function CetarisDialog({ onClose, onlySku }: { onClose: () => void; onlyS
                       {skuOf(s)} <span className="font-normal text-textMuted">· {describe(s)}</span>
                     </span>
                     <span className="block text-[11px] text-textMuted">
-                      Sold {date(s.soldAt)} · qty {s.qtySold} · order {s.orderId}
+                      Sold {date(s.soldAt)} · qty {s.qtySold} · order {s.orderId} ·{' '}
+                      {s.payoutId ? `payout ${s.payoutId}` : 'payout pending'}
                     </span>
                   </span>
                   <span className="shrink-0 text-xs font-semibold tabular-nums text-textPri">{money(s.grossSale)}</span>
@@ -171,6 +172,14 @@ export function CetarisDialog({ onClose, onlySku }: { onClose: () => void; onlyS
                       </span>
                       <span className="block text-[11px] text-textMuted">
                         Part Sale <span className="font-semibold tabular-nums text-textPri">{s.cetarisSaleNumber}</span>
+                        {' · '}
+                        {s.payoutId ? (
+                          <>
+                            payout <span className="font-semibold tabular-nums text-textPri">{s.payoutId}</span>
+                          </>
+                        ) : (
+                          'payout pending'
+                        )}
                         {s.cetarisLoggedBy && ` · ${s.cetarisLoggedBy}`}
                         {s.cetarisLoggedAt && ` · ${date(s.cetarisLoggedAt)}`}
                       </span>

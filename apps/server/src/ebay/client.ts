@@ -35,6 +35,14 @@ export function ebayBaseUrl(): string {
   return env.ebayEnv === 'sandbox' ? 'https://api.sandbox.ebay.com' : 'https://api.ebay.com';
 }
 
+/**
+ * The Finances API is served from apiz rather than api. Asked at the usual host it answers
+ * 404, which the fee lookup took for "no finance records" and estimated every fee instead.
+ */
+export function ebayFinancesBaseUrl(): string {
+  return env.ebayEnv === 'sandbox' ? 'https://apiz.sandbox.ebay.com' : 'https://apiz.ebay.com';
+}
+
 export function ebayAuthUrl(): string {
   return env.ebayEnv === 'sandbox' ? 'https://auth.sandbox.ebay.com' : 'https://auth.ebay.com';
 }
@@ -117,9 +125,9 @@ export async function getAppAccessToken(): Promise<string> {
   return appCached.token;
 }
 
-export async function ebayGet<T>(path: string): Promise<T> {
+export async function ebayGet<T>(path: string, base: string = ebayBaseUrl()): Promise<T> {
   const token = await getAccessToken();
-  const res = await fetch(`${ebayBaseUrl()}${path}`, {
+  const res = await fetch(`${base}${path}`, {
     headers: {
       Authorization: `Bearer ${token}`,
       'X-EBAY-C-MARKETPLACE-ID': env.ebayMarketplaceId,

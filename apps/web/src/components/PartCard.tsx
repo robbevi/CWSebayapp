@@ -61,8 +61,9 @@ export function PartCard({
   const researched = useResearchedSkus();
   const partSales = salesForGroup(part, salesIndex);
   const sold = soldPosition(part, partSales);
-  // A sale is only finished once its Part Sale is logged in Cetaris.
+  // A sale is only finished once its Part Sale is logged in Cetaris and eBay has paid it out.
   const cetarisPending = partSales.filter((s) => !s.cetarisSaleNumber).length;
+  const payoutPending = partSales.filter((s) => !s.payoutId).length;
   // What eBay says it is asking, not what the spreadsheet hoped for. The two differ —
   // one belt is listed at $60 against a $44.99 basis — and the live figure is the one
   // that matches the listing.
@@ -294,14 +295,16 @@ export function PartCard({
             title={
               cetarisPending
                 ? `${cetarisPending} ${cetarisPending === 1 ? 'sale needs its' : 'sales need their'} Cetaris Part Sale logged`
-                : 'Every sale has its Cetaris Part Sale logged'
+                : payoutPending
+                  ? `Part Sale logged; eBay is still holding the money for ${payoutPending} ${payoutPending === 1 ? 'sale' : 'sales'}`
+                  : 'Part Sale logged and paid out by eBay'
             }
             className={cn(
               'ml-auto flex shrink-0 items-center gap-1 rounded-pill border px-2 py-0.5 text-[10px] font-semibold',
-              cetarisPending ? 'border-border text-textMuted' : 'border-primary/30 bg-primary/10 text-primary'
+              cetarisPending || payoutPending ? 'border-border text-textMuted' : 'border-primary/30 bg-primary/10 text-primary'
             )}
           >
-            {cetarisPending ? 'Part Sale to log' : <><Check size={10} /> Complete</>}
+            {cetarisPending ? 'Part Sale to log' : payoutPending ? 'Awaiting payout' : <><Check size={10} /> Complete</>}
           </span>
         )}
         {listingUrl && (

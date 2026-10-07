@@ -63,9 +63,10 @@ function matchesSales(g: PartGroup, filters: SaleFilter[], salesIndex: SalesInde
   if (filters.length === 0) return true;
   const sales = salesForGroup(g, salesIndex);
   const states: SaleFilter[] = [sales.length > 0 ? 'sold' : 'unsold'];
-  // Finished in Cetaris once every sale has its Part Sale; waiting while any one doesn't.
+  // Waiting while any sale lacks its Part Sale; complete once every sale has one and eBay
+  // has paid each of them out.
   if (sales.some((s) => !s.cetarisSaleNumber)) states.push('awaitingCetaris');
-  else if (sales.length > 0) states.push('complete');
+  else if (sales.length > 0 && sales.every((s) => s.payoutId)) states.push('complete');
   return filters.some((f) => states.includes(f));
 }
 

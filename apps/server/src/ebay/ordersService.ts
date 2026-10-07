@@ -1,6 +1,6 @@
 import type { Sale } from '@warehouse/shared';
 import { env } from '../config/env.js';
-import { ebayGet } from './client.js';
+import { ebayFinancesBaseUrl, ebayGet } from './client.js';
 
 /**
  * Sales come from two eBay APIs, because neither alone is enough:
@@ -49,11 +49,21 @@ interface OrderPage {
 
 interface FinanceTransaction {
   orderId?: string;
+  /** The payout this sale's money went out in. Absent while eBay is still holding it. */
+  payoutId?: string;
+  transactionStatus?: string;
   orderLineItems?: {
     lineItemId?: string;
     marketplaceFees?: { amount?: EbayAmount }[];
   }[];
   totalFeeAmount?: EbayAmount;
+}
+
+/** What eBay's finance records add to a sale: the real fees, and where the money stands. */
+interface FinanceLine {
+  fees: number;
+  payoutId?: string;
+  payoutStatus?: string;
 }
 
 interface TransactionPage {
@@ -100,9 +110,12 @@ async function fetchOrders(since: Date, until: Date): Promise<EbayOrder[]> {
   return orders;
 }
 
-/** Fees per line item. Returns an empty map (not an error) when finances is unavailable. */
-async function fetchFees(since: Date, until: Date): Promise<Map<string, number>> {
-  const fees = new Map<string, number>();
+/**
+ * Fees and payout per line item. Returns an empty map (not an error) when finances is
+ * unavailable, so a sync still succeeds on estimated fees.
+ */
+async function fetchFinance(since: Date, until: Date): Promise<Map<string, FinanceLine>> {
+  const lines = new Map<string, FinanceLine>();
   try {
     let offset = 0;
     for (;;) {
@@ -110,14 +123,21 @@ async function fetchFees(since: Date, until: Date): Promise<Map<string, number>>
         `transactionDate:${filterRange(since, until)},transactionType:{SALE}`
       );
       const page = await ebayGet<TransactionPage>(
-        `/sell/finances/v1/transaction?filter=${filter}&limit=${PAGE_SIZE}&offset=${offset}`
+        `/sell/finances/v1/transaction?filter=${filter}&limit=${PAGE_SIZE}&offset=${offset}`,
+        ebayFinancesBaseUrl()
       );
       const batch = page.transactions ?? [];
       for (const t of batch) {
         for (const li of t.orderLineItems ?? []) {
           if (!li.lineItemId) continue;
           const total = (li.marketplaceFees ?? []).reduce((sum, f) => sum + money(f.amount), 0);
-          fees.set(li.lineItemId, round2(fees.get(li.lineItemId) ?? 0) + round2(total));
+          const known = lines.get(li.lineItemId);
+          lines.set(li.lineItemId, {
+            fees: round2((known?.fees ?? 0) + total),
+            // A payout covers the whole transaction, so every line in it shares the id.
+            payoutId: t.payoutId ?? known?.payoutId,
+            payoutStatus: t.transactionStatus ?? known?.payoutStatus,
+          });
         }
       }
       if (batch.length < PAGE_SIZE) break;
@@ -130,11 +150,11 @@ async function fetchFees(since: Date, until: Date): Promise<Map<string, number>>
       err instanceof Error ? err.message : err
     );
   }
-  return fees;
+  return lines;
 }
 
 export async function fetchSales(since: Date, until: Date = new Date()): Promise<Sale[]> {
-  const [orders, fees] = await Promise.all([fetchOrders(since, until), fetchFees(since, until)]);
+  const [orders, finance] = await Promise.all([fetchOrders(since, until), fetchFinance(since, until)]);
   const syncedAt = new Date().toISOString();
   const sales: Sale[] = [];
 
@@ -145,9 +165,9 @@ export async function fetchSales(since: Date, until: Date = new Date()): Promise
       const shipping = money(li.deliveryCost?.shippingCost);
       const tax = (li.ebayCollectAndRemitTaxes ?? []).reduce((sum, t) => sum + money(t.amount), 0);
 
-      const known = fees.get(li.lineItemId);
-      const feesEstimated = known === undefined;
-      const fee = known ?? (gross + shipping) * ESTIMATED_FEE_RATE;
+      const record = finance.get(li.lineItemId);
+      const feesEstimated = record === undefined;
+      const fee = record?.fees ?? (gross + shipping) * ESTIMATED_FEE_RATE;
 
       sales.push({
         lineItemId: li.lineItemId,
@@ -166,6 +186,8 @@ export async function fetchSales(since: Date, until: Date = new Date()): Promise
         currency: li.lineItemCost?.currency ?? 'USD',
         feesEstimated,
         syncedAt,
+        payoutId: record?.payoutId,
+        payoutStatus: record?.payoutStatus,
       });
     }
   }

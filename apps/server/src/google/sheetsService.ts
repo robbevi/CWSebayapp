@@ -33,6 +33,8 @@ const SALES_HEADERS = [
   'currency',
   'feesEstimated',
   'syncedAt',
+  'payoutId',
+  'payoutStatus',
 ];
 const LISTINGS_SHEET = 'Listings';
 const LISTINGS_HEADERS = [
@@ -668,8 +670,25 @@ export async function updatePartFields(sku: string, data: Partial<CreatePartFiel
 }
 
 
+let salesHeadersChecked = false;
+
 async function ensureSalesSheet(): Promise<void> {
   await ensureLogSheet(SALES_SHEET, SALES_HEADERS);
+  // A tab made before the payout columns existed has the old header row; widen it once, so
+  // the new columns are labelled in the sheet as well as filled.
+  if (salesHeadersChecked) return;
+  const sheets = getSheetsClient();
+  const res = await sheets.spreadsheets.values.get({ spreadsheetId: env.googleSheetId, range: `${SALES_SHEET}!1:1` });
+  const current = (res.data.values?.[0] ?? []) as string[];
+  if (current.length < SALES_HEADERS.length) {
+    await sheets.spreadsheets.values.update({
+      spreadsheetId: env.googleSheetId,
+      range: `${SALES_SHEET}!A1:${colLetter(SALES_HEADERS.length - 1)}1`,
+      valueInputOption: 'RAW',
+      requestBody: { values: [SALES_HEADERS] },
+    });
+  }
+  salesHeadersChecked = true;
 }
 
 export async function getSales(): Promise<Sale[]> {
@@ -694,6 +713,8 @@ export async function getSales(): Promise<Sale[]> {
       currency: String(row[11] ?? 'USD'),
       feesEstimated: parseBoolean(String(row[12] ?? '')),
       syncedAt: String(row[13] ?? ''),
+      payoutId: row[14] ? String(row[14]) : undefined,
+      payoutStatus: row[15] ? String(row[15]) : undefined,
     }));
 }
 
@@ -713,6 +734,8 @@ function saleToRow(sale: Sale): unknown[] {
     sale.currency,
     sale.feesEstimated,
     sale.syncedAt,
+    sale.payoutId ?? '',
+    sale.payoutStatus ?? '',
   ];
 }
 
@@ -756,7 +779,10 @@ export async function upsertSales(sales: Sale[]): Promise<SaleWriteResult> {
       current.grossSale === sale.grossSale &&
       current.fees === sale.fees &&
       current.netProceeds === sale.netProceeds &&
-      current.feesEstimated === sale.feesEstimated;
+      current.feesEstimated === sale.feesEstimated &&
+      // A payout arriving is a change worth writing, though nothing else moved.
+      (current.payoutId ?? '') === (sale.payoutId ?? '') &&
+      (current.payoutStatus ?? '') === (sale.payoutStatus ?? '');
     if (same) {
       unchanged++;
       continue;

@@ -93,6 +93,15 @@ export function PartCetaris({ sales }: { sales: Sale[] }) {
         <div key={sale.lineItemId} className="flex flex-wrap items-center justify-between gap-2 text-[11px]">
           <span className="text-textMuted">
             {formatDate(sale.soldAt)} · {sale.qtySold} sold · order {sale.orderId}
+            <span className="block">
+              {sale.payoutId ? (
+                <>
+                  Payout <span className="font-semibold tabular-nums text-textPri">{sale.payoutId}</span>
+                </>
+              ) : (
+                'Payout pending — eBay is still holding the money'
+              )}
+            </span>
           </span>
           {sale.cetarisSaleNumber ? (
             <span className="flex items-center gap-2">
