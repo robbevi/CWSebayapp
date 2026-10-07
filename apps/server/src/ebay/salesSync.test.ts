@@ -14,6 +14,8 @@ vi.mock('../google/sheetsService.js', () => sheets);
 vi.mock('./ordersService.js', () => orders);
 vi.mock('./listingsService.js', () => listings);
 vi.mock('./saleNotify.js', () => notify);
+const reminders = vi.hoisted(() => ({ sendDailyReminders: vi.fn(async () => ({ ship: 0, partSale: 0 })) }));
+vi.mock('./reminders.js', () => reminders);
 
 const { isStale, lastSync, resetSyncState, STALE_AFTER_MS, syncSales } = await import('./salesSync.js');
 
@@ -66,6 +68,15 @@ describe('syncing with eBay', () => {
     expect(notify.notifyNewSales).toHaveBeenCalledWith(['L-new']);
     expect(result.notified).toBe(1);
     expect(result).not.toHaveProperty('addedLineItemIds');
+  });
+
+  it('sends the daily reminders once the sync is done, and survives them failing', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    reminders.sendDailyReminders.mockResolvedValueOnce({ ship: 2, partSale: 5 });
+    expect((await syncSales()).reminded).toEqual({ ship: 2, partSale: 5 });
+    resetSyncState();
+    reminders.sendDailyReminders.mockRejectedValueOnce(new Error('sheet down'));
+    expect((await syncSales()).reminded).toEqual({ ship: 0, partSale: 0 });
   });
 
   it('keeps the sync when the announcement fails', async () => {

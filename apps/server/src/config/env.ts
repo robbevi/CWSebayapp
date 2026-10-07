@@ -39,6 +39,7 @@ const rawSchema = z.object({
   EBAY_PUBLISHING: z.string().optional(),
   SPARE_RESEARCH_URL: z.string().optional(),
   SPARE_SALE_NOTIFY_URL: z.string().optional(),
+  SPARE_CRON_KEY: z.string().optional(),
   SESSION_SECRET: z.string().optional(),
   SPARE_RESEARCH_FOLDER_ID: z.string().optional(),
   PORT: z.string().optional(),
@@ -165,6 +166,9 @@ export const env = {
   // The Power Automate flow that emails each new sale. Its URL carries the flow's access
   // signature too; with none set, sales simply aren't announced.
   saleNotifyUrl: cleanUrlVar(raw.SPARE_SALE_NOTIFY_URL),
+  // The key a scheduler presents to wake the server and sync (routes/cron.ts). Without it
+  // that route doesn't exist.
+  cronKey: raw.SPARE_CRON_KEY?.trim() || undefined,
   // Signs session cookies. Without it sessions end whenever the server restarts.
   sessionSecret: raw.SESSION_SECRET?.trim() || undefined,
   // Where the workflow saves each reply as <SKU>.md: Calfrac Files / SPARE Research.

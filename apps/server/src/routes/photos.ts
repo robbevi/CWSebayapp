@@ -14,7 +14,6 @@ import {
   listPhotosGrouped,
   uploadPhoto as uploadPhotoGoogle,
 } from '../google/driveService.js';
-import { thumbnailFor } from '../lib/thumbnail.js';
 
 // Uploads are no longer downscaled client-side (original quality is preserved), so this
 // needs headroom for full-resolution phone camera photos.
@@ -75,23 +74,6 @@ photosRouter.get('/photos/:fileId/content', async (req, res, next) => {
     res.set('Content-Type', 'image/jpeg');
     res.set('Cache-Control', 'public, max-age=31536000, immutable');
     stream.on('error', next).pipe(res);
-  } catch (err) {
-    next(err);
-  }
-});
-
-// A small upright copy, for the sale email and anywhere else the original is too much.
-photosRouter.get('/photos/:fileId/thumb', async (req, res, next) => {
-  try {
-    if (!isGoogleConfigured()) {
-      res.status(404).json({ error: 'Photo thumbnails are only available for the Google backend.' });
-      return;
-    }
-    const fileId = req.params.fileId;
-    const thumb = await thumbnailFor(fileId, () => getPhotoContent(fileId));
-    res.set('Content-Type', 'image/jpeg');
-    res.set('Cache-Control', 'public, max-age=31536000, immutable');
-    res.send(thumb);
   } catch (err) {
     next(err);
   }

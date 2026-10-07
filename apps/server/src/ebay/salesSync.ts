@@ -1,6 +1,7 @@
 import { getAllParts, replaceListings, updatePart, upsertSales } from '../google/sheetsService.js';
 import { fetchListings } from './listingsService.js';
 import { fetchSales } from './ordersService.js';
+import { sendDailyReminders } from './reminders.js';
 import { notifyNewSales } from './saleNotify.js';
 
 /**
@@ -22,6 +23,8 @@ export interface SyncResult {
   linked: number;
   /** Orders announced by email because this sync found a sale in them. */
   notified: number;
+  /** What went into the reminders this sync sent, when it was the one to send them. */
+  reminded: { ship: number; partSale: number };
   listingsError?: string;
   since: string;
 }
@@ -108,6 +111,13 @@ async function syncOnce(days: number): Promise<SyncResult> {
   } catch (err) {
     console.warn('[notify] Sale notification failed:', err instanceof Error ? err.message : err);
   }
+  // After the sales and listings are current, so the reminders read the latest of both.
+  let reminded = { ship: 0, partSale: 0 };
+  try {
+    reminded = await sendDailyReminders();
+  } catch (err) {
+    console.warn('[notify] Daily reminders failed:', err instanceof Error ? err.message : err);
+  }
 
   lastSyncedAt = Date.now();
   return {
@@ -117,6 +127,7 @@ async function syncOnce(days: number): Promise<SyncResult> {
     listings,
     linked,
     notified,
+    reminded,
     listingsError,
     since: since.toISOString(),
   };

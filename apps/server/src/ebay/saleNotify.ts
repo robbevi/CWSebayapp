@@ -1,14 +1,15 @@
-import { saleNotice, type ShipOrder } from '@warehouse/shared';
+import { saleNotice, type Notice, type ShipOrder } from '@warehouse/shared';
 import { env } from '../config/env.js';
 import { PHOTO_BASE } from './listingPrep.js';
 import { ordersToShip } from './shipping.js';
 
 /**
- * Announcing new sales through the Power Automate flow "SPARE Sale Notification".
+ * Emails through the Power Automate flow "SPARE Sale Notification": one for each new
+ * sale, and the daily reminders (see reminders.ts).
  *
- * Each order with a newly synced sale goes to the flow's HTTP trigger once, carrying its
- * subject line and an email body that holds the pick list; the flow sends it on, so
- * who receives it is decided there rather than in SPARE.
+ * SPARE posts each email's subject and finished HTML body to the flow's HTTP trigger and
+ * the flow sends it on, so who receives it is decided there rather than in SPARE. Each
+ * post names its kind, so the flow can send one kind somewhere else.
  *
  * Only orders eBay still has waiting to ship are announced. That keeps a sale that was
  * packed before SPARE synced from setting anyone off, and it means a Sales sheet rebuilt
@@ -22,19 +23,24 @@ export function isSaleNotifyConfigured(): boolean {
   return !!env.saleNotifyUrl;
 }
 
+/** Where the emails load the logo from, and link back into SPARE. */
+export const NOTICE_OPTIONS = { publicBase: PHOTO_BASE };
+
 /** The open orders that hold any of these line items. */
 export function ordersFor(orders: ShipOrder[], lineItemIds: string[]): ShipOrder[] {
   const wanted = new Set(lineItemIds);
   return orders.filter((o) => o.items.some((i) => wanted.has(i.lineItemId)));
 }
 
-async function post(order: ShipOrder): Promise<void> {
+/** Hands one email to the flow. */
+export async function postNotice(notice: Notice): Promise<void> {
+  if (!env.saleNotifyUrl) throw new Error('Sale notifications are not configured. Set SPARE_SALE_NOTIFY_URL.');
   let res: Response;
   try {
-    res = await fetch(env.saleNotifyUrl!, {
+    res = await fetch(env.saleNotifyUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(saleNotice(order, { publicBase: PHOTO_BASE })),
+      body: JSON.stringify(notice),
     });
   } catch {
     // fetch's own errors quote the URL, signature and all.
@@ -47,9 +53,9 @@ async function post(order: ShipOrder): Promise<void> {
 }
 
 /**
- * Sends one notice per order holding a new sale, and returns how many went. A notice that
- * fails is logged and skipped: the sale is already saved, and the orders-to-ship list in
- * SPARE still shows it.
+ * Sends one email per order holding a new sale, and returns how many went. One that fails
+ * is logged and skipped: the sale is already saved, and the orders-to-ship list in SPARE
+ * still shows it.
  */
 export async function notifyNewSales(lineItemIds: string[]): Promise<number> {
   if (!isSaleNotifyConfigured() || lineItemIds.length === 0) return 0;
@@ -57,7 +63,7 @@ export async function notifyNewSales(lineItemIds: string[]): Promise<number> {
   let sent = 0;
   for (const order of orders) {
     try {
-      await post(order);
+      await postNotice(saleNotice(order, NOTICE_OPTIONS));
       sent++;
     } catch (err) {
       console.warn(`[notify] Order ${order.orderId}:`, err instanceof Error ? err.message : err);

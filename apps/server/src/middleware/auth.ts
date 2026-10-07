@@ -21,12 +21,13 @@ export function userFromRequest(req: Request): AppUser | undefined {
 
 /**
  * What stays reachable without signing in: the sign-in routes themselves, health checks,
- * and photographs — eBay fetches listing photos from these URLs on its own, and the sale
- * email's pictures are loaded by whoever opens it.
+ * and photograph content — eBay fetches listing photos from these URLs on its own.
  */
 function isPublic(req: Request): boolean {
   if (req.path.startsWith('/auth/') || req.path === '/health' || req.path.startsWith('/health/')) return true;
-  return req.method === 'GET' && /^\/photos\/[^/]+\/(content|thumb)$/.test(req.path);
+  // The scheduler's wake-up call carries a key of its own, checked by the route.
+  if (req.method === 'POST' && req.path === '/cron/sync') return true;
+  return req.method === 'GET' && /^\/photos\/[^/]+\/content$/.test(req.path);
 }
 
 /** Mounted on /api: every other API route needs a signed-in person. */

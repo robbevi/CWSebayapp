@@ -74,7 +74,7 @@ describe('ordersToShip', () => {
     expect(o.items[0]).toMatchObject({
       quantity: 5,
       sku: '383-0136',
-      part: { binLocation: 'C-3-3', recoveryBin: 'A-1-3', condition: 'New', photoUrl: '/api/photos/p/content', photoFileId: 'p' },
+      part: { binLocation: 'C-3-3', recoveryBin: 'A-1-3', condition: 'New', photoUrl: '/api/photos/p/content' },
     });
   });
 

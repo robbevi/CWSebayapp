@@ -213,8 +213,6 @@ export interface ShipItem {
     site: string;
     condition: string;
     photoUrl: string | null;
-    /** The photo's Google Drive id, for an upright thumbnail where SPARE's own URL won't do. */
-    photoFileId: string | null;
   } | null;
 }
 

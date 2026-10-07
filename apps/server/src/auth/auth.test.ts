@@ -106,7 +106,8 @@ describe('the sign-in gate', () => {
     expect(run(requireUser, { path: '/health' }).passed).toBe(true);
     expect(run(requireUser, { path: '/health/ebay' }).passed).toBe(true);
     expect(run(requireUser, { path: '/photos/abc123/content' }).passed).toBe(true);
-    expect(run(requireUser, { path: '/photos/abc123/thumb' }).passed).toBe(true);
+    // Its own key is checked by the route.
+    expect(run(requireUser, { path: '/cron/sync', method: 'POST' }).passed).toBe(true);
   });
 
   it('turns everything else away without a session', () => {
