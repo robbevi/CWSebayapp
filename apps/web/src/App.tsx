@@ -10,6 +10,7 @@ import { PartDetailModal } from './components/PartDetailModal';
 import { LoginScreen } from './components/LoginScreen';
 import { Toast } from './components/ui/Toast';
 import { useInventoryParts } from './hooks/useInventoryParts';
+import { useSyncOnOpen } from './hooks/useSales';
 import { fetchMe, SIGNED_OUT_EVENT } from './lib/api';
 import { useUIStore } from './state/useUIStore';
 import { useUserStore } from './state/useUserStore';
@@ -74,6 +75,8 @@ function AuthGate() {
     window.addEventListener(SIGNED_OUT_EVENT, signedOut);
     return () => window.removeEventListener(SIGNED_OUT_EVENT, signedOut);
   }, [setSession]);
+
+  useSyncOnOpen(!!session);
 
   if (!checked) {
     return <div className="flex h-screen items-center justify-center bg-surfaceMuted text-sm text-textMuted">Loading…</div>;

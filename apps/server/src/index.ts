@@ -2,7 +2,9 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import cors from 'cors';
 import express from 'express';
-import { env } from './config/env.js';
+import { env, isGoogleConfigured } from './config/env.js';
+import { isEbayConfigured } from './ebay/ordersService.js';
+import { startAutoSync } from './ebay/salesSync.js';
 import { requireUser } from './middleware/auth.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import { authRouter } from './routes/auth.js';
@@ -59,6 +61,9 @@ app.use(errorHandler);
 // env.port is Render's PORT when it sets one (4000 locally), already a number: listen()
 // with a hostname only accepts a numeric port, and process.env.PORT is a string. Bound
 // to 0.0.0.0 so Render's router can reach it on every interface.
+// Sales, fees, payouts and listing stats stay current with nobody pressing Sync.
+startAutoSync(() => isEbayConfigured() && isGoogleConfigured());
+
 app.listen(env.port, '0.0.0.0', () => {
   console.log(`Server listening on port ${env.port}`);
 });

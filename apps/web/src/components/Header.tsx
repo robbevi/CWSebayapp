@@ -134,7 +134,8 @@ export function Header() {
         <Trophy size={20} />
       </button>
       {/* Only shown once eBay is connected — a button that can only fail is worse than no
-          button. Sales also refresh on their own; this is for wanting them now. */}
+          button. SPARE syncs every hour while running and when opened after half an hour
+          quiet; this is for wanting it now. */}
       {salesStatus?.ebayConfigured && (
         <button
           type="button"

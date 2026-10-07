@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { clearCetarisSale, fetchSales, fetchSalesStatus, logCetarisSale, syncSales } from '../lib/api';
+import { useEffect } from 'react';
+import { clearCetarisSale, fetchSales, fetchSalesStatus, logCetarisSale, syncSales, syncSalesIfStale } from '../lib/api';
 import { useToastStore } from '../state/useToastStore';
 
 export const SALES_QUERY_KEY = ['sales'];
@@ -34,6 +35,27 @@ export function useClearCetaris() {
     onSuccess: () => void qc.invalidateQueries({ queryKey: SALES_QUERY_KEY }),
     onError: (err) => toast(err instanceof Error ? err.message : 'Could not take the number back', 'error'),
   });
+}
+
+/**
+ * Brings eBay up to date when the app opens, if nobody has in the last half hour. Quiet
+ * unless something new arrived: a sale is worth a word, a refreshed view count is not.
+ */
+export function useSyncOnOpen(enabled: boolean) {
+  const qc = useQueryClient();
+  const toast = useToastStore((s) => s.show);
+  useEffect(() => {
+    if (!enabled) return;
+    syncSalesIfStale()
+      .then((r) => {
+        if (!r.synced) return;
+        void qc.invalidateQueries({ queryKey: SALES_QUERY_KEY });
+        void qc.invalidateQueries({ queryKey: ['listings'] });
+        if (r.added) toast(`${r.added} new ${r.added === 1 ? 'sale' : 'sales'} from eBay`);
+      })
+      // A failed background sync is not worth interrupting anyone for; the button is there.
+      .catch(() => undefined);
+  }, [enabled, qc, toast]);
 }
 
 export function useSalesStatus() {
