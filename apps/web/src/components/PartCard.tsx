@@ -304,7 +304,7 @@ export function PartCard({
               cetarisPending || payoutPending ? 'border-border text-textMuted' : 'border-primary/30 bg-primary/10 text-primary'
             )}
           >
-            {cetarisPending ? 'Part Sale to log' : payoutPending ? 'Awaiting payout' : <><Check size={10} /> Complete</>}
+            {cetarisPending ? 'Part Sale Needed' : payoutPending ? 'Awaiting payout' : <><Check size={10} /> Complete</>}
           </span>
         )}
         {listingUrl && (
