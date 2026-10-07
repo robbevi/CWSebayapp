@@ -7,6 +7,7 @@ const config = vi.hoisted(() => ({
 const shipping = vi.hoisted(() => ({ ordersToShip: vi.fn(async (): Promise<ShipOrder[]> => []) }));
 vi.mock('../config/env.js', () => config);
 vi.mock('./shipping.js', () => shipping);
+vi.mock('./listingPrep.js', () => ({ PHOTO_BASE: 'https://spare.example' }));
 
 const { notifyNewSales, ordersFor } = await import('./saleNotify.js');
 
@@ -57,8 +58,8 @@ describe('announcing new sales', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
     const body = JSON.parse(fetchMock.mock.calls[0][1].body);
     expect(body.orderId).toBe('A');
-    expect(body.subject).toMatch(/^eBay sale: 5 × 383-0136, 5 × 383-0136 — ship by /);
-    expect(body.html).toContain('Packing slip');
+    expect(body.subject).toMatch(/^📦 eBay Order A · SKUs 383-0136 ×5, 383-0136 ×5 · Ship by /);
+    expect(body.html).toContain('Buy shipping label in eBay');
     expect(body.sellerHubUrl).toContain('orderid=A');
   });
 

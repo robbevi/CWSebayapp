@@ -1,12 +1,13 @@
 import { saleNotice, type ShipOrder } from '@warehouse/shared';
 import { env } from '../config/env.js';
+import { PHOTO_BASE } from './listingPrep.js';
 import { ordersToShip } from './shipping.js';
 
 /**
  * Announcing new sales through the Power Automate flow "SPARE Sale Notification".
  *
  * Each order with a newly synced sale goes to the flow's HTTP trigger once, carrying its
- * subject line and an email body that holds the packing slip; the flow sends it on, so
+ * subject line and an email body that holds the pick list; the flow sends it on, so
  * who receives it is decided there rather than in SPARE.
  *
  * Only orders eBay still has waiting to ship are announced. That keeps a sale that was
@@ -33,7 +34,7 @@ async function post(order: ShipOrder): Promise<void> {
     res = await fetch(env.saleNotifyUrl!, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(saleNotice(order)),
+      body: JSON.stringify(saleNotice(order, { photoBase: PHOTO_BASE })),
     });
   } catch {
     // fetch's own errors quote the URL, signature and all.

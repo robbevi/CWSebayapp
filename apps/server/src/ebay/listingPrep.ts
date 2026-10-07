@@ -33,7 +33,7 @@ export class HttpError extends Error {
 
 // eBay fetches the photographs itself. They are served by the deployed app whichever
 // server builds the listing, so a local run still hands eBay addresses it can reach.
-const PHOTO_BASE = env.publicBaseUrl ?? 'https://calfracusebayinventoryapp.onrender.com';
+export const PHOTO_BASE = env.publicBaseUrl ?? 'https://calfracusebayinventoryapp.onrender.com';
 // eBay's limit for a fixed-price listing.
 const MAX_PICTURES = 24;
 
