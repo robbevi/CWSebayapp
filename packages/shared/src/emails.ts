@@ -68,48 +68,95 @@ const spacer = (height: number) =>
 
 const money = (n: number) => `$${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
-/** A rounded label: red when it's late, orange when it's close, green otherwise. */
-function dueChip(due: string): string {
-  if (!due) return '';
-  const bg = due === 'Overdue' ? RED : due === 'Due today' || due === 'Due tomorrow' ? ORANGE : GREEN;
-  return `<span style="${text(14, '#ffffff', `display:inline-block;background:${bg};font-weight:700;padding:5px 12px;border-radius:999px;white-space:nowrap;`)}">${due}</span>`;
+const VML = 'xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word"';
+
+/**
+ * A rounded shape holding one line, in classic Outlook too. Outlook ignores rounded corners
+ * and padding everywhere but its own shapes, so it is drawn twice: as an Outlook shape, in
+ * comments only Outlook reads, and as plain styled HTML for every other client. Inside a
+ * shape Outlook runs block elements together and drops text-transform, so the line is
+ * written as it should read, capitals and all.
+ */
+function rounded(o: {
+  width: number;
+  height: number;
+  radius: number;
+  fill: string;
+  stroke?: string;
+  href?: string;
+  /** Space from the left edge to the line; without it the line is centered. */
+  inset?: number;
+  line: string;
+}): string {
+  const arc = Math.min(50, Math.round((o.radius / Math.min(o.width, o.height)) * 100));
+  const edge = o.stroke ? `strokecolor="${o.stroke}" strokeweight="1.5px"` : 'stroke="f"';
+  const href = o.href ? ` href="${escapeHtml(o.href)}"` : '';
+  const align = o.inset === undefined ? 'center' : 'left';
+  const pad = o.inset ?? 0;
+  const outlook = `<!--[if mso]><v:roundrect ${VML}${href} style="width:${o.width}px;height:${o.height}px;v-text-anchor:middle;" arcsize="${arc}%" ${edge} fillcolor="${o.fill}"><w:anchorlock/><v:textbox inset="${pad}px,0px,${pad}px,0px"><div style="text-align:${align};">${o.line}</div></v:textbox></v:roundrect><![endif]-->`;
+  const box = `width:${o.width - 2 * pad - (o.stroke ? 3 : 0)}px;height:${o.height - (o.stroke ? 3 : 0)}px;line-height:${o.height - (o.stroke ? 3 : 0)}px;padding:0 ${pad}px;background:${o.fill};border-radius:${o.radius}px;text-align:${align};${o.stroke ? `border:1.5px solid ${o.stroke};` : ''}white-space:nowrap;text-decoration:none;display:block;`;
+  const other = o.href
+    ? `<a href="${escapeHtml(o.href)}" style="${box}">${o.line}</a>`
+    : `<div style="${box}">${o.line}</div>`;
+  return `${outlook}<!--[if !mso]><!-->${other}<!--<![endif]-->`;
 }
 
+const DUE_FILL: Record<string, string> = { Overdue: RED, 'Due today': ORANGE, 'Due tomorrow': ORANGE };
+
+/** The days left to ship, as a small pill: red when it's late, orange when it's close. */
+function dueChip(due: string): string {
+  if (!due) return '';
+  return rounded({
+    width: 132,
+    height: 32,
+    radius: 16,
+    fill: DUE_FILL[due] ?? GREEN,
+    line: `<span style="${text(14, '#ffffff', 'font-weight:700;')}">${due}</span>`,
+  });
+}
+
+/** A large pill button: solid green, or outlined in navy. */
 function button(label: string, href: string, solid: boolean, size = 18): string {
-  const fill = solid ? GREEN : '#ffffff';
-  const fg = solid ? '#ffffff' : NAVY;
-  const edge = solid ? GREEN : NAVY;
-  return `<table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>
-  <td style="background:${fill};border:2px solid ${edge};border-radius:10px;">
-    <a href="${escapeHtml(href)}" style="${text(size, fg, `display:inline-block;padding:${size > 16 ? '14px 28px' : '10px 20px'};font-weight:700;text-decoration:none;border-radius:10px;`)}">${label}</a>
-  </td>
-</tr></table>`;
+  const big = size > 16;
+  return rounded({
+    width: big ? (solid ? 250 : 200) : solid ? 200 : 160,
+    height: big ? 58 : 46,
+    radius: big ? 29 : 23,
+    fill: solid ? GREEN : '#ffffff',
+    stroke: solid ? undefined : NAVY,
+    href,
+    line: `<span style="${text(size, solid ? '#ffffff' : NAVY, 'font-weight:700;')}">${label}</span>`,
+  });
 }
 
 function buttons(...each: string[]): string {
   return `<table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>${each
-    .map((b, i) => `${i ? '<td width="12" style="width:12px;font-size:0;line-height:0;">&nbsp;</td>' : ''}<td style="vertical-align:middle;">${b}</td>`)
+    .map((b, i) => `${i ? '<td width="14" style="width:14px;font-size:0;line-height:0;">&nbsp;</td>' : ''}<td style="vertical-align:middle;">${b}</td>`)
     .join('')}</tr></table>`;
 }
 
 /**
  * Where a part is, recovery bin first — that's where it's pulled from — and its bin under
- * it, each a slim rounded strip.
+ * it, each a rounded card with its label and location on one line.
  */
 function binStack(part: NonNullable<ShipItem['part']>): string {
-  const strip = (label: string, value: string, bg: string, edge: string, labelColor: string, valueColor: string) =>
-    `<tr><td style="background:${bg};border:1px solid ${edge};border-radius:8px;padding:7px 14px;">
-      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
-        <td width="130" style="${caps(labelColor, 12)}vertical-align:middle;">${label}</td>
-        <td style="${text(18, valueColor, 'font-weight:700;')}vertical-align:middle;">${escapeHtml(value)}</td>
-      </tr></table>
-    </td></tr>`;
-  const rows = [
-    part.recoveryBin ? strip('Recovery bin', part.recoveryBin, '#e7f4ee', '#b5dcc9', GREEN, '#0b4d39') : '',
-    strip('Bin', part.binLocation || '—', '#eef2f6', '#d3dce6', '#50637a', NAVY),
+  const card = (label: string, value: string, fill: string, stroke: string | undefined, labelColor: string, valueColor: string) =>
+    rounded({
+      width: 300,
+      height: 44,
+      radius: 12,
+      fill,
+      stroke,
+      inset: 16,
+      line: `<span style="${text(12, labelColor, 'font-weight:700;letter-spacing:1px;')}">${label}</span>&nbsp;&nbsp;&nbsp;<span style="${text(19, valueColor, 'font-weight:700;')}">${escapeHtml(value)}</span>`,
+    });
+  const cards = [
+    part.recoveryBin ? card('RECOVERY BIN', part.recoveryBin, GREEN, undefined, '#cdeadf', '#ffffff') : '',
+    card('BIN', part.binLocation || '—', '#eef2f6', '#c9d4e0', '#50637a', NAVY),
   ].filter(Boolean);
-  return `<table role="presentation" width="300" cellpadding="0" cellspacing="0" border="0" style="width:300px;max-width:100%;margin-top:12px;">
-    ${rows.join(spacer(6))}
+  return `<table role="presentation" cellpadding="0" cellspacing="0" border="0">
+    ${spacer(14)}
+    ${cards.map((c) => `<tr><td>${c}</td></tr>`).join(spacer(8))}
   </table>`;
 }
 
@@ -127,13 +174,12 @@ function shell(o: { eyebrow: string; title: string; subtitle: string; body: stri
   return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#f1f4f3;">
 <tr><td align="center" style="padding:24px 12px;">
 <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:600px;background:#ffffff;border:1px solid ${LINE};border-radius:12px;overflow:hidden;">
-  <tr><td style="background:${GREEN};padding:20px 28px;border-radius:12px 12px 0 0;">
+  <tr><td bgcolor="${GREEN}" style="background:${GREEN};padding:20px 28px;border-radius:12px 12px 0 0;">
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
       <td style="vertical-align:middle;">${logo}</td>
       <td align="right" style="vertical-align:middle;${caps('#cdeadf')}">${o.eyebrow}</td>
     </tr></table>
   </td></tr>
-  <tr><td height="5" style="height:5px;background:${ORANGE};font-size:0;line-height:0;">&nbsp;</td></tr>
   <tr><td style="padding:24px 28px 0;">
     <div style="${text(26, NAVY, 'font-weight:700;')}">${o.title}</div>
     <div style="${text(15, MUTED, 'margin-top:4px;')}">${o.subtitle}</div>
@@ -169,9 +215,11 @@ export function saleNotice(order: ShipOrder, options: NoticeOptions = {}): SaleN
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
       <td style="vertical-align:top;">
         <div style="${text(20, INK, 'font-weight:700;')}">${escapeHtml(i.sku || 'No SKU')}</div>
-        <div style="${text(15, MUTED, 'margin-top:2px;')}">${escapeHtml(i.part?.description || i.title)}${
-          i.part?.condition ? ` · ${escapeHtml(i.part.condition)}` : ''
-        }</div>
+        <div style="${text(17, INK, 'padding-top:4px;')}">${escapeHtml(i.part?.description || i.title)}</div>${
+          i.part?.condition
+            ? `<div style="${text(14, MUTED, 'padding-top:2px;')}">Condition: ${escapeHtml(i.part.condition)}</div>`
+            : ''
+        }
       </td>
       <td width="70" align="right" style="vertical-align:top;">
         <div style="${caps(MUTED)}">Qty</div>
@@ -185,12 +233,16 @@ export function saleNotice(order: ShipOrder, options: NoticeOptions = {}): SaleN
 
   const body = `
   <tr><td style="padding:20px 28px 0;">
-    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#fff4e8;border:1px solid #f9c995;border-radius:10px;"><tr>
-      <td style="padding:12px 18px;vertical-align:middle;">
-        <span style="${caps('#a85500')}">Ship by</span>&nbsp;&nbsp;
-        <span style="${text(21, NAVY, 'font-weight:700;')}">${escapeHtml(shipDay(order.shipBy))}</span>
-      </td>
-      <td align="right" style="padding:12px 18px;vertical-align:middle;">${dueChip(due)}</td>
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>
+      <td style="vertical-align:middle;">${rounded({
+        width: 340,
+        height: 60,
+        radius: 14,
+        fill: ORANGE,
+        inset: 20,
+        line: `<span style="${text(13, '#fff1e0', 'font-weight:700;letter-spacing:1px;')}">SHIP BY</span>&nbsp;&nbsp;&nbsp;<span style="${text(24, '#ffffff', 'font-weight:700;')}">${escapeHtml(shipDay(order.shipBy))}</span>`,
+      })}</td>
+      ${due ? `<td width="14" style="width:14px;font-size:0;line-height:0;">&nbsp;</td><td style="vertical-align:middle;">${dueChip(due)}</td>` : ''}
     </tr></table>
   </td></tr>
 

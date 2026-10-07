@@ -91,14 +91,28 @@ describe('the sale email', () => {
 
   it('puts the recovery bin above the bin', () => {
     const html = saleNotice(order).html;
-    expect(html).toMatch(/Recovery bin<\/td>\s*<td[^>]*>A-1-3</);
-    expect(html).toMatch(/>Bin<\/td>\s*<td[^>]*>C-3-3</);
+    expect(html).toMatch(/RECOVERY BIN<\/span>(&nbsp;)+<span[^>]*>A-1-3</);
+    expect(html).toMatch(/>BIN<\/span>(&nbsp;)+<span[^>]*>C-3-3</);
     expect(html.indexOf('A-1-3')).toBeLessThan(html.indexOf('C-3-3'));
   });
 
   it('shows only the bin when there is no recovery bin', () => {
     const plain = { ...order, items: [{ ...order.items[0], part: { ...order.items[0].part!, recoveryBin: '' } }] };
-    expect(saleNotice(plain).html).not.toContain('Recovery bin');
+    expect(saleNotice(plain).html).not.toContain('RECOVERY BIN');
+  });
+
+  it('draws its rounded pieces as Outlook shapes too, and has no stripe under the header', () => {
+    const html = saleNotice(order, { now: NOW }).html;
+    // Ship by, the days-left pill, two bins and two buttons.
+    expect(html.match(/<v:roundrect /g)).toHaveLength(6);
+    expect(html.match(/<!--\[if !mso\]><!-->/g)).toHaveLength(6);
+    expect(html).toMatch(/SHIP BY<\/span>(&nbsp;)+<span[^>]*>Tues, Oct 13</);
+    expect(html).not.toContain('height:5px');
+  });
+
+  it('gives the part description its own line in the pick list', () => {
+    expect(saleNotice(order).html).toMatch(/>383-0136<\/div>\s*<div[^>]*>SEAL, OIL<\/div>/);
+    expect(saleNotice(order).html).toContain('Condition: New');
   });
 
   it('escapes what the buyer typed', () => {
