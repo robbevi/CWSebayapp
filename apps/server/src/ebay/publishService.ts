@@ -218,9 +218,26 @@ export async function suggestCategories(title: string, path = ''): Promise<Categ
   return ranked;
 }
 
+const isUpc = (s: { name: string }) => /^upc$/i.test(s.name.trim());
+
+/**
+ * The listing's UPC. Some categories, mostly outside eBay Motors, refuse a listing without
+ * one, and they only look for it in ProductListingDetails — a UPC item specific doesn't
+ * count. Surplus parts rarely have a usable barcode, so unless a real one was entered as
+ * the UPC item specific, the listing says "Does not apply", which is eBay's own answer for
+ * an item with none.
+ */
+export function upcFor(specifics: { name: string; values: string[] }[]): string {
+  const given = specifics.find(isUpc)?.values[0]?.replace(/\s+/g, '') ?? '';
+  return /^\d{12,14}$/.test(given) ? given : 'Does not apply';
+}
+
 function itemXml(input: PublishInput): string {
   const l = input.listing;
+  // The UPC travels in ProductListingDetails; leaving it among the specifics as well could
+  // set the two against each other.
   const specifics = l.specifics
+    .filter((s) => !isUpc(s))
     .map(
       (s) =>
         `<NameValueList><Name>${xmlEscape(s.name)}</Name>${s.values.map((v) => `<Value>${xmlEscape(v)}</Value>`).join('')}</NameValueList>`
@@ -236,6 +253,7 @@ function itemXml(input: PublishInput): string {
 <PrimaryCategory><CategoryID>${xmlEscape(l.categoryId)}</CategoryID></PrimaryCategory>
 <ConditionID>${input.conditionId}</ConditionID>
 <ItemSpecifics>${specifics}</ItemSpecifics>
+<ProductListingDetails><UPC>${xmlEscape(upcFor(l.specifics))}</UPC></ProductListingDetails>
 <PictureDetails>${input.imageUrls.map((u) => `<PictureURL>${xmlEscape(u)}</PictureURL>`).join('')}</PictureDetails>
 <StartPrice currencyID="USD">${(l.price ?? 0).toFixed(2)}</StartPrice>
 <BestOfferDetails><BestOfferEnabled>${l.bestOffer}</BestOfferEnabled></BestOfferDetails>
