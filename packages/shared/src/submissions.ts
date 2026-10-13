@@ -7,6 +7,11 @@ export interface AppUser {
   role: UserRole;
   /** Can publish to eBay and set other people's PINs. Set in APP_USERS_JSON. */
   admin?: boolean;
+  /**
+   * Where they work, when it isn't Williston — e.g. "Grand Junction". SPARE opens on the
+   * Inbound screen for them, since shipping their stock to Williston is their part.
+   */
+  district?: string;
 }
 
 // The actual roster (real names) lives server-side only, in the APP_USERS_JSON env

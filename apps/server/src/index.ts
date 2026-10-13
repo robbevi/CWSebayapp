@@ -19,6 +19,7 @@ import { partsRouter } from './routes/parts.js';
 import { salesRouter } from './routes/sales.js';
 import { photosRouter } from './routes/photos.js';
 import { cronRouter } from './routes/cron.js';
+import { inboundRouter } from './routes/inbound.js';
 import { discrepanciesRouter } from './routes/discrepancies.js';
 import { submissionsRouter } from './routes/submissions.js';
 import { usersRouter } from './routes/users.js';
@@ -47,6 +48,7 @@ app.use('/api', draftsRouter);
 app.use('/api', ebayListingRouter);
 app.use('/api', listingQueueRouter);
 app.use('/api', researchRouter);
+app.use('/api', inboundRouter);
 
 if (process.env.NODE_ENV === 'production') {
   const webDist = path.resolve(__dirname, '../../web/dist');

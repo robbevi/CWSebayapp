@@ -109,6 +109,7 @@ function parseAppUsers(json: string | undefined): AppUser[] {
   for (const u of users) {
     // Only a literal true makes an admin, so a stray string can't grant publishing.
     u.admin = u.admin === true;
+    u.district = typeof u.district === 'string' && u.district.trim() ? u.district.trim() : undefined;
     if (u.role !== 'warehouse' && u.role !== 'lister') {
       console.error(`APP_USERS_JSON: "${u.name}" has role "${u.role}"; expected warehouse or lister.`);
       u.role = 'warehouse';

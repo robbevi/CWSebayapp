@@ -13,7 +13,7 @@ const lockout = new Lockout();
 const findUser = (name: unknown): AppUser | undefined =>
   typeof name === 'string' ? env.appUsers.find((u) => u.name.toLowerCase() === name.trim().toLowerCase()) : undefined;
 
-const me = (u: AppUser) => ({ name: u.name, role: u.role, admin: !!u.admin });
+const me = (u: AppUser) => ({ name: u.name, role: u.role, admin: !!u.admin, district: u.district ?? null });
 
 function signIn(res: Response, user: AppUser): void {
   res.setHeader('Set-Cookie', sessionCookie(createSessionToken(user.name)));

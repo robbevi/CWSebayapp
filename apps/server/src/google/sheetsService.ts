@@ -96,6 +96,8 @@ const KNOWN_FIELDS = [
   'activeRecoveryPriceBasis',
   'expectedGrossRecoveryMargin',
   'grossMarginStatus',
+  'origin',
+  'unitCost',
   'updatedAt',
 ] as const;
 type FieldName = (typeof KNOWN_FIELDS)[number];
@@ -133,6 +135,8 @@ export interface CreatePartFields {
   activeRecoveryPriceBasis?: number | null;
   expectedGrossRecoveryMargin?: number | null;
   grossMarginStatus?: string;
+  origin?: string;
+  unitCost?: number | null;
 }
 
 function cellToString(value: unknown): string | undefined {
@@ -195,6 +199,8 @@ export function mapRowToPart(headers: string[], row: unknown[], photos: Photo[])
     activeRecoveryPriceBasis: parseNumberOrNull(get('activeRecoveryPriceBasis')),
     expectedGrossRecoveryMargin: parseNumberOrNull(get('expectedGrossRecoveryMargin')),
     grossMarginStatus: get('grossMarginStatus'),
+    origin: get('origin'),
+    unitCost: parseNumberOrNull(get('unitCost')),
     photos,
     updatedAt: get('updatedAt'),
   };
@@ -281,6 +287,8 @@ function buildCreateRecord(data: CreatePartFields, updatedAt: string): Partial<R
     activeRecoveryPriceBasis: data.activeRecoveryPriceBasis,
     expectedGrossRecoveryMargin: data.expectedGrossRecoveryMargin,
     grossMarginStatus: data.grossMarginStatus,
+    origin: data.origin,
+    unitCost: data.unitCost,
     updatedAt,
   };
 }
@@ -620,6 +628,44 @@ export async function createPart(data: CreatePartFields): Promise<string> {
 // row — matters once an import gets into the hundreds/thousands of rows, since each
 // row would otherwise cost a full-sheet read (readSheet is O(current row count)).
 const APPEND_CHUNK_SIZE = 500;
+
+/**
+ * Adds any of these columns the Parts tab doesn't have yet, after the last one. Rows are
+ * read and written by header name, so a new column changes nothing for the rest.
+ */
+async function ensurePartsColumns(names: FieldName[]): Promise<string[]> {
+  const headers = await getHeaders();
+  const missing = names.filter((n) => !headers.includes(n));
+  if (missing.length === 0) return headers;
+  const start = colLetter(headers.length);
+  const end = colLetter(headers.length + missing.length - 1);
+  await getSheetsClient().spreadsheets.values.update({
+    spreadsheetId: env.googleSheetId,
+    range: `${SHEET_NAME}!${start}1:${end}1`,
+    valueInputOption: 'RAW',
+    requestBody: { values: [missing] },
+  });
+  return [...headers, ...missing];
+}
+
+/**
+ * Creates parts received from another district, returning each one's new partId in order.
+ * The origin and unit cost columns are added the first time they're needed.
+ */
+export async function createReceivedParts(items: CreatePartFields[]): Promise<string[]> {
+  if (items.length === 0) return [];
+  const headers = await ensurePartsColumns(['origin', 'unitCost']);
+  const now = new Date().toISOString();
+  const records = items.map((data) => buildCreateRecord(data, now));
+  await getSheetsClient().spreadsheets.values.append({
+    spreadsheetId: env.googleSheetId,
+    range: SHEET_NAME,
+    valueInputOption: 'USER_ENTERED',
+    insertDataOption: 'INSERT_ROWS',
+    requestBody: { values: records.map((r) => recordToRow(headers, r)) },
+  });
+  return records.map((r) => String(r.partId));
+}
 
 export async function bulkCreateParts(items: CreatePartFields[]): Promise<void> {
   if (items.length === 0) return;

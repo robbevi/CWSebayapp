@@ -2,6 +2,7 @@ import type {
   AgentListing,
   AppUser,
   CategorySuggestion,
+  InboundItem,
   CreatePartInput,
   DiscrepancyLogEntry,
   HealthStatus,
@@ -443,6 +444,8 @@ export interface Session {
   name: string;
   role: 'warehouse' | 'lister';
   admin: boolean;
+  /** Where they work when it isn't Williston; SPARE opens on the Inbound screen for them. */
+  district?: string | null;
 }
 
 export interface LoginUser {
@@ -506,3 +509,44 @@ export async function adminSetPin(name: string, pin: string): Promise<void> {
   await authJson(await post('/api/auth/admin/pin', { name, pin }));
 }
 
+// Stock coming in to Williston from another district.
+
+export async function fetchInbound(): Promise<InboundItem[]> {
+  return parseJson(await fetch('/api/inbound'));
+}
+
+export interface InboundImportResult {
+  added: number;
+  skipped: number;
+  rows: number;
+}
+
+export async function importInbound(file: File, origin: string): Promise<InboundImportResult> {
+  const form = new FormData();
+  form.append('origin', origin);
+  form.append('file', file);
+  return parseJson(await fetch('/api/inbound/import', { method: 'POST', body: form }));
+}
+
+export async function packInbound(crate: string, items: { id: string; qty?: number }[]): Promise<{ packed: number }> {
+  return parseJson(await post('/api/inbound/pack', { crate, items }));
+}
+
+export async function unpackInbound(ids: string[]): Promise<{ unpacked: number }> {
+  return parseJson(await post('/api/inbound/unpack', { ids }));
+}
+
+export async function shipInboundCrate(crate: string): Promise<{ shipped: number }> {
+  return parseJson(await post('/api/inbound/ship', { crate }));
+}
+
+export interface ReceiveCrateInput {
+  crate: string;
+  transferId: string;
+  site: string;
+  items: { id: string; receivedQty: number; binLocation: string; newBinLocation: string }[];
+}
+
+export async function receiveInboundCrate(input: ReceiveCrateInput): Promise<{ received: number; parts: number }> {
+  return parseJson(await post('/api/inbound/receive', input));
+}

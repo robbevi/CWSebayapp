@@ -91,6 +91,10 @@ export interface InventoryPart {
   activeRecoveryPriceBasis?: number | null;
   expectedGrossRecoveryMargin?: number | null;
   grossMarginStatus?: GrossMarginStatus | string;
+  /** The district it was shipped in from, for stock received from one; Williston's own has none. */
+  origin?: string;
+  /** Average cost per unit, as the origin district valued it. */
+  unitCost?: number | null;
   photos: Photo[];
   updatedAt?: string;
   workflowStatus: WorkflowStatus;

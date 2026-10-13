@@ -1,10 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   AlertTriangle,
   ArrowRight,
   Boxes,
   CalendarDays,
   Camera,
+  Container,
   ClipboardList,
   DollarSign,
   Download,
@@ -36,6 +37,8 @@ import { useDarkMode } from '../hooks/useDarkMode';
 import { useGoalsPopupStore } from '../state/useGoalsPopupStore';
 import { useOrdersToShip, useSalesStatus, useSyncSales } from '../hooks/useSales';
 import { ToShipDialog } from './ToShipDialog';
+import { InboundDialog } from './InboundDialog';
+import { useInbound } from '../hooks/useInbound';
 import { useUserStore } from '../state/useUserStore';
 import { AccountDialog } from './AccountDialog';
 import { Scoreboard } from './Scoreboard';
@@ -84,11 +87,39 @@ export function Header() {
   const [toShipOpen, setToShipOpen] = useState(false);
   const waiting = toShip.data?.length ?? 0;
 
+  // Stock on its way in from another district. Someone based there packs and ships it, so
+  // their count is what is left to pack; for Williston it is the crates on their way.
+  const session = useUserStore((s) => s.session);
+  const district = session?.district ?? null;
+  const inbound = useInbound(!!currentUser);
+  const [inboundOpen, setInboundOpen] = useState(false);
+  const inboundCount = useMemo(() => {
+    const items = inbound.data ?? [];
+    return district
+      ? items.filter((i) => i.status === 'awaiting').length
+      : new Set(items.filter((i) => i.status === 'shipped').map((i) => i.crate)).size;
+  }, [inbound.data, district]);
+  const showInbound = (inbound.data?.length ?? 0) > 0 || !!session?.admin;
+
+  // Someone based in another district signs in to ship their stock to Williston, so that
+  // is where SPARE opens for them, once per sign-in.
+  useEffect(() => {
+    if (!currentUser || !district) return;
+    const key = `spare.inbound.shown.${currentUser}`;
+    try {
+      if (sessionStorage.getItem(key)) return;
+      sessionStorage.setItem(key, '1');
+    } catch {
+      // Without storage it simply opens again next time.
+    }
+    setInboundOpen(true);
+  }, [currentUser, district]);
+
   // Opens on its own once per sign-in when something is waiting: the first thing anyone
   // signing in should know is what has to go out. Keyed by name, so switching user shows
-  // the next person too.
+  // the next person too. Not for someone in another district — eBay orders ship from here.
   useEffect(() => {
-    if (!currentUser || !waiting) return;
+    if (!currentUser || !waiting || district) return;
     const key = `spare.toShip.shown.${currentUser}`;
     try {
       if (sessionStorage.getItem(key)) return;
@@ -97,7 +128,7 @@ export function Header() {
       // Without storage it simply shows again next time; better than not at all.
     }
     setToShipOpen(true);
-  }, [currentUser, waiting]);
+  }, [currentUser, waiting, district]);
 
   return (
     <header className="flex shrink-0 items-center gap-1 bg-primaryDeep px-3 py-4 sm:gap-3 sm:px-6 lg:py-3">
@@ -147,6 +178,22 @@ export function Header() {
           {waiting > 0 && (
             <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-amber-500 px-1 text-[10px] font-bold text-white">
               {waiting}
+            </span>
+          )}
+        </button>
+      )}
+      {currentUser && showInbound && (
+        <button
+          type="button"
+          onClick={() => setInboundOpen(true)}
+          className="relative flex h-9 w-8 shrink-0 items-center justify-center rounded-full text-white sm:w-9 hover:bg-white/10"
+          aria-label={district ? `Inbound: ${inboundCount} to pack` : `Inbound: ${inboundCount} ${inboundCount === 1 ? 'crate' : 'crates'} on the way`}
+          title={district ? `${inboundCount.toLocaleString()} parts to pack for Williston` : inboundCount ? `${inboundCount} ${inboundCount === 1 ? 'crate' : 'crates'} on the way to Williston` : 'Inbound to Williston'}
+        >
+          <Container size={20} />
+          {inboundCount > 0 && (
+            <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-sky-500 px-1 text-[10px] font-bold text-white">
+              {inboundCount > 999 ? `${(inboundCount / 1000).toFixed(1)}k` : inboundCount}
             </span>
           )}
         </button>
@@ -219,6 +266,7 @@ export function Header() {
 
       {scoreboardOpen && <Scoreboard onClose={() => setScoreboardOpen(false)} />}
       {accountOpen && <AccountDialog onClose={() => setAccountOpen(false)} />}
+      {inboundOpen && <InboundDialog onClose={() => setInboundOpen(false)} />}
       {toShipOpen && <ToShipDialog orders={toShip.data ?? []} onClose={() => setToShipOpen(false)} />}
 
       {infoOpen && (
