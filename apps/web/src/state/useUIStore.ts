@@ -31,6 +31,9 @@ export type ResearchFilter = 'researched' | 'ready' | 'notReady';
 /** Whether anything has sold. Sold parts stay on the board, in the Listed / Sold column. */
 export type SaleFilter = 'sold' | 'unsold' | 'awaitingCetaris' | 'complete';
 
+/** How the Listed / Sold column is read: everything, what is still for sale, or what has sold. */
+export type EbayView = 'all' | 'listed' | 'sold';
+
 interface UIState {
   search: string;
   sites: string[];
@@ -51,6 +54,12 @@ interface UIState {
   sort: SortKey;
   /** Breaks ties in the first sort — bin within a site, priority within a bin. */
   sortThen: SortKey | null;
+  /**
+   * The Listed / Sold column's own All / Listed / Sold choice. A way of reading one column
+   * rather than a filter, so clearing the filters leaves it be; kept here so the export
+   * sees it too.
+   */
+  ebayView: EbayView;
   selectedId: string | null;
   modalOpen: boolean;
   set: (patch: Partial<UIState>) => void;
@@ -78,6 +87,7 @@ const DEFAULTS = {
 
 export const useUIStore = create<UIState>((set) => ({
   ...DEFAULTS,
+  ebayView: 'all',
   selectedId: null,
   modalOpen: false,
   set: (patch) => set(patch),

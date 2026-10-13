@@ -31,6 +31,7 @@ import {
 import calfracLogo from '../assets/calfrac-logo.png';
 import spareWordmark from '../assets/spare-wordmark-light.png';
 
+import { useBoardExport } from '../hooks/useBoardExport';
 import { useDarkMode } from '../hooks/useDarkMode';
 import { useGoalsPopupStore } from '../state/useGoalsPopupStore';
 import { useOrdersToShip, useSalesStatus, useSyncSales } from '../hooks/useSales';
@@ -76,6 +77,7 @@ export function Header() {
   const currentUser = useUserStore((s) => s.currentUser);
   const [accountOpen, setAccountOpen] = useState(false);
   const setGoalsOpen = useGoalsPopupStore((s) => s.setOpen);
+  const boardExport = useBoardExport();
   const { data: salesStatus } = useSalesStatus();
   const syncSales = useSyncSales();
   const toShip = useOrdersToShip(!!currentUser && !!salesStatus?.ebayConfigured);
@@ -185,16 +187,18 @@ export function Header() {
         </button>
       )}
 
-      {/* A plain link, not a fetch: the endpoint sends Content-Disposition: attachment, so
-          the browser saves it directly and never has to hold the whole file in memory. */}
-      <a
-        href="/api/export"
-        className="hidden h-9 w-8 shrink-0 items-center justify-center rounded-full text-white sm:flex sm:w-9 hover:bg-white/10"
-        aria-label="Export all data to a spreadsheet"
-        title="Export all data to a spreadsheet"
+      {/* Exports what the board shows — its filters, search, sort and Listed / Sold choice.
+          With nothing narrowing the board, that is everything. */}
+      <button
+        type="button"
+        onClick={boardExport.download}
+        disabled={!boardExport.ready}
+        className="hidden h-9 w-8 shrink-0 items-center justify-center rounded-full text-white sm:flex sm:w-9 hover:bg-white/10 disabled:opacity-50"
+        aria-label="Export the board as shown to a spreadsheet"
+        title="Export the board as shown, with its filters and sort, to a spreadsheet"
       >
         <Download size={20} />
-      </a>
+      </button>
       <button
         type="button"
         onClick={() => setDark((d) => !d)}

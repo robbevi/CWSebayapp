@@ -3,17 +3,17 @@ import { ChevronDown, ClipboardCheck, ClipboardList, Tag, Wrench } from 'lucide-
 import {
   extendedValue,
   listingFor,
-  salesForGroup,
   type Listing,
   type PartGroup,
   type SalesIndex,
   type WorkflowStatus,
 } from '@warehouse/shared';
+import { columnParts, splitListed } from '../lib/boardView';
 import { cn } from '../lib/cn';
 import { useSales } from '../hooks/useSales';
 import { CetarisDialog } from './CetarisDialog';
 import { ColumnSummaryDialog, type FilterPatch } from './ColumnSummaryDialog';
-import { useUIStore } from '../state/useUIStore';
+import { useUIStore, type EbayView } from '../state/useUIStore';
 import { PartCard } from './PartCard';
 import { SelectDropdown } from './ui/SelectDropdown';
 
@@ -72,21 +72,15 @@ export function BucketColumn({
   listingsIndex: Map<string, Listing>;
 }) {
   const meta = BUCKET_META[status];
-  // Within the eBay column, split what is still for sale from what has gone. Local state:
-  // it is a way of reading one column, not a filter over the whole board.
-  const [ebayView, setEbayView] = useState<'all' | 'listed' | 'sold'>('all');
+  // Within the eBay column, split what is still for sale from what has gone. A way of
+  // reading one column rather than a filter over the whole board; it lives in the store so
+  // the export reads the column the same way.
+  const ebayView = useUIStore((s) => s.ebayView);
+  const setEbayView = (view: EbayView) => useUIStore.getState().set({ ebayView: view });
 
-  const split = useMemo(() => {
-    if (status !== 'Listed') return null;
-    const sold: PartGroup[] = [];
-    const listed: PartGroup[] = [];
-    for (const p of parts) {
-      (salesForGroup(p, salesIndex).length > 0 ? sold : listed).push(p);
-    }
-    return { sold, listed };
-  }, [status, parts, salesIndex]);
+  const split = useMemo(() => (status === 'Listed' ? splitListed(parts, salesIndex) : null), [status, parts, salesIndex]);
 
-  const shown = split && ebayView !== 'all' ? (ebayView === 'sold' ? split.sold : split.listed) : parts;
+  const shown = columnParts(status, parts, ebayView, salesIndex);
   const [summaryOpen, setSummaryOpen] = useState(false);
   const [cetarisOpen, setCetarisOpen] = useState(false);
   // Every sale, not only those on screen: the Part Sale backlog doesn't shrink because a
