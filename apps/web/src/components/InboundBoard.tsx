@@ -1,5 +1,23 @@
-import { useMemo, useState, type ReactNode } from 'react';
-import { Boxes, ChevronDown, Coins, Container, Download, Factory, Layers, MapPin, PackagePlus, Search, Truck, X } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import {
+  ArrowUpDown,
+  Boxes,
+  ChevronDown,
+  Coins,
+  Container,
+  DollarSign,
+  Download,
+  Factory,
+  Filter,
+  Layers,
+  MapPin,
+  Package,
+  PackagePlus,
+  Search,
+  Truck,
+  Wrench,
+  X,
+} from 'lucide-react';
 import {
   cratesOf,
   CSV_BOM,
@@ -15,6 +33,7 @@ import { cn } from '../lib/cn';
 import { Card } from './StatStrip';
 import { Input } from './ui/Input';
 import { MultiSelectDropdown } from './ui/MultiSelectDropdown';
+import { Pill } from './ui/Pill';
 import { SelectDropdown } from './ui/SelectDropdown';
 
 /**
@@ -23,14 +42,16 @@ import { SelectDropdown } from './ui/SelectDropdown';
  * board — it is Williston's from then on, on the Williston board.
  *
  * Kept apart from Williston's board rather than mixed into it: the same SKU stocked in both
- * places would otherwise fold into one card and one eBay listing before it has arrived.
+ * places would otherwise fold into one card and one eBay listing before it has arrived. It
+ * is drawn like Williston's, though — the same toolbar, column heads and cards — so it
+ * reads as the same app.
  */
 
 type Column = Exclude<InboundStatus, 'received'>;
-const COLUMNS: { status: Column; label: string; hint: string; icon: ReactNode }[] = [
-  { status: 'awaiting', label: 'To pack', hint: 'On the shelf, waiting for a crate', icon: <Boxes size={15} /> },
-  { status: 'packed', label: 'Packed', hint: 'In a crate that hasn’t shipped', icon: <Container size={15} /> },
-  { status: 'shipped', label: 'In transit', hint: 'On its way to Williston', icon: <Truck size={15} /> },
+const COLUMNS: { status: Column; label: string; hint: string; icon: ReactNode; badge: string }[] = [
+  { status: 'awaiting', label: 'To pack', hint: 'On the shelf, waiting for a crate', icon: <Boxes size={18} />, badge: 'bg-blue-500' },
+  { status: 'packed', label: 'Packed', hint: 'In a crate that hasn’t shipped', icon: <Container size={18} />, badge: 'bg-amber-500' },
+  { status: 'shipped', label: 'In transit', hint: 'On its way to Williston', icon: <Truck size={18} />, badge: 'bg-primary' },
 ];
 
 const SORTS = ['Bin', 'SKU', 'Site', 'Manufacturer', 'Quantity', 'Unit cost', 'Value'] as const;
@@ -48,38 +69,59 @@ const COMPARE: Record<Sort, (a: InboundItem, b: InboundItem) => number> = {
   Value: (a, b) => value(b) - value(a),
 };
 
-/** Cards drawn per column before "Show more". */
-const PAGE = 60;
+/** Cards drawn per column at a time, as on Williston's board. */
+const PAGE = 40;
+
+// Williston's toolbar, borrowed: round icon buttons on a phone, labelled from sm up.
+const ROUND =
+  'flex h-11 min-h-0 shrink-0 items-center justify-center gap-2 rounded-full border w-11 sm:h-12 sm:w-auto sm:px-5';
+const ROUND_PLAIN = `${ROUND} border-border bg-surface text-textPri`;
+const PILL_LABEL = 'hidden text-sm font-medium sm:inline';
 
 const usd = (n: number, cents = false) =>
   n.toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: cents ? 2 : 0, minimumFractionDigits: cents ? 2 : 0 });
 const uniqueSorted = (xs: string[]) => [...new Set(xs.filter(Boolean))].sort((a, b) => a.localeCompare(b));
 const countBy = (xs: string[]) => xs.reduce<Record<string, number>>((m, x) => ((m[x] = (m[x] ?? 0) + 1), m), {});
 
+interface Filters {
+  sites: string[];
+  bins: string[];
+  makers: string[];
+}
+const NO_FILTERS: Filters = { sites: [], bins: [], makers: [] };
+
 export function InboundBoard({ origin, onOpenPacking }: { origin: string; onOpenPacking: () => void }) {
   const { data, isLoading } = useInbound();
   const all = useMemo(() => (data ?? []).filter((i) => i.origin === origin && i.status !== 'received'), [data, origin]);
   const [search, setSearch] = useState('');
-  const [sites, setSites] = useState<string[]>([]);
-  const [bins, setBins] = useState<string[]>([]);
-  const [makers, setMakers] = useState<string[]>([]);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [filters, setFilters] = useState<Filters>(NO_FILTERS);
+  const [drawerOpen, setDrawerOpen] = useState(false);
   const [sort, setSort] = useState<Sort>('Bin');
   const [selected, setSelected] = useState<InboundItem | null>(null);
+  const [focused, setFocused] = useState<Column | null>(null);
 
   const shown = useMemo(() => {
     const needle = search.trim().toLowerCase();
     return all
-      .filter((i) => (sites.length === 0 || sites.includes(i.originSite)) && (bins.length === 0 || bins.includes(i.originBin)))
-      .filter((i) => makers.length === 0 || makers.includes(i.manufacturer))
+      .filter((i) => filters.sites.length === 0 || filters.sites.includes(i.originSite))
+      .filter((i) => filters.bins.length === 0 || filters.bins.includes(i.originBin))
+      .filter((i) => filters.makers.length === 0 || filters.makers.includes(i.manufacturer))
       .filter(
         (i) => !needle || [i.sku, i.description, i.manufacturer, i.originSite, i.originBin, i.crate].some((v) => v.toLowerCase().includes(needle))
       )
       .sort(COMPARE[sort]);
-  }, [all, search, sites, bins, makers, sort]);
+  }, [all, search, filters, sort]);
 
-  const filtered = !!search.trim() || sites.length + bins.length + makers.length > 0;
+  const chips = [
+    ...filters.sites.map((v) => ({ key: `site:${v}`, label: `Site: ${v}`, remove: () => setFilters((f) => ({ ...f, sites: f.sites.filter((x) => x !== v) })) })),
+    ...filters.bins.map((v) => ({ key: `bin:${v}`, label: `Bin: ${v}`, remove: () => setFilters((f) => ({ ...f, bins: f.bins.filter((x) => x !== v) })) })),
+    ...filters.makers.map((v) => ({ key: `mfr:${v}`, label: v, remove: () => setFilters((f) => ({ ...f, makers: f.makers.filter((x) => x !== v) })) })),
+  ];
+  const narrowed = !!search.trim() || chips.length > 0;
   const received = useMemo(() => (data ?? []).filter((i) => i.origin === origin && i.status === 'received'), [data, origin]);
-  const onTheRoad = cratesOf(all).filter((c) => c.status === 'shipped');
+  const crates = cratesOf(all);
+  const packed = all.filter((i) => i.status === 'packed');
 
   if (isLoading) return <div className="py-16 text-center text-textMuted">Loading {origin}…</div>;
 
@@ -91,89 +133,260 @@ export function InboundBoard({ origin, onOpenPacking }: { origin: string; onOpen
     const url = URL.createObjectURL(new Blob([CSV_BOM, csv], { type: 'text/csv;charset=utf-8' }));
     const a = document.createElement('a');
     a.href = url;
-    a.download = `${origin.toLowerCase().replace(/\s+/g, '-')}-inbound-${new Date().toISOString().slice(0, 10)}${filtered ? '-filtered' : ''}.csv`;
+    a.download = `${origin.toLowerCase().replace(/\s+/g, '-')}-inbound-${new Date().toISOString().slice(0, 10)}${narrowed ? '-filtered' : ''}.csv`;
     document.body.appendChild(a);
     a.click();
     a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 10_000);
   };
 
+  const sortDropdownMobile = (
+    <SelectDropdown
+      options={[...SORTS]}
+      value={sort}
+      onChange={(v) => setSort(v as Sort)}
+      renderTrigger={({ open }) => (
+        <span className={cn(ROUND_PLAIN, open && 'border-primary ring-2 ring-primary/40')} title={`Sort: ${sort}`}>
+          <ArrowUpDown size={18} />
+          <span className={PILL_LABEL}>Sort</span>
+        </span>
+      )}
+    />
+  );
+
   return (
     <>
-      <div className="hidden gap-3 lg:grid lg:grid-cols-4">
+      <div className="relative hidden gap-3 lg:grid lg:grid-cols-5">
         <Card label={`At ${origin}`} value={all.length.toLocaleString()} icon={<Layers size={13} />}>
-          {uniqueSorted(all.map((i) => i.sku)).length.toLocaleString()} SKUs across {uniqueSorted(all.map((i) => i.originSite)).length} sites
+          {uniqueSorted(all.map((i) => i.sku)).length.toLocaleString()} SKUs · {uniqueSorted(all.map((i) => i.originSite)).length} sites
         </Card>
         <Card label="Units" value={all.reduce((n, i) => n + i.qty, 0).toLocaleString()} icon={<Boxes size={13} />}>
-          {shown.length !== all.length ? `${shown.reduce((n, i) => n + i.qty, 0).toLocaleString()} shown` : 'still to reach Williston'}
+          still to reach Williston
         </Card>
         <Card label="Value" value={usd(all.reduce((n, i) => n + value(i), 0))} icon={<Coins size={13} />}>
           at average unit cost
         </Card>
-        <Card label="Crates on the way" value={onTheRoad.length.toLocaleString()} icon={<Truck size={13} />}>
+        <Card label="Packed" value={packed.reduce((n, i) => n + i.qty, 0).toLocaleString()} icon={<Container size={13} />}>
+          units in {crates.filter((c) => c.status === 'packed').length} open {crates.filter((c) => c.status === 'packed').length === 1 ? 'crate' : 'crates'}
+        </Card>
+        <Card label="Crates on the way" value={crates.filter((c) => c.status === 'shipped').length.toLocaleString()} icon={<Truck size={13} />}>
           {received.length ? `${received.reduce((n, i) => n + (i.receivedQty ?? 0), 0).toLocaleString()} units received so far` : 'none received yet'}
         </Card>
       </div>
 
-      <div className="flex flex-wrap items-center gap-2 rounded-card border border-border bg-surface p-2">
-        <label className="relative min-w-[200px] flex-1">
-          <Search size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-textMuted" />
-          <Input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder={`Search ${origin} SKU, description, manufacturer, bin or crate`}
-            className="min-h-[40px] pl-8"
-          />
-        </label>
-        <MultiSelectDropdown icon={<MapPin size={14} />} label="Site" options={uniqueSorted(all.map((i) => i.originSite))} counts={countBy(all.map((i) => i.originSite))} selected={sites} onChange={setSites} />
-        <MultiSelectDropdown icon={<Boxes size={14} />} label="Bin" options={uniqueSorted(all.map((i) => i.originBin))} counts={countBy(all.map((i) => i.originBin))} selected={bins} onChange={setBins} />
-        <MultiSelectDropdown icon={<Factory size={14} />} label="Manufacturer" options={uniqueSorted(all.map((i) => i.manufacturer))} counts={countBy(all.map((i) => i.manufacturer))} selected={makers} onChange={setMakers} />
-        <SelectDropdown options={[...SORTS]} value={sort} valuePrefix="Sort: " onChange={(v) => setSort(v as Sort)} />
-        {filtered && (
+      <div className="relative rounded-card bg-surfaceMuted p-0 lg:p-1.5">
+        <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:gap-3">
+          <div className={cn('relative flex-1', !searchOpen && !search && 'hidden lg:block')}>
+            <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-textMuted" />
+            <Input
+              className={cn('pl-9', search && 'pr-9')}
+              placeholder={`Search ${origin} SKU, description, manufacturer, bin or crate`}
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+            {search && (
+              <button
+                type="button"
+                onClick={() => setSearch('')}
+                aria-label="Clear search"
+                className="absolute right-1.5 top-1/2 flex h-7 w-7 min-h-0 -translate-y-1/2 items-center justify-center rounded-full text-textMuted hover:bg-surfaceMuted hover:text-textPri"
+              >
+                <X size={14} />
+              </button>
+            )}
+          </div>
+
+          <div className="flex items-center justify-between gap-2 lg:hidden">
+            <button
+              type="button"
+              onClick={() => setSearchOpen((v) => !v)}
+              aria-label={searchOpen ? 'Hide search' : 'Search'}
+              aria-expanded={searchOpen}
+              className={cn(ROUND_PLAIN, (searchOpen || search) && 'border-primary text-primary')}
+            >
+              <Search size={18} />
+              <span className={PILL_LABEL}>Search</span>
+            </button>
+            {sortDropdownMobile}
+            <button
+              type="button"
+              onClick={() => setDrawerOpen(true)}
+              aria-label={chips.length ? `Filters, ${chips.length} set` : 'Filters'}
+              className={cn(ROUND_PLAIN, 'relative')}
+            >
+              <Filter size={18} />
+              <span className={PILL_LABEL}>Filter</span>
+              {chips.length > 0 && (
+                <span className="absolute -right-0.5 -top-0.5 flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-primary px-1 text-[10px] font-bold text-white">
+                  {chips.length}
+                </span>
+              )}
+            </button>
+            <button type="button" onClick={exportShown} aria-label="Export" className={cn(ROUND, 'border-primary bg-primary text-white')}>
+              <Download size={20} />
+              <span className={PILL_LABEL}>Export</span>
+            </button>
+          </div>
+
+          <div className="hidden w-full lg:block lg:w-48">
+            <SelectDropdown
+              icon={<ArrowUpDown size={14} />}
+              options={[...SORTS]}
+              value={sort}
+              valuePrefix="Sort: "
+              valueClassName="text-center"
+              triggerClassName="font-medium text-textPri"
+              onChange={(v) => setSort(v as Sort)}
+            />
+          </div>
+
           <button
             type="button"
-            onClick={() => {
-              setSearch('');
-              setSites([]);
-              setBins([]);
-              setMakers([]);
-            }}
-            className="flex min-h-0 items-center gap-1 rounded-btn px-2 py-2 text-xs font-semibold text-primary hover:bg-surfaceMuted"
+            onClick={() => setDrawerOpen(true)}
+            className="hidden h-11 shrink-0 items-center justify-center gap-2 rounded-btn border border-border bg-surface px-4 text-xs font-medium text-textPri hover:bg-surfaceMuted lg:flex lg:w-auto"
           >
-            <X size={13} /> Clear
+            <Filter size={14} />
+            Filters
+            {chips.length > 0 && (
+              <span className="flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-primary px-1 text-[10px] font-bold text-white">
+                {chips.length}
+              </span>
+            )}
           </button>
-        )}
-        <button
-          type="button"
-          onClick={exportShown}
-          className="flex min-h-0 items-center gap-1.5 rounded-btn border border-border px-3 py-2 text-xs font-semibold text-textPri hover:bg-surfaceMuted"
-          title={`Export what is shown of ${origin}'s stock to a spreadsheet`}
-        >
-          <Download size={13} /> Export
-        </button>
-      </div>
 
-      <div className="grid grid-cols-1 gap-4 lg:min-h-0 lg:flex-1 lg:grid-cols-3">
-        {COLUMNS.map((c) => (
-          <InboundColumn
-            key={c.status}
-            column={c}
-            items={shown.filter((i) => i.status === c.status)}
-            total={all.filter((i) => i.status === c.status).length}
-            onSelect={setSelected}
-            action={
-              c.status === 'awaiting' ? (
-                <button type="button" onClick={onOpenPacking} className="flex min-h-0 items-center gap-1 rounded-pill border border-border bg-surface px-2.5 py-1 text-xs font-semibold text-textPri hover:bg-surfaceMuted">
-                  <PackagePlus size={12} /> Pack several
+          <button
+            type="button"
+            onClick={exportShown}
+            title={`Export what is shown of ${origin}'s stock to a spreadsheet`}
+            className="hidden h-11 shrink-0 items-center justify-center gap-2 rounded-btn bg-primary px-4 text-xs font-medium text-white hover:bg-primaryHover lg:flex lg:w-auto"
+          >
+            <Download size={14} />
+            Export
+          </button>
+        </div>
+
+        {chips.length > 0 && (
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            {chips.map((c) => (
+              <span
+                key={c.key}
+                className="inline-flex max-w-full items-center gap-1.5 rounded-pill border border-border bg-surface px-2.5 py-1 text-xs text-textMuted"
+              >
+                <span className="max-w-[220px] truncate">{c.label}</span>
+                <button type="button" onClick={c.remove} aria-label={`Remove ${c.label}`} className="min-h-0 shrink-0 rounded-full hover:text-primary">
+                  <X size={12} />
                 </button>
-              ) : null
-            }
-          />
-        ))}
+              </span>
+            ))}
+            <button type="button" onClick={() => setFilters(NO_FILTERS)} className="text-xs font-semibold text-primary hover:underline">
+              Clear All
+            </button>
+          </div>
+        )}
       </div>
 
+      <div className="lg:min-h-0 lg:flex-1">
+        <div className="mx-auto grid w-full grid-cols-1 gap-4 lg:h-full lg:grid-cols-3">
+          {COLUMNS.map((c) => (
+            <InboundColumn
+              key={c.status}
+              column={c}
+              items={shown.filter((i) => i.status === c.status)}
+              total={all.filter((i) => i.status === c.status).length}
+              expanded={focused === c.status}
+              onToggle={() => setFocused((f) => (f === c.status ? null : c.status))}
+              className={focused === c.status ? 'order-first lg:order-none' : undefined}
+              onSelect={setSelected}
+              action={
+                c.status === 'awaiting' ? (
+                  <button
+                    type="button"
+                    onClick={onOpenPacking}
+                    title="Pick several parts into a crate at once"
+                    className="flex min-h-0 shrink-0 items-center gap-1 rounded-pill border border-border bg-surface px-2.5 py-1 text-xs font-semibold text-textPri hover:bg-surfaceMuted"
+                  >
+                    <PackagePlus size={12} />
+                    <span className="hidden sm:inline">Pack several</span>
+                  </button>
+                ) : null
+              }
+            />
+          ))}
+        </div>
+      </div>
+
+      {drawerOpen && <InboundFilterDrawer all={all} filters={filters} onChange={setFilters} onClose={() => setDrawerOpen(false)} />}
       {selected && <InboundItemDialog item={selected} all={data ?? []} onClose={() => setSelected(null)} />}
     </>
+  );
+}
+
+/** The same sheet as Williston's filters, with what a district's stock can be narrowed by. */
+function InboundFilterDrawer({
+  all,
+  filters,
+  onChange,
+  onClose,
+}: {
+  all: InboundItem[];
+  filters: Filters;
+  onChange: (f: Filters) => void;
+  onClose: () => void;
+}) {
+  useBodyScrollLock();
+  const field = (label: string, icon: ReactNode, options: string[], counts: Record<string, number>, key: keyof Filters) => (
+    <div>
+      <label className="mb-1 block text-xs font-semibold text-textMuted">{label}</label>
+      <MultiSelectDropdown
+        icon={icon}
+        label={label}
+        options={options}
+        counts={counts}
+        selected={filters[key]}
+        onChange={(next) => onChange({ ...filters, [key]: next })}
+      />
+    </div>
+  );
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-3 sm:items-center sm:p-6">
+      <div className="flex max-h-[85vh] w-full flex-col overflow-hidden rounded-card bg-surface sm:max-w-md">
+        <div className="mx-auto mt-2 h-1 w-10 shrink-0 rounded-full bg-border sm:hidden" />
+        <div className="flex shrink-0 items-center justify-between gap-3 border-b border-border bg-surfaceMuted p-4">
+          <h2 className="text-base font-semibold text-textPri">Filters</h2>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => onChange(NO_FILTERS)}
+              className="flex h-9 min-h-0 items-center rounded-btn border border-border px-3 text-xs font-semibold text-primary hover:bg-surfaceMuted"
+            >
+              Clear All
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Close"
+              className="flex h-9 w-9 min-h-0 items-center justify-center rounded-btn border border-border text-textMuted hover:bg-surfaceMuted hover:text-textPri"
+            >
+              <X size={18} />
+            </button>
+          </div>
+        </div>
+        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain p-4">
+          {field('Inventory Site', <Factory size={14} />, uniqueSorted(all.map((i) => i.originSite)), countBy(all.map((i) => i.originSite)), 'sites')}
+          {field('Bin Location', <MapPin size={14} />, uniqueSorted(all.map((i) => i.originBin)), countBy(all.map((i) => i.originBin)), 'bins')}
+          {field('Manufacturer', <Wrench size={14} />, uniqueSorted(all.map((i) => i.manufacturer)), countBy(all.map((i) => i.manufacturer)), 'makers')}
+        </div>
+        <div className="shrink-0 border-t border-border p-4">
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex h-11 w-full items-center justify-center rounded-btn bg-primary text-sm font-semibold text-white hover:bg-primaryHover"
+          >
+            Show results
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -181,82 +394,142 @@ function InboundColumn({
   column,
   items,
   total,
+  expanded,
+  onToggle,
+  className,
   onSelect,
   action,
 }: {
   column: (typeof COLUMNS)[number];
   items: InboundItem[];
   total: number;
+  expanded: boolean;
+  onToggle: () => void;
+  className?: string;
   onSelect: (i: InboundItem) => void;
   action: ReactNode;
 }) {
-  const [limit, setLimit] = useState(PAGE);
-  // Below lg the columns stack, so each opens on a tap rather than all three running down
-  // the page — the same as Williston's board.
-  const [open, setOpen] = useState(false);
+  const [rendered, setRendered] = useState(PAGE);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const sentinelRef = useRef<HTMLDivElement>(null);
+  const filtered = items.length !== total;
+  const worth = items.reduce((n, i) => n + value(i), 0);
+
+  // A new filter starts the column from the top again.
+  useEffect(() => setRendered(PAGE), [items]);
+
+  // Draws the next page as the end of the column comes into view, as Williston's does.
+  useEffect(() => {
+    const sentinel = sentinelRef.current;
+    if (!sentinel) return;
+    const seen = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((e) => e.isIntersecting)) setRendered((n) => Math.min(n + PAGE, items.length));
+      },
+      { root: scrollRef.current, rootMargin: '400px' }
+    );
+    seen.observe(sentinel);
+    return () => seen.disconnect();
+  }, [rendered, items.length, expanded]);
+
   return (
-    <section className="flex flex-col overflow-hidden rounded-card bg-columnHeaderBg lg:min-h-0">
-      <div className="flex items-center justify-between gap-2 px-3 py-3" title={column.hint}>
-        <button
-          type="button"
-          onClick={() => setOpen((o) => !o)}
-          aria-expanded={open}
-          className="flex min-h-0 flex-1 items-center gap-2 text-left text-sm font-semibold text-textPri lg:pointer-events-none"
-        >
-          <span className="flex h-7 w-7 items-center justify-center rounded-full bg-primaryDeep text-white">{column.icon}</span>
-          {column.label}
-        </button>
-        <span className="flex items-center gap-2">
-          {action}
-          <span className="rounded-pill bg-surface px-2 py-0.5 text-xs font-semibold tabular-nums text-textPri">
-            {items.length === total ? total.toLocaleString() : `${items.length.toLocaleString()} of ${total.toLocaleString()}`}
+    <div className={cn('flex flex-col rounded-card border border-border bg-surfaceMuted lg:h-full lg:min-h-0', className)}>
+      <div className="flex w-full items-center gap-3 rounded-t-card border-b border-border bg-columnHeaderBg p-4" title={column.hint}>
+        <button type="button" onClick={onToggle} aria-expanded={expanded} className="flex flex-1 items-center gap-3 text-left lg:pointer-events-none">
+          <div className={cn('flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-white', column.badge)}>{column.icon}</div>
+          <span className="min-w-0">
+            <span className="block text-base font-medium text-textPri lg:text-lg">{column.label}</span>
+            <span className="hidden text-[11px] leading-tight text-textMuted lg:block">
+              <span className="font-semibold tabular-nums text-textPri">{usd(worth)}</span> at average cost
+            </span>
           </span>
-          <button
-            type="button"
-            onClick={() => setOpen((o) => !o)}
-            aria-label={open ? `Close ${column.label}` : `Open ${column.label}`}
-            className="flex h-7 w-7 min-h-0 items-center justify-center text-textMuted lg:hidden"
-          >
-            <ChevronDown size={16} className={cn('transition-transform', open && 'rotate-180')} />
-          </button>
+        </button>
+        {action}
+        <span
+          className="rounded-pill border border-border bg-surface px-2.5 py-1 text-xs font-semibold text-textMuted"
+          title={filtered ? `${items.length} of ${total} shown by the current filters` : undefined}
+        >
+          {items.length.toLocaleString()}
+          {filtered && <span className="font-normal text-textMuted/70"> of {total.toLocaleString()}</span>}
         </span>
+        <button type="button" onClick={onToggle} aria-label={expanded ? 'Collapse' : 'Expand'} className="min-h-0 shrink-0 lg:hidden">
+          <ChevronDown size={18} className={cn('text-textMuted transition-transform', expanded && 'rotate-180')} />
+        </button>
       </div>
-      <div className={cn('space-y-2 overflow-y-auto overscroll-contain px-2 pb-2 lg:block lg:min-h-0 lg:flex-1', !open && 'hidden')}>
-        {items.length === 0 && <p className="px-1 py-4 text-center text-xs text-textMuted">Nothing here.</p>}
-        {items.slice(0, limit).map((i) => (
-          <button
-            key={i.id}
-            type="button"
-            onClick={() => onSelect(i)}
-            className="block w-full rounded-card border border-border bg-surface p-3 text-left hover:border-primary/50"
-          >
-            <span className="flex items-baseline justify-between gap-2">
-              <span className="truncate text-sm font-semibold text-textPri">{i.sku}</span>
-              <span className="shrink-0 text-sm font-bold tabular-nums text-textPri">× {i.qty}</span>
-            </span>
-            <span className="block truncate text-xs text-textMuted">{i.description || '—'}</span>
-            <span className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-textMuted">
-              <span>
-                {i.originSite} · Bin <span className="font-semibold text-textPri">{i.originBin || '—'}</span>
-              </span>
-              {i.unitCost != null && <span>{usd(i.unitCost, true)}/ea</span>}
-              {i.crate && (
-                <span className="rounded-pill bg-tileBg px-2 py-0.5 font-semibold text-primary">Crate {i.crate}</span>
-              )}
-            </span>
-          </button>
-        ))}
-        {items.length > limit && (
-          <button
-            type="button"
-            onClick={() => setLimit((n) => n + PAGE)}
-            className="block w-full rounded-btn py-2 text-xs font-semibold text-primary hover:bg-surface"
-          >
-            Show more ({(items.length - limit).toLocaleString()} left)
-          </button>
+
+      <div
+        ref={scrollRef}
+        className={cn(
+          'column-scroll min-h-0 max-h-[calc(100vh-15rem)] flex-1 flex-col gap-3 overflow-y-auto overscroll-contain p-4 lg:flex lg:max-h-none',
+          expanded ? 'flex' : 'hidden'
+        )}
+      >
+        {items.length === 0 ? (
+          <div className="flex flex-1 items-center justify-center rounded-card border border-dashed border-border p-8 text-center text-xs text-textMuted">
+            {total === 0 ? 'Nothing here yet.' : 'No parts match the selected filters here.'}
+          </div>
+        ) : (
+          <>
+            {items.slice(0, rendered).map((i) => (
+              <InboundCard key={i.id} item={i} onSelect={() => onSelect(i)} />
+            ))}
+            {rendered < items.length && (
+              <div ref={sentinelRef} className="py-3 text-center text-[11px] text-textMuted">
+                Showing {rendered} of {items.length.toLocaleString()}…
+              </div>
+            )}
+          </>
         )}
       </div>
-    </section>
+    </div>
+  );
+}
+
+/** Williston's card, saying what a part on its way needs to: where it sits, how many, what it cost, and its crate. */
+function InboundCard({ item, onSelect }: { item: InboundItem; onSelect: () => void }) {
+  return (
+    <div className="shrink-0 overflow-hidden rounded-[10px] border border-border bg-surface transition-shadow hover:shadow-md">
+      <button type="button" onClick={onSelect} className="w-full p-3 text-left">
+        <div className="flex items-start gap-1.5">
+          <span className="min-w-0 flex-1 text-sm font-semibold text-textPri">{item.sku}</span>
+          {item.crate && (
+            <span
+              title={`In crate ${item.crate}`}
+              className="flex shrink-0 items-center gap-1 rounded-pill bg-primary/10 px-2 py-0.5 text-[11px] font-semibold text-primary"
+            >
+              <Container size={11} /> {item.crate}
+            </span>
+          )}
+        </div>
+        <div className="mb-2 line-clamp-2 min-h-[2rem] text-xs leading-snug text-textMuted">{item.description}</div>
+        <div className="grid grid-cols-2 gap-1.5">
+          <Pill tone="chip" className="w-full">
+            <Wrench size={12} className="shrink-0" />
+            <span className="truncate">{item.manufacturer || '—'}</span>
+          </Pill>
+          <Pill tone="chip" className="w-full">
+            <Factory size={12} className="shrink-0" />
+            <span className="truncate">{item.originSite || '—'}</span>
+          </Pill>
+          <Pill tone="chip" className="w-full">
+            <MapPin size={12} className="shrink-0" />
+            <span className="truncate">{item.originBin || '—'}</span>
+          </Pill>
+          <Pill tone="chip" className="w-full">
+            <Package size={12} className="shrink-0" />
+            <span className="truncate">Qty: {item.qty.toLocaleString()}</span>
+          </Pill>
+          {item.unitCost != null && (
+            <Pill tone="chip" className="w-full">
+              <DollarSign size={12} className="shrink-0" />
+              <span className="truncate" title={`${usd(value(item), true)} for ${item.qty}`}>
+                {usd(item.unitCost, true)} ea
+              </span>
+            </Pill>
+          )}
+        </div>
+      </button>
+    </div>
   );
 }
 
