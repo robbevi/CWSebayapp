@@ -34,6 +34,9 @@ export type SaleFilter = 'sold' | 'unsold' | 'awaitingCetaris' | 'complete';
 /** How the Listed / Sold column is read: everything, what is still for sale, or what has sold. */
 export type EbayView = 'all' | 'listed' | 'sold';
 
+/** The district SPARE sells from; every other district's stock is on its way here. */
+export const WILLISTON = 'Williston';
+
 interface UIState {
   search: string;
   sites: string[];
@@ -60,6 +63,15 @@ interface UIState {
    * sees it too.
    */
   ebayView: EbayView;
+  /**
+   * Whose stock the dashboard shows: Williston's own, or a district's on its way in. Not a
+   * filter, so clearing the filters leaves it be.
+   */
+  district: string;
+  /** The Inbound screen: packing, shipping and receiving crates. */
+  inboundOpen: boolean;
+  /** Which part of the Inbound screen to open on, when something asked for one. */
+  inboundStart: 'pack' | null;
   selectedId: string | null;
   modalOpen: boolean;
   set: (patch: Partial<UIState>) => void;
@@ -88,6 +100,9 @@ const DEFAULTS = {
 export const useUIStore = create<UIState>((set) => ({
   ...DEFAULTS,
   ebayView: 'all',
+  district: WILLISTON,
+  inboundOpen: false,
+  inboundStart: null,
   selectedId: null,
   modalOpen: false,
   set: (patch) => set(patch),

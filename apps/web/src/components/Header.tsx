@@ -40,6 +40,7 @@ import { ToShipDialog } from './ToShipDialog';
 import { InboundDialog } from './InboundDialog';
 import { useInbound } from '../hooks/useInbound';
 import { useUserStore } from '../state/useUserStore';
+import { useUIStore } from '../state/useUIStore';
 import { AccountDialog } from './AccountDialog';
 import { Scoreboard } from './Scoreboard';
 
@@ -92,7 +93,8 @@ export function Header() {
   const session = useUserStore((s) => s.session);
   const district = session?.district ?? null;
   const inbound = useInbound(!!currentUser);
-  const [inboundOpen, setInboundOpen] = useState(false);
+  const inboundOpen = useUIStore((s) => s.inboundOpen);
+  const setInboundOpen = (open: boolean) => useUIStore.getState().set({ inboundOpen: open, inboundStart: null });
   const inboundCount = useMemo(() => {
     const items = inbound.data ?? [];
     return district

@@ -19,6 +19,7 @@ import {
 } from '../hooks/useInbound';
 import { useInventoryParts } from '../hooks/useInventoryParts';
 import { cn } from '../lib/cn';
+import { useUIStore } from '../state/useUIStore';
 import { useUserStore } from '../state/useUserStore';
 import { Input } from './ui/Input';
 
@@ -53,7 +54,8 @@ export function InboundDialog({ onClose }: { onClose: () => void }) {
   const received = crates.filter((c) => c.status === 'received');
 
   // The origin's team starts where their work is; Williston starts on what is arriving.
-  const [tab, setTab] = useState<Tab>(() => (session?.district ? 'pack' : transit.length ? 'transit' : 'pack'));
+  const start = useUIStore((s) => s.inboundStart);
+  const [tab, setTab] = useState<Tab>(() => start ?? (session?.district ? 'pack' : transit.length ? 'transit' : 'pack'));
   const [importing, setImporting] = useState(false);
 
   const tabs: { key: Tab; label: string; count: number }[] = [

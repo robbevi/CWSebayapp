@@ -50,7 +50,7 @@ const COLUMNS: { header: string; value: (p: InventoryPart) => unknown }[] = [
   { header: 'Part ID', value: (p) => p.id },
 ];
 
-function csvCell(value: unknown): string {
+export function csvCell(value: unknown): string {
   if (value === null || value === undefined) return '';
   if (typeof value === 'boolean') return value ? 'Yes' : 'No';
   // Numbers are written bare so quantities and variances stay numeric in Excel — the

@@ -1,9 +1,11 @@
 import { useEffect } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ConfigBanner } from './components/ConfigBanner';
+import { DistrictSwitch } from './components/DistrictSwitch';
 import { FilterPanel } from './components/FilterPanel';
 import { GoalsPopup } from './components/GoalsPopup';
 import { Header } from './components/Header';
+import { InboundBoard } from './components/InboundBoard';
 import { KanbanBoard } from './components/KanbanBoard';
 import { StatStrip } from './components/StatStrip';
 import { PartDetailModal } from './components/PartDetailModal';
@@ -12,7 +14,7 @@ import { Toast } from './components/ui/Toast';
 import { useInventoryParts } from './hooks/useInventoryParts';
 import { useSyncOnOpen } from './hooks/useSales';
 import { fetchMe, SIGNED_OUT_EVENT } from './lib/api';
-import { useUIStore } from './state/useUIStore';
+import { useUIStore, WILLISTON } from './state/useUIStore';
 import { useUserStore } from './state/useUserStore';
 
 const qc = new QueryClient();
@@ -33,17 +35,26 @@ function DeepLinkHandler() {
 }
 
 function Dashboard() {
+  const district = useUIStore((s) => s.district);
   return (
     <>
       <div className="flex flex-col bg-surfaceMuted lg:h-screen lg:overflow-hidden">
         <Header />
         <div className="mx-auto flex w-full max-w-[1400px] flex-1 flex-col gap-2 px-3 py-2 sm:px-4 sm:py-3 lg:gap-3 lg:px-6 lg:min-h-0 lg:overflow-hidden">
-          <StatStrip />
-          <FilterPanel />
-          <ConfigBanner />
-          <div className="lg:min-h-0 lg:flex-1">
-            <KanbanBoard />
-          </div>
+          <DistrictSwitch />
+          {district === WILLISTON ? (
+            <>
+              <StatStrip />
+              <FilterPanel />
+              <ConfigBanner />
+              <div className="lg:min-h-0 lg:flex-1">
+                <KanbanBoard />
+              </div>
+            </>
+          ) : (
+            // Another district's stock on its way in, on a board of its own.
+            <InboundBoard origin={district} onOpenPacking={() => useUIStore.getState().set({ inboundOpen: true, inboundStart: 'pack' })} />
+          )}
         </div>
       </div>
       <PartDetailModal />
