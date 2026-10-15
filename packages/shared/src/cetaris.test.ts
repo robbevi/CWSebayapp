@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { cetarisDone, isCetarisSaleNumber } from './sales.js';
+import { cetarisDone, cetarisNeeded, cetarisPending, isCetarisSaleNumber, saleComplete } from './sales.js';
 
 describe('isCetarisSaleNumber', () => {
   it('takes exactly seven digits', () => {
@@ -14,9 +14,25 @@ describe('isCetarisSaleNumber', () => {
   });
 });
 
-describe('cetarisDone', () => {
-  it('counts a sale finished once it carries a number', () => {
-    expect(cetarisDone({ cetarisSaleNumber: '1234567' })).toBe(true);
-    expect(cetarisDone({})).toBe(false);
+describe('a Part Sale', () => {
+  const started = { cetarisSaleNumber: '3087786' };
+  const completed = { ...started, cetarisCompletedAt: '2026-10-16T15:00:00Z' };
+
+  it('is needed until it has a number', () => {
+    expect(cetarisNeeded({})).toBe(true);
+    expect(cetarisNeeded(started)).toBe(false);
+  });
+
+  it('is pending once started, until it is completed', () => {
+    expect(cetarisPending(started)).toBe(true);
+    expect(cetarisDone(started)).toBe(false);
+    expect(cetarisPending(completed)).toBe(false);
+    expect(cetarisDone(completed)).toBe(true);
+  });
+
+  it('finishes a sale only once completed and paid out', () => {
+    expect(saleComplete({ ...started, payoutId: 'P1' })).toBe(false);
+    expect(saleComplete({ ...completed })).toBe(false);
+    expect(saleComplete({ ...completed, payoutId: 'P1' })).toBe(true);
   });
 });

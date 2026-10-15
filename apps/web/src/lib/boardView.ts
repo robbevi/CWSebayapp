@@ -5,6 +5,9 @@ import {
   getCheckpoints,
   getGroupDiscrepancy,
   listingFor,
+  cetarisNeeded,
+  cetarisPending,
+  saleComplete,
   salesForGroup,
   type AgeBandKey,
   type InventoryPart,
@@ -68,10 +71,11 @@ function matchesSales(g: PartGroup, filters: SaleFilter[], salesIndex: SalesInde
   if (filters.length === 0) return true;
   const sales = salesForGroup(g, salesIndex);
   const states: SaleFilter[] = [sales.length > 0 ? 'sold' : 'unsold'];
-  // Waiting while any sale lacks its Part Sale; complete once every sale has one and eBay
-  // has paid each of them out.
-  if (sales.some((s) => !s.cetarisSaleNumber)) states.push('awaitingCetaris');
-  else if (sales.length > 0 && sales.every((s) => s.payoutId)) states.push('complete');
+  // A Part Sale still to start, or started and still Pending in Cetaris; complete once every
+  // sale's Part Sale is completed and eBay has paid each of them out.
+  if (sales.some(cetarisNeeded)) states.push('awaitingCetaris');
+  if (sales.some(cetarisPending)) states.push('cetarisPending');
+  if (sales.length > 0 && sales.every(saleComplete)) states.push('complete');
   return filters.some((f) => states.includes(f));
 }
 

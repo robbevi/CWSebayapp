@@ -99,13 +99,30 @@ describe('the daily reminders', () => {
   it('reminds about sales with no Part Sale logged', async () => {
     sheets.getSales.mockResolvedValue([sale('done', '2026-10-01T12:00:00Z'), sale('waiting', '2026-10-02T12:00:00Z')]);
     cetaris.getCetarisLogs.mockResolvedValue(
-      new Map([['done', { lineItemId: 'done', cetarisSaleNumber: '1234567', loggedAt: '', loggedBy: '' }]])
+      new Map([
+        [
+          'done',
+          { lineItemId: 'done', cetarisSaleNumber: '1234567', loggedAt: '', loggedBy: '', completedAt: '2026-10-03T15:00:00Z', completedBy: 'Jo' },
+        ],
+      ])
     );
     const result = await sendDailyReminders(THURSDAY_8AM);
     expect(result.partSale).toBe(1);
     const notice = notify.postNotice.mock.calls.find(([n]) => n.kind === 'part-sale-reminder')![0];
     expect(notice.subject).toBe('[REMINDER] Cetaris Part Sale needed for 1 eBay sale');
     expect(notice.html).toContain('o-waiting');
+  });
+
+  it('reminds about Part Sales started but still pending', async () => {
+    sheets.getSales.mockResolvedValue([sale('started', '2026-10-02T12:00:00Z')]);
+    cetaris.getCetarisLogs.mockResolvedValue(
+      new Map([
+        ['started', { lineItemId: 'started', cetarisSaleNumber: '3087786', loggedAt: '2026-10-03T15:00:00Z', loggedBy: 'Jo', completedAt: '', completedBy: '' }],
+      ])
+    );
+    expect((await sendDailyReminders(THURSDAY_8AM)).partSale).toBe(1);
+    const notice = notify.postNotice.mock.calls.find(([n]) => n.kind === 'part-sale-reminder')![0];
+    expect(notice.subject).toBe('[REMINDER] 1 Part Sale pending completion in Cetaris');
   });
 
   it('sends each once a day, however many syncs there are', async () => {

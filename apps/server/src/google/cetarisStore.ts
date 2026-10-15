@@ -12,7 +12,7 @@ import { getSheetsClient } from './client.js';
  */
 
 const TAB = 'Cetaris Sales';
-const HEADERS = ['lineItemId', 'cetarisSaleNumber', 'sku', 'loggedAt', 'loggedBy'];
+const HEADERS = ['lineItemId', 'cetarisSaleNumber', 'sku', 'loggedAt', 'loggedBy', 'completedAt', 'completedBy'];
 
 let ready = false;
 let cache: { at: number; logs: Map<string, CetarisLog> } | undefined;
@@ -27,13 +27,15 @@ async function ensureTab(): Promise<void> {
       spreadsheetId: env.googleSheetId,
       requestBody: { requests: [{ addSheet: { properties: { title: TAB, gridProperties: { frozenRowCount: 1 } } } }] },
     });
-    await sheets.spreadsheets.values.update({
-      spreadsheetId: env.googleSheetId,
-      range: `'${TAB}'!A1:E1`,
-      valueInputOption: 'RAW',
-      requestBody: { values: [HEADERS] },
-    });
   }
+  // Written every time the tab is first touched, which also widens a tab made before the
+  // completion columns existed. The names never change, so rewriting them is harmless.
+  await sheets.spreadsheets.values.update({
+    spreadsheetId: env.googleSheetId,
+    range: `'${TAB}'!A1:G1`,
+    valueInputOption: 'RAW',
+    requestBody: { values: [HEADERS] },
+  });
   ready = true;
 }
 
@@ -43,12 +45,19 @@ export async function getCetarisLogs(): Promise<Map<string, CetarisLog>> {
   await ensureTab();
   const res = await getSheetsClient().spreadsheets.values.get({
     spreadsheetId: env.googleSheetId,
-    range: `'${TAB}'!A2:E`,
+    range: `'${TAB}'!A2:G`,
   });
   const logs = new Map<string, CetarisLog>();
-  for (const [lineItemId, cetarisSaleNumber, , loggedAt, loggedBy] of (res.data.values ?? []) as string[][]) {
+  for (const [lineItemId, cetarisSaleNumber, , loggedAt, loggedBy, completedAt, completedBy] of (res.data.values ?? []) as string[][]) {
     if (lineItemId && cetarisSaleNumber) {
-      logs.set(lineItemId, { lineItemId, cetarisSaleNumber, loggedAt: loggedAt ?? '', loggedBy: loggedBy ?? '' });
+      logs.set(lineItemId, {
+        lineItemId,
+        cetarisSaleNumber,
+        loggedAt: loggedAt ?? '',
+        loggedBy: loggedBy ?? '',
+        completedAt: completedAt ?? '',
+        completedBy: completedBy ?? '',
+      });
     }
   }
   cache = { at: Date.now(), logs };
@@ -57,8 +66,10 @@ export async function getCetarisLogs(): Promise<Map<string, CetarisLog>> {
 
 /**
  * Logs one Part Sale number against any number of eBay sales — often several, since one
- * Part Sale can cover many sales, of several SKUs. A sale that already has a number gets
- * the new one: correcting a typo is the same act as logging it.
+ * Part Sale can cover many sales, of several SKUs. Starting a Part Sale in Cetaris is what
+ * gives the number, so a logged sale is Pending until the Part Sale is completed. A sale
+ * that already has a number gets the new one: correcting a typo is the same act as logging
+ * it, and leaves any completion as it was.
  */
 export async function logCetaris(
   sales: { lineItemId: string; sku: string }[],
@@ -113,7 +124,32 @@ export async function clearCetaris(lineItemId: string): Promise<void> {
   // wrong row once the rows below have shifted up.
   await sheets.spreadsheets.values.clear({
     spreadsheetId: env.googleSheetId,
-    range: `'${TAB}'!A${index + 2}:E${index + 2}`,
+    range: `'${TAB}'!A${index + 2}:G${index + 2}`,
   });
   cache = undefined;
+}
+
+/**
+ * Marks a Part Sale completed in Cetaris — or, with `done` false, back to Pending — for
+ * every sale logged under its number, since completing one Part Sale completes all it
+ * covers. Returns how many sales that was.
+ */
+export async function setCetarisCompleted(cetarisSaleNumber: string, who: string, done = true): Promise<number> {
+  await ensureTab();
+  const sheets = getSheetsClient();
+  const res = await sheets.spreadsheets.values.get({ spreadsheetId: env.googleSheetId, range: `'${TAB}'!A2:B` });
+  const rows = ((res.data.values ?? []) as string[][])
+    .map((r, i) => ({ number: r[1], row: i + 2, lineItemId: r[0] }))
+    .filter((r) => r.lineItemId && r.number === cetarisSaleNumber);
+  if (rows.length === 0) return 0;
+  const stamp = done ? [new Date().toISOString(), who] : ['', ''];
+  await sheets.spreadsheets.values.batchUpdate({
+    spreadsheetId: env.googleSheetId,
+    requestBody: {
+      valueInputOption: 'RAW',
+      data: rows.map((r) => ({ range: `'${TAB}'!F${r.row}:G${r.row}`, values: [stamp] })),
+    },
+  });
+  cache = undefined;
+  return rows.length;
 }

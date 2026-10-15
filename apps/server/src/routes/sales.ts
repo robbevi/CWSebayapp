@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { isCetarisSaleNumber } from '@warehouse/shared';
 import { env, isGoogleConfigured } from '../config/env.js';
-import { clearCetaris, getCetarisLogs, logCetaris } from '../google/cetarisStore.js';
+import { clearCetaris, getCetarisLogs, logCetaris, setCetarisCompleted } from '../google/cetarisStore.js';
 import { isEbayConfigured } from '../ebay/ordersService.js';
 import { DEFAULT_LOOKBACK_DAYS, isStale, lastSync, syncSales } from '../ebay/salesSync.js';
 import { ordersToShip } from '../ebay/shipping.js';
@@ -22,7 +22,14 @@ salesRouter.get('/sales', async (_req, res, next) => {
       sales.map((sale) => {
         const log = logs.get(sale.lineItemId);
         return log
-          ? { ...sale, cetarisSaleNumber: log.cetarisSaleNumber, cetarisLoggedAt: log.loggedAt, cetarisLoggedBy: log.loggedBy }
+          ? {
+              ...sale,
+              cetarisSaleNumber: log.cetarisSaleNumber,
+              cetarisLoggedAt: log.loggedAt,
+              cetarisLoggedBy: log.loggedBy,
+              cetarisCompletedAt: log.completedAt || undefined,
+              cetarisCompletedBy: log.completedBy || undefined,
+            }
           : sale;
       })
     );
@@ -61,6 +68,30 @@ salesRouter.post('/sales/cetaris', async (req, res, next) => {
       req.user?.name ?? ''
     );
     res.json({ logged, cetarisSaleNumber: number });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * Completes a Part Sale — every sale logged under its number — once it is completed in
+ * Cetaris, recording when and by whom. `reopen` puts it back to Pending, for one marked
+ * complete by mistake.
+ */
+salesRouter.post('/sales/cetaris/complete', async (req, res, next) => {
+  try {
+    const number = String(req.body?.cetarisSaleNumber ?? '').trim();
+    if (!isCetarisSaleNumber(number)) {
+      res.status(400).json({ error: 'A Cetaris Part Sale number is seven digits.' });
+      return;
+    }
+    const reopen = req.body?.reopen === true;
+    const sales = await setCetarisCompleted(number, req.user?.name ?? '', !reopen);
+    if (sales === 0) {
+      res.status(404).json({ error: `No sales are logged under Part Sale ${number}.` });
+      return;
+    }
+    res.json({ sales, cetarisSaleNumber: number, completed: !reopen });
   } catch (err) {
     next(err);
   }

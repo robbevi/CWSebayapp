@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
 import {
   clearCetarisSale,
+  completeCetarisSale,
   fetchOrdersToShip,
   fetchSales,
   fetchSalesStatus,
@@ -45,6 +46,24 @@ export function useLogCetaris() {
       toast(`Part Sale ${v.number} logged against ${result.logged} ${result.logged === 1 ? 'sale' : 'sales'}`);
     },
     onError: (err) => toast(err instanceof Error ? err.message : 'Could not log the Part Sale', 'error'),
+  });
+}
+
+/** Marks a Part Sale completed in Cetaris, for every sale it covers; or reopens it. */
+export function useCompleteCetaris() {
+  const qc = useQueryClient();
+  const toast = useToastStore((s) => s.show);
+  return useMutation({
+    mutationFn: (v: { number: string; reopen?: boolean }) => completeCetarisSale(v.number, v.reopen),
+    onSuccess: (result, v) => {
+      void qc.invalidateQueries({ queryKey: SALES_QUERY_KEY });
+      toast(
+        v.reopen
+          ? `Part Sale ${v.number} is back to Pending`
+          : `Part Sale ${v.number} completed for ${result.sales} ${result.sales === 1 ? 'sale' : 'sales'}`
+      );
+    },
+    onError: (err) => toast(err instanceof Error ? err.message : 'Could not complete the Part Sale', 'error'),
   });
 }
 

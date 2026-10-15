@@ -20,6 +20,8 @@ import {
   isHighPriority,
   isPositiveMargin,
   listingFor,
+  cetarisNeeded,
+  cetarisPending,
   salesForGroup,
   soldPosition,
   type Listing,
@@ -61,8 +63,9 @@ export function PartCard({
   const researched = useResearchedSkus();
   const partSales = salesForGroup(part, salesIndex);
   const sold = soldPosition(part, partSales);
-  // A sale is only finished once its Part Sale is logged in Cetaris and eBay has paid it out.
-  const cetarisPending = partSales.filter((s) => !s.cetarisSaleNumber).length;
+  // A sale is only finished once its Part Sale is completed in Cetaris and eBay has paid it out.
+  const partSaleNeeded = partSales.filter(cetarisNeeded).length;
+  const partSalePending = partSales.filter(cetarisPending).length;
   const payoutPending = partSales.filter((s) => !s.payoutId).length;
   // What eBay says it is asking, not what the spreadsheet hoped for. The two differ —
   // one belt is listed at $60 against a $44.99 basis — and the live figure is the one
@@ -293,18 +296,20 @@ export function PartCard({
         {sold.soldQty > 0 && (
           <span
             title={
-              cetarisPending
-                ? `${cetarisPending} ${cetarisPending === 1 ? 'sale needs its' : 'sales need their'} Cetaris Part Sale logged`
-                : payoutPending
-                  ? `Part Sale logged; eBay is still holding the money for ${payoutPending} ${payoutPending === 1 ? 'sale' : 'sales'}`
-                  : 'Part Sale logged and paid out by eBay'
+              partSaleNeeded
+                ? `${partSaleNeeded} ${partSaleNeeded === 1 ? 'sale needs its' : 'sales need their'} Cetaris Part Sale started`
+                : partSalePending
+                  ? `${partSalePending} ${partSalePending === 1 ? 'sale’s Part Sale is' : 'sales’ Part Sales are'} Pending in Cetaris`
+                  : payoutPending
+                    ? `Part Sale completed; eBay is still holding the money for ${payoutPending} ${payoutPending === 1 ? 'sale' : 'sales'}`
+                    : 'Part Sale completed and paid out by eBay'
             }
             className={cn(
               'ml-auto flex shrink-0 items-center gap-1 rounded-pill border px-2 py-0.5 text-[10px] font-semibold',
-              cetarisPending || payoutPending ? 'border-border text-textMuted' : 'border-primary/30 bg-primary/10 text-primary'
+              partSaleNeeded || partSalePending || payoutPending ? 'border-border text-textMuted' : 'border-primary/30 bg-primary/10 text-primary'
             )}
           >
-            {cetarisPending ? 'Part Sale Needed' : payoutPending ? 'Awaiting payout' : <><Check size={10} /> Complete</>}
+            {partSaleNeeded ? 'Part Sale Needed' : partSalePending ? 'Part Sale Pending' : payoutPending ? 'Awaiting payout' : <><Check size={10} /> Complete</>}
           </span>
         )}
         {listingUrl && (

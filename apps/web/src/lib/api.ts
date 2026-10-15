@@ -550,3 +550,8 @@ export interface ReceiveCrateInput {
 export async function receiveInboundCrate(input: ReceiveCrateInput): Promise<{ received: number; parts: number }> {
   return parseJson(await post('/api/inbound/receive', input));
 }
+
+/** Completes a Part Sale — every sale logged under its number — or, reopening, puts it back to Pending. */
+export async function completeCetarisSale(cetarisSaleNumber: string, reopen = false): Promise<{ sales: number }> {
+  return parseJson(await post('/api/sales/cetaris/complete', { cetarisSaleNumber, reopen }));
+}

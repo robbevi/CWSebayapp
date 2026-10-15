@@ -369,55 +369,110 @@ const saleLabel = (s: Sale) => s.sku || (s.ebayListingId ? `Item ${s.ebayListing
 /** Shown in full up to here; past it, the rest are counted and left to SPARE. */
 export const PART_SALE_REMINDER_ROWS = 30;
 
-/** The morning's reminder of every sale still waiting on its Cetaris Part Sale, oldest first. */
-export function partSaleReminder(sales: Sale[], options: NoticeOptions = {}): Notice {
-  const sorted = [...sales].sort((a, b) => a.soldAt.localeCompare(b.soldAt));
+/**
+ * The morning's Part Sale reminder: sales with no Part Sale started yet, oldest first, and
+ * Part Sales started but still Pending in Cetaris, waiting to be completed.
+ */
+export function partSaleReminder(needed: Sale[], pending: Sale[] = [], options: NoticeOptions = {}): Notice {
+  const sorted = [...needed].sort((a, b) => a.soldAt.localeCompare(b.soldAt));
   const shown = sorted.slice(0, PART_SALE_REMINDER_ROWS);
   const rest = sorted.length - shown.length;
   const n = sorted.length;
   const what = `${n} eBay ${n === 1 ? 'sale' : 'sales'}`;
+
+  // One row per Part Sale, however many eBay sales it covers, oldest started first.
+  const byNumber = new Map<string, Sale[]>();
+  for (const s of pending) {
+    const list = byNumber.get(s.cetarisSaleNumber!);
+    if (list) list.push(s);
+    else byNumber.set(s.cetarisSaleNumber!, [s]);
+  }
+  const partSales = [...byNumber.entries()]
+    .map(([number, sales]) => ({ number, sales, startedAt: sales.map((s) => s.cetarisLoggedAt ?? '').sort()[0] ?? '' }))
+    .sort((a, b) => a.startedAt.localeCompare(b.startedAt));
+  const p = partSales.length;
+  const pendingWhat = `${p} Part ${p === 1 ? 'Sale' : 'Sales'}`;
+
   const cell = (s: string, more = '') => `<td style="${text(15, INK, `padding:10px 12px;border-top:1px solid ${LINE};${more}`)}">${s}</td>`;
   const head = (s: string, more = '') => `<td style="${caps(MUTED, 12)}padding:10px 12px;${more}">${s}</td>`;
+  const section = (title: string, note: string) =>
+    `<div style="${text(17, NAVY, 'font-weight:700;')}">${title}</div><div style="${text(14, MUTED, 'padding:2px 0 10px;')}">${note}</div>`;
 
-  const rows = shown
+  const neededRows = shown
     .map(
       (s) => `<tr>${cell(escapeHtml(shipDay(s.soldAt)), 'white-space:nowrap;')}${cell(
         `<strong>${escapeHtml(saleLabel(s))}</strong> x ${s.qtySold}`
       )}${cell(escapeHtml(s.orderId), `color:${MUTED};font-size:14px;white-space:nowrap;`)}${cell(money(s.grossSale), 'text-align:right;white-space:nowrap;')}</tr>`
     )
     .join('');
+  const pendingRows = partSales
+    .map(
+      (ps) => `<tr>${cell(`<strong>${escapeHtml(ps.number)}</strong>`, 'white-space:nowrap;')}${cell(
+        escapeHtml(ps.startedAt ? shipDay(ps.startedAt) : '—'),
+        'white-space:nowrap;'
+      )}${cell(escapeHtml(ps.sales.map(saleLabel).join(', ')))}${cell(
+        money(ps.sales.reduce((t, s) => t + s.grossSale, 0)),
+        'text-align:right;white-space:nowrap;'
+      )}</tr>`
+    )
+    .join('');
 
-  const body = `
-  <tr><td style="padding:20px 28px 0;">
+  const neededBlock = n
+    ? `<tr><td style="padding:20px 28px 0;">
+    ${section('Need a Part Sale', 'Sold on eBay, with no Part Sale started in Cetaris yet. Oldest first.')}
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border:1px solid ${LINE};border-radius:10px;">
       <tr>${head('Sold')}${head('SKU')}${head('Order')}${head('Sale', 'text-align:right;')}</tr>
-      ${rows}
+      ${neededRows}
     </table>
     ${rest > 0 ? `<div style="${text(14, MUTED, 'margin-top:10px;')}">…and ${rest} more in SPARE.</div>` : ''}
-  </td></tr>
+  </td></tr>`
+    : '';
+  const pendingBlock = p
+    ? `<tr><td style="padding:24px 28px 0;">
+    ${section('Pending in Cetaris', 'Part Sales started but not completed yet. Complete them in Cetaris, then mark them complete in SPARE.')}
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border:1px solid ${LINE};border-radius:10px;">
+      <tr>${head('Part Sale')}${head('Started')}${head('Covers')}${head('Sales', 'text-align:right;')}</tr>
+      ${pendingRows}
+    </table>
+  </td></tr>`
+    : '';
+
+  const body = `
+  ${neededBlock}
+  ${pendingBlock}
   ${
     options.publicBase
-      ? `<tr><td style="padding:24px 28px 8px;">${button('Log Part Sales in SPARE', options.publicBase, true)}</td></tr>`
+      ? `<tr><td style="padding:24px 28px 8px;">${button('Open Part Sales in SPARE', options.publicBase, true)}</td></tr>`
       : ''
   }
   <tr><td style="padding:6px 28px 28px;">
-    <div style="${text(14, MUTED)}">One Part Sale number can cover several sales. In SPARE, open the "to log" count on Listed / Sold.</div>
+    <div style="${text(14, MUTED)}">One Part Sale can cover several sales. In SPARE, open the Part Sales count on Listed / Sold.</div>
   </td></tr>`;
+
+  const subject =
+    n && p
+      ? `[REMINDER] Cetaris Part Sales: ${what} ${n === 1 ? 'needs' : 'need'} one, ${pendingWhat} to complete`
+      : n
+        ? `[REMINDER] Cetaris Part Sale needed for ${what}`
+        : `[REMINDER] ${pendingWhat} pending completion in Cetaris`;
 
   return {
     kind: 'part-sale-reminder',
-    subject: `[REMINDER] Cetaris Part Sale needed for ${what}`,
+    subject,
     html: shell({
       eyebrow: 'Cetaris Reminder',
-      title: `${what} need a Part Sale`,
-      subtitle: 'Sold on eBay, with no Cetaris Part Sale number logged yet. Oldest first.',
+      title: n ? `${what} ${n === 1 ? 'needs' : 'need'} a Part Sale` : `${pendingWhat} to complete`,
+      subtitle: n && p ? `And ${pendingWhat} pending completion in Cetaris.` : n ? 'Sold on eBay, with no Part Sale started in Cetaris yet.' : 'Started in Cetaris, waiting to be completed.',
       body,
       publicBase: options.publicBase,
     }),
     text: [
-      `[REMINDER] Cetaris Part Sale needed for ${what}`,
+      subject,
+      ...(n ? ['Need a Part Sale:'] : []),
       ...shown.map((s) => `• ${shipDay(s.soldAt)} — ${saleLabel(s)} x ${s.qtySold} — order ${s.orderId} — ${money(s.grossSale)}`),
       ...(rest > 0 ? [`…and ${rest} more in SPARE.`] : []),
+      ...(p ? ['Pending in Cetaris:'] : []),
+      ...partSales.map((ps) => `• Part Sale ${ps.number} — started ${ps.startedAt ? shipDay(ps.startedAt) : '—'} — ${ps.sales.map(saleLabel).join(', ')}`),
     ].join('\n'),
   };
 }

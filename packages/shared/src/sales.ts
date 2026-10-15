@@ -33,10 +33,17 @@ export interface Sale {
   payoutId?: string;
   /** eBay's word for where the money stands: FUNDS_ON_HOLD, PAYOUT, and so on. */
   payoutStatus?: string;
-  /** The Cetaris Part Sale that closed this sale out, once someone has logged it. */
+  /**
+   * The Cetaris Part Sale for this sale. Starting one in Cetaris gives its number and
+   * leaves it Pending; it is finished once completed there.
+   */
   cetarisSaleNumber?: string;
+  /** When the Part Sale's number was logged, which is when it was started. */
   cetarisLoggedAt?: string;
   cetarisLoggedBy?: string;
+  /** When the Part Sale was completed in Cetaris; absent while it is still Pending. */
+  cetarisCompletedAt?: string;
+  cetarisCompletedBy?: string;
 }
 
 export interface SaleTotals {
@@ -154,6 +161,9 @@ export interface CetarisLog {
   cetarisSaleNumber: string;
   loggedAt: string;
   loggedBy: string;
+  /** Empty while the Part Sale is Pending in Cetaris. */
+  completedAt: string;
+  completedBy: string;
 }
 
 /** Cetaris Part Sale numbers are seven digits; anything else is a typo. */
@@ -163,15 +173,22 @@ export function isCetarisSaleNumber(value: unknown): value is string {
   return typeof value === 'string' && CETARIS_SALE_NUMBER.test(value.trim());
 }
 
-/** A sale is finished once it carries its Cetaris number. */
-export const cetarisDone = (sale: Pick<Sale, 'cetarisSaleNumber'>) => !!sale.cetarisSaleNumber;
+type CetarisFields = Pick<Sale, 'cetarisSaleNumber' | 'cetarisCompletedAt'>;
+
+/** No Part Sale started for this sale yet. */
+export const cetarisNeeded = (sale: CetarisFields) => !sale.cetarisSaleNumber;
+
+/** The Part Sale is started — it has its number — but still Pending in Cetaris. */
+export const cetarisPending = (sale: CetarisFields) => !!sale.cetarisSaleNumber && !sale.cetarisCompletedAt;
+
+/** The Part Sale is completed in Cetaris. */
+export const cetarisDone = (sale: CetarisFields) => !!sale.cetarisSaleNumber && !!sale.cetarisCompletedAt;
 
 /** eBay has paid this sale out. */
 export const paidOut = (sale: Pick<Sale, 'payoutId'>) => !!sale.payoutId;
 
-/** Both halves done: the Part Sale logged in Cetaris, and the money paid out by eBay. */
-export const saleComplete = (sale: Pick<Sale, 'cetarisSaleNumber' | 'payoutId'>) =>
-  cetarisDone(sale) && paidOut(sale);
+/** Both halves done: the Part Sale completed in Cetaris, and the money paid out by eBay. */
+export const saleComplete = (sale: CetarisFields & Pick<Sale, 'payoutId'>) => cetarisDone(sale) && paidOut(sale);
 
 /**
  * An eBay order that still has to go out: what to pick, where it lives, and where it goes.

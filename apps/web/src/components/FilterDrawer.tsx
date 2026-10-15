@@ -52,8 +52,9 @@ export const AGE_OPTIONS = AGE_BANDS.map((b) => ({ key: b.key, label: b.label })
 export const SALE_OPTIONS: { key: SaleFilter; label: string; icon: React.ReactNode }[] = [
   { key: 'sold', label: 'Sold, in part or whole', icon: <ShoppingCart size={14} /> },
   { key: 'unsold', label: 'Nothing sold yet', icon: <Tag size={14} /> },
-  { key: 'awaitingCetaris', label: 'Sold, Part Sale not logged', icon: <ClipboardCheck size={14} /> },
-  { key: 'complete', label: 'Complete: logged and paid out', icon: <ClipboardCheck size={14} /> },
+  { key: 'awaitingCetaris', label: 'Sold, Part Sale not started', icon: <ClipboardCheck size={14} /> },
+  { key: 'cetarisPending', label: 'Part Sale pending in Cetaris', icon: <ClipboardCheck size={14} /> },
+  { key: 'complete', label: 'Complete: Part Sale completed and paid out', icon: <ClipboardCheck size={14} /> },
 ];
 
 export const TASK_OPTIONS: { key: TaskKey; label: string; icon: React.ReactNode }[] = [

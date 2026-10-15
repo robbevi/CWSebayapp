@@ -56,9 +56,16 @@ export async function sendDailyReminders(now = new Date()): Promise<ReminderResu
   if (!(await wasSent(partSaleKey))) {
     const [sales, logs] = await Promise.all([getSales(), getCetarisLogs()]);
     const waiting = sales.filter((s) => !logs.has(s.lineItemId) && soldBeforeToday(s.soldAt));
-    if (waiting.length) await postNotice(partSaleReminder(waiting, { ...NOTICE_OPTIONS, now }));
-    await markSent(partSaleKey, `${waiting.length} sales`);
-    result.partSale = waiting.length;
+    // Part Sales started but not completed in Cetaris, whenever they were started.
+    const pending = sales.flatMap((s) => {
+      const log = logs.get(s.lineItemId);
+      return log && !log.completedAt
+        ? [{ ...s, cetarisSaleNumber: log.cetarisSaleNumber, cetarisLoggedAt: log.loggedAt, cetarisLoggedBy: log.loggedBy }]
+        : [];
+    });
+    if (waiting.length || pending.length) await postNotice(partSaleReminder(waiting, pending, { ...NOTICE_OPTIONS, now }));
+    await markSent(partSaleKey, `${waiting.length} sales, ${pending.length} pending`);
+    result.partSale = waiting.length + pending.length;
   }
 
   return result;

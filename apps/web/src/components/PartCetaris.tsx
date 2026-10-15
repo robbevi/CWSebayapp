@@ -1,7 +1,7 @@
-import { ClipboardCheck, Undo2 } from 'lucide-react';
+import { Check, ClipboardCheck, RotateCcw, Undo2 } from 'lucide-react';
 import { useState, type KeyboardEvent } from 'react';
-import { CETARIS_SALE_NUMBER, formatDate, type Sale } from '@warehouse/shared';
-import { useClearCetaris, useLogCetaris } from '../hooks/useSales';
+import { CETARIS_SALE_NUMBER, cetarisNeeded, cetarisPending, formatDate, type Sale } from '@warehouse/shared';
+import { useClearCetaris, useCompleteCetaris, useLogCetaris } from '../hooks/useSales';
 import { cn } from '../lib/cn';
 
 /**
@@ -42,17 +42,20 @@ function NumberInput({
 }
 
 /**
- * The Cetaris side of a part's sales, on the part itself: each sale's Part Sale number, or
- * a place to log it. Where several are still waiting, one number can be logged for all of
- * them at once, since a single Part Sale usually covers them.
+ * The Cetaris side of a part's sales, on the part itself: each sale's Part Sale — started,
+ * with its number and Pending until completed in Cetaris — or a place to log one. Where
+ * several are still waiting, one number can be logged for all of them at once, since a
+ * single Part Sale usually covers them.
  */
 export function PartCetaris({ sales }: { sales: Sale[] }) {
   const log = useLogCetaris();
   const clear = useClearCetaris();
+  const complete = useCompleteCetaris();
   const [perSale, setPerSale] = useState<Record<string, string>>({});
   const [forAll, setForAll] = useState('');
 
-  const waiting = sales.filter((s) => !s.cetarisSaleNumber);
+  const waiting = sales.filter(cetarisNeeded);
+  const pending = new Set(sales.filter(cetarisPending).map((s) => s.cetarisSaleNumber)).size;
   const send = (lineItemIds: string[], number: string, done: () => void) => {
     if (!CETARIS_SALE_NUMBER.test(number) || !lineItemIds.length) return;
     log.mutate({ lineItemIds, number }, { onSuccess: done });
@@ -65,7 +68,7 @@ export function PartCetaris({ sales }: { sales: Sale[] }) {
           <ClipboardCheck size={12} /> Cetaris Part Sale
         </span>
         <span className="text-[11px] font-semibold text-emerald-800">
-          {waiting.length ? `${waiting.length} to log` : 'All logged'}
+          {[waiting.length && `${waiting.length} to log`, pending && `${pending} pending`].filter(Boolean).join(' · ') || 'All completed'}
         </span>
       </div>
 
@@ -104,20 +107,52 @@ export function PartCetaris({ sales }: { sales: Sale[] }) {
             </span>
           </span>
           {sale.cetarisSaleNumber ? (
-            <span className="flex items-center gap-2">
-              <span className="text-textMuted">
-                Part Sale <span className="font-semibold tabular-nums text-textPri">{sale.cetarisSaleNumber}</span>
-                {sale.cetarisLoggedBy && ` · ${sale.cetarisLoggedBy}`}
+            <span className="flex flex-wrap items-center justify-end gap-2">
+              <span className="text-right text-textMuted">
+                Part Sale <span className="font-semibold tabular-nums text-textPri">{sale.cetarisSaleNumber}</span>{' '}
+                {sale.cetarisCompletedAt ? (
+                  <span className="rounded-pill bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold text-primary">Completed</span>
+                ) : (
+                  <span className="rounded-pill bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-800">Pending</span>
+                )}
+                <span className="block">
+                  {sale.cetarisCompletedAt
+                    ? `Completed ${formatDate(sale.cetarisCompletedAt)}${sale.cetarisCompletedBy ? ` by ${sale.cetarisCompletedBy}` : ''}`
+                    : `Started ${sale.cetarisLoggedAt ? formatDate(sale.cetarisLoggedAt) : '—'}${sale.cetarisLoggedBy ? ` by ${sale.cetarisLoggedBy}` : ''}`}
+                </span>
               </span>
-              <button
-                type="button"
-                onClick={() => clear.mutate(sale.lineItemId)}
-                disabled={clear.isPending}
-                title="Take this number back off the sale"
-                className="flex min-h-0 items-center gap-1 rounded-btn border border-border px-1.5 py-0.5 font-semibold text-textMuted hover:bg-surface"
-              >
-                <Undo2 size={10} /> Undo
-              </button>
+              {sale.cetarisCompletedAt ? (
+                <button
+                  type="button"
+                  onClick={() => complete.mutate({ number: sale.cetarisSaleNumber!, reopen: true })}
+                  disabled={complete.isPending}
+                  title="Not completed after all: put the Part Sale back to Pending"
+                  className="flex min-h-0 items-center gap-1 rounded-btn border border-border px-1.5 py-0.5 font-semibold text-textMuted hover:bg-surface"
+                >
+                  <RotateCcw size={10} /> Reopen
+                </button>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => complete.mutate({ number: sale.cetarisSaleNumber! })}
+                    disabled={complete.isPending}
+                    title="Completed in Cetaris: record it as done today, for every sale this Part Sale covers"
+                    className="flex h-8 min-h-0 items-center gap-1 rounded-btn bg-primary px-2.5 font-semibold text-white disabled:opacity-40"
+                  >
+                    <Check size={11} /> Complete
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => clear.mutate(sale.lineItemId)}
+                    disabled={clear.isPending}
+                    title="Take this number back off the sale"
+                    className="flex min-h-0 items-center gap-1 rounded-btn border border-border px-1.5 py-0.5 font-semibold text-textMuted hover:bg-surface"
+                  >
+                    <Undo2 size={10} /> Undo
+                  </button>
+                </>
+              )}
             </span>
           ) : (
             <span className="flex items-center gap-1.5">

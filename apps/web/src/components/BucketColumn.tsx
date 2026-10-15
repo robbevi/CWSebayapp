@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState, type ReactElement } from 'react';
 import { ChevronDown, ClipboardCheck, ClipboardList, Tag, Wrench } from 'lucide-react';
 import {
+  cetarisNeeded,
+  cetarisPending,
   extendedValue,
   listingFor,
   type Listing,
@@ -86,7 +88,10 @@ export function BucketColumn({
   // Every sale, not only those on screen: the Part Sale backlog doesn't shrink because a
   // filter hides some of it.
   const { data: allSales } = useSales();
-  const awaitingCetaris = status === 'Listed' ? (allSales ?? []).filter((s) => !s.cetarisSaleNumber).length : 0;
+  const awaitingCetaris = status === 'Listed' ? (allSales ?? []).filter(cetarisNeeded).length : 0;
+  // Counted by Part Sale rather than by eBay sale: one Part Sale is one thing to complete.
+  const pendingPartSales =
+    status === 'Listed' ? new Set((allSales ?? []).filter(cetarisPending).map((s) => s.cetarisSaleNumber)).size : 0;
 
   /**
    * Cards are drawn a page at a time as the column is scrolled, not all 1,600 of Not Started
@@ -150,16 +155,27 @@ export function BucketColumn({
           </span>
         </button>
 
-        {status === 'Listed' && awaitingCetaris > 0 && (
+        {status === 'Listed' && (awaitingCetaris > 0 || pendingPartSales > 0) && (
           <button
             type="button"
             onClick={() => setCetarisOpen(true)}
-            title="Sales still waiting on their Cetaris Part Sale"
+            title={`${awaitingCetaris} ${awaitingCetaris === 1 ? 'sale needs' : 'sales need'} a Part Sale started; ${pendingPartSales} Part ${pendingPartSales === 1 ? 'Sale is' : 'Sales are'} Pending in Cetaris`}
             className="flex min-h-0 shrink-0 items-center gap-1 rounded-pill border border-border bg-surface px-2.5 py-1 text-xs font-semibold text-textPri hover:bg-surfaceMuted"
           >
             <ClipboardCheck size={12} />
-            {awaitingCetaris}
-            <span className="hidden font-normal text-textMuted sm:inline">to log</span>
+            {awaitingCetaris > 0 && (
+              <>
+                {awaitingCetaris}
+                <span className="hidden font-normal text-textMuted sm:inline">to log</span>
+              </>
+            )}
+            {awaitingCetaris > 0 && pendingPartSales > 0 && <span className="text-textMuted">·</span>}
+            {pendingPartSales > 0 && (
+              <>
+                {pendingPartSales}
+                <span className="hidden font-normal text-textMuted sm:inline">pending</span>
+              </>
+            )}
           </button>
         )}
 

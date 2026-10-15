@@ -182,6 +182,7 @@ describe('the Part Sale reminder', () => {
   it('lists the sales oldest first, with a way into SPARE', () => {
     const n = partSaleReminder(
       [sale('b', '2026-10-05T15:00:00Z'), sale('a', '2026-09-30T15:00:00Z', { sku: 'OLD-1', qtySold: 2 })],
+      [],
       { publicBase: 'https://spare.example' }
     );
     expect(n.kind).toBe('part-sale-reminder');
@@ -189,6 +190,23 @@ describe('the Part Sale reminder', () => {
     expect(n.html.indexOf('OLD-1')).toBeLessThan(n.html.indexOf('order-b'));
     expect(n.html).toContain('$1,234.50');
     expect(n.html).toContain('href="https://spare.example"');
+  });
+
+  it('lists Part Sales still pending, one row per Part Sale', () => {
+    const pending = [
+      sale('p1', '2026-10-01T12:00:00Z', { sku: 'A-1', cetarisSaleNumber: '3087786', cetarisLoggedAt: '2026-10-02T15:00:00Z' }),
+      sale('p2', '2026-10-01T12:00:00Z', { sku: 'B-2', cetarisSaleNumber: '3087786', cetarisLoggedAt: '2026-10-02T15:00:00Z' }),
+    ];
+    const both = partSaleReminder([sale('n', '2026-10-05T12:00:00Z')], pending);
+    expect(both.subject).toBe('[REMINDER] Cetaris Part Sales: 1 eBay sale needs one, 1 Part Sale to complete');
+    expect(both.html).toContain('Pending in Cetaris');
+    expect(both.html.match(/>3087786</g)).toHaveLength(1);
+    expect(both.html).toContain('A-1, B-2');
+    expect(both.text).toContain('• Part Sale 3087786 — started Fri, Oct 2 — A-1, B-2');
+
+    const onlyPending = partSaleReminder([], pending);
+    expect(onlyPending.subject).toBe('[REMINDER] 1 Part Sale pending completion in Cetaris');
+    expect(onlyPending.html).not.toContain('Need a Part Sale');
   });
 
   it('names a sale with no SKU by its eBay item number', () => {
