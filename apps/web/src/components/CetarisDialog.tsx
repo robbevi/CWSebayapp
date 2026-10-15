@@ -6,6 +6,7 @@ import { useInventoryParts } from '../hooks/useInventoryParts';
 import { useListings } from '../hooks/useListings';
 import { useClearCetaris, useCompleteCetaris, useLogCetaris, useSales } from '../hooks/useSales';
 import { cn } from '../lib/cn';
+import { useUIStore } from '../state/useUIStore';
 import { Button } from './ui/Button';
 import { Input } from './ui/Input';
 
@@ -48,6 +49,39 @@ export function CetarisDialog({ onClose, onlySku }: { onClose: () => void; onlyS
   // A sale with no part in SPARE still has its eBay listing, whose title says what it was.
   const titleOf = useMemo(() => new Map((listings ?? []).map((l) => [l.ebayListingId, l.title])), [listings]);
   const describe = (s: Sale) => partFor(s)?.description ?? titleOf.get(s.ebayListingId) ?? '';
+
+  /**
+   * What the sale was, opening the part's detail when SPARE has the part. This dialog stays
+   * open underneath, so closing the part comes back to the list.
+   */
+  const PartName = ({ sale, detail }: { sale: Sale; detail?: string }) => {
+    const part = partFor(sale);
+    const text = (
+      <>
+        <span className="font-semibold text-textPri">{skuOf(sale)}</span>
+        <span className="text-textMuted">
+          {' '}· {describe(sale)}
+          {detail}
+        </span>
+      </>
+    );
+    if (!part) return <span className="block truncate">{text}</span>;
+    return (
+      <button
+        type="button"
+        onClick={(e) => {
+          // Inside a row's label, a click would otherwise tick the sale too.
+          e.preventDefault();
+          e.stopPropagation();
+          useUIStore.getState().set({ selectedId: part.id, modalOpen: true });
+        }}
+        title={`Open ${part.sku}`}
+        className="block min-h-0 max-w-full truncate text-left hover:underline hover:decoration-primary"
+      >
+        {text}
+      </button>
+    );
+  };
 
   const matches = (s: Sale) => {
     const q = search.trim().toLowerCase();
@@ -158,8 +192,8 @@ export function CetarisDialog({ onClose, onlySku }: { onClose: () => void; onlyS
                     className="h-4 w-4 shrink-0 accent-primary"
                   />
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate text-xs font-semibold text-textPri">
-                      {skuOf(s)} <span className="font-normal text-textMuted">· {describe(s)}</span>
+                    <span className="block text-xs">
+                      <PartName sale={s} />
                     </span>
                     <span className="block text-[11px] text-textMuted">
                       Sold {date(s.soldAt)} · qty {s.qtySold} · order {s.orderId} ·{' '}
@@ -179,13 +213,13 @@ export function CetarisDialog({ onClose, onlySku }: { onClose: () => void; onlyS
               </h3>
               <ul className="mt-1 space-y-2">
                 {pending.map(([number, list]) => (
-                  <li key={number} className="rounded-card border border-amber-200 bg-amber-50/60 p-2.5">
+                  <li key={number} className="rounded-card border border-sky-200 bg-sky-50/70 p-2.5">
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="min-w-0 flex-1 text-xs">
                         <span className="font-semibold text-textPri">
                           Part Sale <span className="tabular-nums">{number}</span>
                         </span>
-                        <span className="ml-1.5 rounded-pill bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-800">Pending</span>
+                        <span className="ml-1.5 rounded-pill bg-sky-100 px-1.5 py-0.5 text-[10px] font-semibold text-sky-800">Pending</span>
                         <span className="block text-[11px] text-textMuted">
                           Started {list[0]!.cetarisLoggedAt ? date(list[0]!.cetarisLoggedAt) : '—'}
                           {list[0]!.cetarisLoggedBy && ` by ${list[0]!.cetarisLoggedBy}`} · {list.length} {list.length === 1 ? 'sale' : 'sales'} ·{' '}
@@ -201,20 +235,22 @@ export function CetarisDialog({ onClose, onlySku }: { onClose: () => void; onlyS
                         <Check size={14} /> Complete
                       </Button>
                     </div>
-                    <ul className="mt-1.5 border-t border-amber-200/70">
+                    <ul className="mt-1.5 border-t border-sky-200/70">
                       {list.map((s) => (
                         <li key={s.lineItemId} className="flex items-center gap-2 py-1 text-[11px]">
-                          <span className="min-w-0 flex-1 truncate text-textPri">
-                            {skuOf(s)} <span className="text-textMuted">· {describe(s)} · sold {date(s.soldAt)} · qty {s.qtySold}</span>
+                          <span className="min-w-0 flex-1">
+                            <PartName sale={s} detail={` · sold ${date(s.soldAt)} · qty ${s.qtySold}`} />
                           </span>
+                          {/* Quiet: taking one sale off a Part Sale is the rare correction, not the job. */}
                           <button
                             type="button"
                             onClick={() => clear.mutate(s.lineItemId)}
                             disabled={clear.isPending}
-                            title="Take this number back off the sale"
-                            className="flex min-h-0 shrink-0 items-center gap-1 rounded-btn border border-border px-1.5 py-0.5 font-semibold text-textMuted hover:bg-surface hover:text-textPri"
+                            title={`Take this sale off Part Sale ${number}`}
+                            aria-label={`Take ${skuOf(s)} off Part Sale ${number}`}
+                            className="flex h-6 w-6 min-h-0 shrink-0 items-center justify-center rounded-full text-textMuted hover:bg-surface hover:text-textPri"
                           >
-                            <Undo2 size={10} /> Undo
+                            <Undo2 size={12} />
                           </button>
                         </li>
                       ))}
@@ -234,7 +270,29 @@ export function CetarisDialog({ onClose, onlySku }: { onClose: () => void; onlyS
                     <span className="min-w-0 flex-1">
                       <span className="block text-xs text-textPri">
                         Part Sale <span className="font-semibold tabular-nums">{number}</span>{' '}
-                        <span className="text-textMuted">· {list.map(skuOf).join(', ')}</span>
+                        <span className="text-textMuted">
+                          ·{' '}
+                          {list.map((s, k) => {
+                            const part = partFor(s);
+                            return (
+                              <span key={s.lineItemId}>
+                                {k > 0 && ', '}
+                                {part ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => useUIStore.getState().set({ selectedId: part.id, modalOpen: true })}
+                                    title={`Open ${part.sku}`}
+                                    className="min-h-0 hover:text-textPri hover:underline hover:decoration-primary"
+                                  >
+                                    {skuOf(s)}
+                                  </button>
+                                ) : (
+                                  skuOf(s)
+                                )}
+                              </span>
+                            );
+                          })}
+                        </span>
                       </span>
                       <span className="block text-[11px] text-textMuted">
                         Completed {list[0]!.cetarisCompletedAt ? date(list[0]!.cetarisCompletedAt) : '—'}

@@ -113,7 +113,7 @@ export function PartCetaris({ sales }: { sales: Sale[] }) {
                 {sale.cetarisCompletedAt ? (
                   <span className="rounded-pill bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold text-primary">Completed</span>
                 ) : (
-                  <span className="rounded-pill bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-800">Pending</span>
+                  <span className="rounded-pill bg-sky-100 px-1.5 py-0.5 text-[10px] font-semibold text-sky-800">Pending</span>
                 )}
                 <span className="block">
                   {sale.cetarisCompletedAt
@@ -146,10 +146,11 @@ export function PartCetaris({ sales }: { sales: Sale[] }) {
                     type="button"
                     onClick={() => clear.mutate(sale.lineItemId)}
                     disabled={clear.isPending}
-                    title="Take this number back off the sale"
-                    className="flex min-h-0 items-center gap-1 rounded-btn border border-border px-1.5 py-0.5 font-semibold text-textMuted hover:bg-surface"
+                    title={`Take this sale off Part Sale ${sale.cetarisSaleNumber}`}
+                    aria-label={`Take this sale off Part Sale ${sale.cetarisSaleNumber}`}
+                    className="flex h-7 w-7 min-h-0 items-center justify-center rounded-full text-textMuted hover:bg-surface hover:text-textPri"
                   >
-                    <Undo2 size={10} /> Undo
+                    <Undo2 size={12} />
                   </button>
                 </>
               )}
