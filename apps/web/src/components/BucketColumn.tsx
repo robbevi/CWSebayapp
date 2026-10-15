@@ -130,14 +130,16 @@ export function BucketColumn({
 
   return (
     <div className={cn('flex flex-col rounded-card border border-border bg-surfaceMuted lg:h-full lg:min-h-0', className)}>
-      <div className="flex w-full items-center gap-3 rounded-t-card border-b border-border bg-columnHeaderBg p-4">
+      {/* Wraps rather than squeezing: on a narrow desktop the counts drop below the title
+          instead of crushing it onto three lines. */}
+      <div className="flex w-full flex-wrap items-center gap-x-3 gap-y-2 rounded-t-card border-b border-border bg-columnHeaderBg p-4">
         {/* Only the left of the header toggles the column, so the count beside it can be a
             control of its own. Inert from lg up, where columns are always open. */}
         <button
           type="button"
           onClick={onToggleExpanded}
           aria-expanded={expanded}
-          className="flex flex-1 items-center gap-3 text-left lg:pointer-events-none"
+          className="flex min-w-[11rem] flex-1 items-center gap-3 text-left lg:pointer-events-none"
         >
           <div
             className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${meta.badgeBg} ${meta.iconColor}`}
@@ -145,10 +147,10 @@ export function BucketColumn({
             {meta.icon}
           </div>
           <span className="min-w-0">
-            <span className="block text-base font-medium text-textPri lg:text-lg">{meta.label}</span>
+            <span className="block whitespace-nowrap text-base font-medium text-textPri lg:text-lg">{meta.label}</span>
             {/* Desktop only: on a phone the columns stack and collapse, where another line
                 sits between someone and their work. */}
-            <span className="hidden text-[11px] leading-tight text-textMuted lg:block">
+            <span className="hidden whitespace-nowrap text-[11px] leading-tight text-textMuted lg:block">
               <span className="font-semibold tabular-nums text-textPri">{money(subtotal.value)}</span>{' '}
               {subtotal.label}
             </span>
@@ -166,14 +168,15 @@ export function BucketColumn({
             {awaitingCetaris > 0 && (
               <>
                 {awaitingCetaris}
-                <span className="hidden font-normal text-textMuted sm:inline">to log</span>
+                <span className="hidden font-normal text-textMuted sm:inline lg:hidden 2xl:inline">to log</span>
               </>
             )}
             {awaitingCetaris > 0 && pendingPartSales > 0 && <span className="text-textMuted">·</span>}
             {pendingPartSales > 0 && (
               <>
-                {pendingPartSales}
-                <span className="hidden font-normal text-textMuted sm:inline">pending</span>
+                {/* Blue, as Pending is everywhere else, so the bare number still reads as pending. */}
+                <span className="text-sky-700">{pendingPartSales}</span>
+                <span className="hidden font-normal text-textMuted sm:inline lg:hidden 2xl:inline">pending</span>
               </>
             )}
           </button>
