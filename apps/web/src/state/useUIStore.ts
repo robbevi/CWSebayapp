@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import type { AgeBandKey, TaskKey, WorkflowStatus } from '@warehouse/shared';
+import { DEFAULT_INBOUND_VIEW, type InboundView } from '../lib/inboundView';
 
 export type SortKey =
   | 'SKU'
@@ -72,6 +73,9 @@ interface UIState {
   inboundOpen: boolean;
   /** Which part of the Inbound screen to open on, when something asked for one. */
   inboundStart: 'pack' | null;
+  /** The search, filters and sort on a district's stock, shared by its board and the packing list. */
+  inboundView: InboundView;
+  setInboundView: (patch: Partial<InboundView>) => void;
   selectedId: string | null;
   modalOpen: boolean;
   set: (patch: Partial<UIState>) => void;
@@ -103,6 +107,8 @@ export const useUIStore = create<UIState>((set) => ({
   district: WILLISTON,
   inboundOpen: false,
   inboundStart: null,
+  inboundView: DEFAULT_INBOUND_VIEW,
+  setInboundView: (patch) => set((s) => ({ inboundView: { ...s.inboundView, ...patch } })),
   selectedId: null,
   modalOpen: false,
   set: (patch) => set(patch),

@@ -95,14 +95,14 @@ inboundRouter.post('/inbound/ship', async (req, res, next) => {
 interface ReceiveLine {
   id: string;
   receivedQty: number;
-  binLocation: string;
-  newBinLocation: string;
+  recoveryBin: string;
 }
 
 /**
  * Receives a whole crate into Williston: the Cetaris transfer that moved it, the site it
- * goes into, and for each part what was counted and where it was put. Every part counted
- * becomes a Williston part, joining that SKU's card if Williston already has one.
+ * goes into, and for each part what was counted and the recovery bin it went into — stock
+ * from another district goes straight into one. Every part counted becomes a Williston part,
+ * joining that SKU's card if Williston already has one.
  */
 inboundRouter.post('/inbound/receive', async (req, res, next) => {
   try {
@@ -110,13 +110,13 @@ inboundRouter.post('/inbound/receive', async (req, res, next) => {
     const transferId = String(req.body?.transferId ?? '').trim();
     const site = String(req.body?.site ?? '').trim();
     if (!transferId) throw new InboundError('Enter the Cetaris transfer number.');
-    if (!site) throw new InboundError('Choose the Williston site the crate goes into.');
+    if (!site) throw new InboundError('Choose the inventory site the crate goes into.');
 
     const lines: ReceiveLine[] = (Array.isArray(req.body?.items) ? (req.body.items as Record<string, unknown>[]) : []).map((l) => ({
       id: String(l.id ?? ''),
       receivedQty: Math.trunc(Number(l.receivedQty)),
-      binLocation: String(l.binLocation ?? '').trim(),
-      newBinLocation: String(l.newBinLocation ?? '').trim(),
+      // An older screen sent the recovery bin as newBinLocation.
+      recoveryBin: String(l.recoveryBin ?? l.newBinLocation ?? '').trim(),
     }));
     const shipped = await shippedIn(crate);
     if (shipped.length === 0) throw new InboundError('That crate has nothing waiting to be received.');
@@ -125,7 +125,7 @@ inboundRouter.post('/inbound/receive', async (req, res, next) => {
       const line = byId.get(item.id);
       if (!line) throw new InboundError(`${item.sku} is missing from what was received. Receive the whole crate at once.`);
       if (!Number.isFinite(line.receivedQty) || line.receivedQty < 0) throw new InboundError(`${item.sku}: enter how many arrived.`);
-      if (line.receivedQty > 0 && !line.binLocation) throw new InboundError(`${item.sku}: enter the bin it went into.`);
+      if (line.receivedQty > 0 && !line.recoveryBin) throw new InboundError(`${item.sku}: enter the recovery bin it went into.`);
     }
 
     const today = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'America/Chicago' });
@@ -138,8 +138,7 @@ inboundRouter.post('/inbound/receive', async (req, res, next) => {
           description: i.description,
           manufacturer: i.manufacturer,
           inventorySite: site,
-          binLocation: line.binLocation,
-          newBinLocation: line.newBinLocation || undefined,
+          newBinLocation: line.recoveryBin,
           qoh: line.receivedQty,
           origin: i.origin,
           unitCost: i.unitCost,

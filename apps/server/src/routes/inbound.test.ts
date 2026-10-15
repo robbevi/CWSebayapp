@@ -79,8 +79,8 @@ describe('receiving a crate', () => {
       transferId: 'T-55',
       site: 'NDPARTS',
       items: [
-        { id: 'a', receivedQty: 25, binLocation: 'C-3-3', newBinLocation: 'A-1-3' },
-        { id: 'b', receivedQty: 0, binLocation: '' },
+        { id: 'a', receivedQty: 25, recoveryBin: 'A-1-3' },
+        { id: 'b', receivedQty: 0, recoveryBin: '' },
       ],
     });
     expect(res.status).toBe(200);
@@ -91,7 +91,6 @@ describe('receiving a crate', () => {
     expect(created[0]).toMatchObject({
       sku: '236577BXW',
       inventorySite: 'NDPARTS',
-      binLocation: 'C-3-3',
       newBinLocation: 'A-1-3',
       qoh: 25,
       origin: 'Grand Junction',
@@ -109,12 +108,12 @@ describe('receiving a crate', () => {
     );
   });
 
-  it('needs the transfer number, the site, and a bin for everything that arrived', async () => {
+  it('needs the transfer number, the site, and a recovery bin for everything that arrived', async () => {
     store.shippedIn.mockResolvedValue([item('a', 'A', 2)]);
     expect((await receive({ crate: 'GJ-001', site: 'NDPARTS', items: [] })).status).toBe(400);
     expect((await receive({ crate: 'GJ-001', transferId: 'T', items: [] })).status).toBe(400);
-    const noBin = await receive({ crate: 'GJ-001', transferId: 'T', site: 'NDPARTS', items: [{ id: 'a', receivedQty: 2, binLocation: '' }] });
-    expect((await noBin.json()).error).toMatch(/A: enter the bin/);
+    const noBin = await receive({ crate: 'GJ-001', transferId: 'T', site: 'NDPARTS', items: [{ id: 'a', receivedQty: 2, recoveryBin: '' }] });
+    expect((await noBin.json()).error).toMatch(/A: enter the recovery bin/);
     const partial = await receive({ crate: 'GJ-001', transferId: 'T', site: 'NDPARTS', items: [] });
     expect((await partial.json()).error).toMatch(/Receive the whole crate/);
     expect(sheets.createReceivedParts).not.toHaveBeenCalled();

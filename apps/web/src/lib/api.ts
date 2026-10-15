@@ -544,7 +544,7 @@ export interface ReceiveCrateInput {
   crate: string;
   transferId: string;
   site: string;
-  items: { id: string; receivedQty: number; binLocation: string; newBinLocation: string }[];
+  items: { id: string; receivedQty: number; recoveryBin: string }[];
 }
 
 export async function receiveInboundCrate(input: ReceiveCrateInput): Promise<{ received: number; parts: number }> {

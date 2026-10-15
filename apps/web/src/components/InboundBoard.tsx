@@ -30,6 +30,17 @@ import {
 import { useBodyScrollLock } from '../hooks/useBodyScrollLock';
 import { useInbound, usePackInbound, useUnpackInbound } from '../hooks/useInbound';
 import { cn } from '../lib/cn';
+import {
+  applyInboundView,
+  countBy,
+  INBOUND_SORTS,
+  inboundChips,
+  inboundValue,
+  uniqueSorted,
+  type InboundSort,
+  type InboundView,
+} from '../lib/inboundView';
+import { useUIStore } from '../state/useUIStore';
 import { Card } from './StatStrip';
 import { Input } from './ui/Input';
 import { MultiSelectDropdown } from './ui/MultiSelectDropdown';
@@ -54,20 +65,7 @@ const COLUMNS: { status: Column; label: string; hint: string; icon: ReactNode; b
   { status: 'shipped', label: 'In transit', hint: 'On its way to Williston', icon: <Truck size={18} />, badge: 'bg-primary' },
 ];
 
-const SORTS = ['Bin', 'SKU', 'Site', 'Manufacturer', 'Quantity', 'Unit cost', 'Value'] as const;
-type Sort = (typeof SORTS)[number];
-
-const value = (i: InboundItem) => (i.unitCost ?? 0) * i.qty;
-const COMPARE: Record<Sort, (a: InboundItem, b: InboundItem) => number> = {
-  Bin: (a, b) => a.originSite.localeCompare(b.originSite) || a.originBin.localeCompare(b.originBin) || a.sku.localeCompare(b.sku),
-  SKU: (a, b) => a.sku.localeCompare(b.sku),
-  Site: (a, b) => a.originSite.localeCompare(b.originSite) || a.sku.localeCompare(b.sku),
-  Manufacturer: (a, b) => a.manufacturer.localeCompare(b.manufacturer) || a.sku.localeCompare(b.sku),
-  // Bigger first: these are read for what is worth most.
-  Quantity: (a, b) => b.qty - a.qty,
-  'Unit cost': (a, b) => (b.unitCost ?? -1) - (a.unitCost ?? -1),
-  Value: (a, b) => value(b) - value(a),
-};
+const value = inboundValue;
 
 /** Cards drawn per column at a time, as on Williston's board. */
 const PAGE = 40;
@@ -80,44 +78,26 @@ const PILL_LABEL = 'hidden text-sm font-medium sm:inline';
 
 const usd = (n: number, cents = false) =>
   n.toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: cents ? 2 : 0, minimumFractionDigits: cents ? 2 : 0 });
-const uniqueSorted = (xs: string[]) => [...new Set(xs.filter(Boolean))].sort((a, b) => a.localeCompare(b));
-const countBy = (xs: string[]) => xs.reduce<Record<string, number>>((m, x) => ((m[x] = (m[x] ?? 0) + 1), m), {});
-
-interface Filters {
-  sites: string[];
-  bins: string[];
-  makers: string[];
-}
+type Filters = Pick<InboundView, 'sites' | 'bins' | 'makers'>;
 const NO_FILTERS: Filters = { sites: [], bins: [], makers: [] };
 
 export function InboundBoard({ origin, onOpenPacking }: { origin: string; onOpenPacking: () => void }) {
   const { data, isLoading } = useInbound();
   const all = useMemo(() => (data ?? []).filter((i) => i.origin === origin && i.status !== 'received'), [data, origin]);
-  const [search, setSearch] = useState('');
+  // Shared with the packing list, so "Pack Multiple" opens on what the board shows.
+  const view = useUIStore((s) => s.inboundView);
+  const setView = useUIStore((s) => s.setInboundView);
+  const { search, sort } = view;
+  const setSearch = (v: string) => setView({ search: v });
+  const setSort = (v: InboundSort) => setView({ sort: v });
+  const setFilters = (f: Filters) => setView(f);
   const [searchOpen, setSearchOpen] = useState(false);
-  const [filters, setFilters] = useState<Filters>(NO_FILTERS);
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [sort, setSort] = useState<Sort>('Bin');
   const [selected, setSelected] = useState<InboundItem | null>(null);
   const [focused, setFocused] = useState<Column | null>(null);
 
-  const shown = useMemo(() => {
-    const needle = search.trim().toLowerCase();
-    return all
-      .filter((i) => filters.sites.length === 0 || filters.sites.includes(i.originSite))
-      .filter((i) => filters.bins.length === 0 || filters.bins.includes(i.originBin))
-      .filter((i) => filters.makers.length === 0 || filters.makers.includes(i.manufacturer))
-      .filter(
-        (i) => !needle || [i.sku, i.description, i.manufacturer, i.originSite, i.originBin, i.crate].some((v) => v.toLowerCase().includes(needle))
-      )
-      .sort(COMPARE[sort]);
-  }, [all, search, filters, sort]);
-
-  const chips = [
-    ...filters.sites.map((v) => ({ key: `site:${v}`, label: `Site: ${v}`, remove: () => setFilters((f) => ({ ...f, sites: f.sites.filter((x) => x !== v) })) })),
-    ...filters.bins.map((v) => ({ key: `bin:${v}`, label: `Bin: ${v}`, remove: () => setFilters((f) => ({ ...f, bins: f.bins.filter((x) => x !== v) })) })),
-    ...filters.makers.map((v) => ({ key: `mfr:${v}`, label: v, remove: () => setFilters((f) => ({ ...f, makers: f.makers.filter((x) => x !== v) })) })),
-  ];
+  const shown = useMemo(() => applyInboundView(all, view), [all, view]);
+  const chips = inboundChips(view, setView);
   const narrowed = !!search.trim() || chips.length > 0;
   const received = useMemo(() => (data ?? []).filter((i) => i.origin === origin && i.status === 'received'), [data, origin]);
   const crates = cratesOf(all);
@@ -142,9 +122,9 @@ export function InboundBoard({ origin, onOpenPacking }: { origin: string; onOpen
 
   const sortDropdownMobile = (
     <SelectDropdown
-      options={[...SORTS]}
+      options={[...INBOUND_SORTS]}
       value={sort}
-      onChange={(v) => setSort(v as Sort)}
+      onChange={(v) => setSort(v as InboundSort)}
       renderTrigger={({ open }) => (
         <span className={cn(ROUND_PLAIN, open && 'border-primary ring-2 ring-primary/40')} title={`Sort: ${sort}`}>
           <ArrowUpDown size={18} />
@@ -231,12 +211,12 @@ export function InboundBoard({ origin, onOpenPacking }: { origin: string; onOpen
           <div className="hidden w-full lg:block lg:w-48">
             <SelectDropdown
               icon={<ArrowUpDown size={14} />}
-              options={[...SORTS]}
+              options={[...INBOUND_SORTS]}
               value={sort}
               valuePrefix="Sort: "
               valueClassName="text-center"
               triggerClassName="font-medium text-textPri"
-              onChange={(v) => setSort(v as Sort)}
+              onChange={(v) => setSort(v as InboundSort)}
             />
           </div>
 
@@ -302,11 +282,11 @@ export function InboundBoard({ origin, onOpenPacking }: { origin: string; onOpen
                   <button
                     type="button"
                     onClick={onOpenPacking}
-                    title="Pick several parts into a crate at once"
+                    title="Pack several parts into a crate at once, from the list as filtered and sorted here"
                     className="flex min-h-0 shrink-0 items-center gap-1 rounded-pill border border-border bg-surface px-2.5 py-1 text-xs font-semibold text-textPri hover:bg-surfaceMuted"
                   >
                     <PackagePlus size={12} />
-                    <span className="hidden sm:inline">Pack several</span>
+                    <span className="hidden sm:inline">Pack Multiple</span>
                   </button>
                 ) : null
               }
@@ -315,7 +295,7 @@ export function InboundBoard({ origin, onOpenPacking }: { origin: string; onOpen
         </div>
       </div>
 
-      {drawerOpen && <InboundFilterDrawer all={all} filters={filters} onChange={setFilters} onClose={() => setDrawerOpen(false)} />}
+      {drawerOpen && <InboundFilterDrawer all={all} filters={view} onChange={setFilters} onClose={() => setDrawerOpen(false)} />}
       {selected && <InboundItemDialog item={selected} all={data ?? []} onClose={() => setSelected(null)} />}
     </>
   );

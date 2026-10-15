@@ -1,5 +1,5 @@
 import { useMemo, useState, type ReactNode } from 'react';
-import { Container, PackageCheck, PackagePlus, Truck, Upload, X } from 'lucide-react';
+import { ArrowUpDown, Container, Factory, MapPin, PackageCheck, PackagePlus, Search, Truck, Upload, Wrench, X } from 'lucide-react';
 import {
   cratesOf,
   INBOUND_ORIGINS,
@@ -20,6 +20,9 @@ import {
 import { useInventoryParts } from '../hooks/useInventoryParts';
 import { cn } from '../lib/cn';
 import { useUIStore } from '../state/useUIStore';
+import { applyInboundView, countBy, INBOUND_SORTS, inboundChips, uniqueSorted, type InboundSort } from '../lib/inboundView';
+import { MultiSelectDropdown } from './ui/MultiSelectDropdown';
+import { SelectDropdown } from './ui/SelectDropdown';
 import { useUserStore } from '../state/useUserStore';
 import { Input } from './ui/Input';
 
@@ -75,7 +78,7 @@ export function InboundDialog({ onClose }: { onClose: () => void }) {
                 <Container size={16} /> Inbound to Williston
               </h2>
               <p className="mt-0.5 text-[11px] text-textMuted">
-                Packed into crates and shipped by the district sending it; received here into a Williston bin.
+                Packed into crates and shipped by the district sending it; received here into a Williston recovery bin.
               </p>
             </div>
             <div className="flex items-center gap-2">
@@ -180,7 +183,11 @@ function ImportForm({ onDone }: { onDone: () => void }) {
   );
 }
 
-/** Everything waiting at the origin, by site and bin, ready to be picked into a crate. */
+/**
+ * Everything waiting at the origin, ready to be picked into a crate. Searched, filtered and
+ * sorted by the same view as the district's board, so it opens on what the board showed,
+ * and narrowing it here narrows the board too.
+ */
 function PackList({
   awaiting,
   items,
@@ -192,25 +199,15 @@ function PackList({
   openCrates: Crate[];
   onPacked: () => void;
 }) {
-  const [search, setSearch] = useState('');
-  const [site, setSite] = useState('');
+  const view = useUIStore((s) => s.inboundView);
+  const setView = useUIStore((s) => s.setInboundView);
+  const chips = inboundChips(view, setView);
   const [chosen, setChosen] = useState<Map<string, number>>(new Map());
   const origin = awaiting[0]?.origin ?? openCrates[0]?.origin ?? '';
   const [crate, setCrate] = useState(() => openCrates[0]?.label ?? nextCrateLabel(items, origin));
   const pack = usePackInbound();
 
-  const sites = useMemo(() => [...new Set(awaiting.map((i) => i.originSite))].sort(), [awaiting]);
-  const matching = useMemo(() => {
-    const needle = search.trim().toLowerCase();
-    return awaiting
-      .filter((i) => !site || i.originSite === site)
-      .filter(
-        (i) =>
-          !needle ||
-          [i.sku, i.description, i.manufacturer, i.originBin, i.originSite].some((v) => v.toLowerCase().includes(needle))
-      )
-      .sort((a, b) => a.originSite.localeCompare(b.originSite) || a.originBin.localeCompare(b.originBin) || a.sku.localeCompare(b.sku));
-  }, [awaiting, search, site]);
+  const matching = useMemo(() => applyInboundView(awaiting, view), [awaiting, view]);
 
   const toggle = (i: InboundItem) =>
     setChosen((m) => {
@@ -240,26 +237,61 @@ function PackList({
 
   return (
     <div className="flex min-h-full flex-col">
-      <div className="sticky top-0 z-10 flex flex-wrap gap-2 border-b border-border bg-surface p-3">
-        <Input
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search SKU, description, manufacturer or bin"
-          className="min-h-[36px] flex-1"
-        />
-        {sites.length > 1 && (
-          <select
-            value={site}
-            onChange={(e) => setSite(e.target.value)}
-            className="min-h-[36px] rounded-btn border border-border bg-surface px-2 text-xs text-textPri"
-            aria-label="Site"
-          >
-            <option value="">All sites</option>
-            {sites.map((s) => (
-              <option key={s}>{s}</option>
+      <div className="sticky top-0 z-10 space-y-2 border-b border-border bg-surface p-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <label className="relative min-w-[220px] flex-1">
+            <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-textMuted" />
+            <Input
+              value={view.search}
+              onChange={(e) => setView({ search: e.target.value })}
+              placeholder="Search SKU, description, manufacturer or bin"
+              className={cn('pl-9', view.search && 'pr-9')}
+            />
+            {view.search && (
+              <button
+                type="button"
+                onClick={() => setView({ search: '' })}
+                aria-label="Clear search"
+                className="absolute right-1.5 top-1/2 flex h-7 w-7 min-h-0 -translate-y-1/2 items-center justify-center rounded-full text-textMuted hover:bg-surfaceMuted hover:text-textPri"
+              >
+                <X size={14} />
+              </button>
+            )}
+          </label>
+          <MultiSelectDropdown icon={<Factory size={14} />} label="Site" options={uniqueSorted(awaiting.map((i) => i.originSite))} counts={countBy(awaiting.map((i) => i.originSite))} selected={view.sites} onChange={(sites) => setView({ sites })} />
+          <MultiSelectDropdown icon={<MapPin size={14} />} label="Bin" options={uniqueSorted(awaiting.map((i) => i.originBin))} counts={countBy(awaiting.map((i) => i.originBin))} selected={view.bins} onChange={(bins) => setView({ bins })} />
+          <MultiSelectDropdown icon={<Wrench size={14} />} label="Manufacturer" options={uniqueSorted(awaiting.map((i) => i.manufacturer))} counts={countBy(awaiting.map((i) => i.manufacturer))} selected={view.makers} onChange={(makers) => setView({ makers })} />
+          <div className="w-44">
+            <SelectDropdown
+              icon={<ArrowUpDown size={14} />}
+              options={[...INBOUND_SORTS]}
+              value={view.sort}
+              valuePrefix="Sort: "
+              triggerClassName="font-medium text-textPri"
+              onChange={(v) => setView({ sort: v as InboundSort })}
+            />
+          </div>
+        </div>
+        {chips.length > 0 && (
+          <div className="flex flex-wrap items-center gap-2">
+            {chips.map((c) => (
+              <span key={c.key} className="inline-flex max-w-full items-center gap-1.5 rounded-pill border border-border bg-surface px-2.5 py-1 text-xs text-textMuted">
+                <span className="max-w-[220px] truncate">{c.label}</span>
+                <button type="button" onClick={c.remove} aria-label={`Remove ${c.label}`} className="min-h-0 shrink-0 rounded-full hover:text-primary">
+                  <X size={12} />
+                </button>
+              </span>
             ))}
-          </select>
+            <button type="button" onClick={() => setView({ sites: [], bins: [], makers: [] })} className="text-xs font-semibold text-primary hover:underline">
+              Clear All
+            </button>
+          </div>
         )}
+        <p className="text-[11px] text-textMuted">
+          {matching.length === awaiting.length
+            ? `${awaiting.length.toLocaleString()} waiting to pack`
+            : `${matching.length.toLocaleString()} of ${awaiting.length.toLocaleString()} waiting to pack, as filtered on the board`}
+        </p>
       </div>
 
       <ul className="flex-1 divide-y divide-border">
@@ -452,13 +484,19 @@ function ArrivingCrate({ crate }: { crate: Crate }) {
 
 interface Line {
   receivedQty: number;
-  binLocation: string;
-  newBinLocation: string;
+  recoveryBin: string;
 }
 
+// One height for every control along the top of the form, the dropdown included.
+const FIELD = 'block h-11 min-h-[44px] rounded-btn border border-border bg-surface px-3 text-xs text-textPri';
+
+/**
+ * Receiving a crate into Williston. Everything from another district goes straight into a
+ * recovery bin, so that is the one place each part needs.
+ */
 function ReceiveForm({ crate, onCancel }: { crate: Crate; onCancel: () => void }) {
   const { data: parts } = useInventoryParts();
-  // Williston's own sites, most used first, so the usual one is the default.
+  // The district's own inventory sites, most used first, so the usual one is the default.
   const sites = useMemo(() => {
     const count = new Map<string, number>();
     for (const p of parts ?? []) if (p.inventorySite && !p.origin) count.set(p.inventorySite, (count.get(p.inventorySite) ?? 0) + 1);
@@ -466,63 +504,64 @@ function ReceiveForm({ crate, onCancel }: { crate: Crate; onCancel: () => void }
   }, [parts]);
   const [site, setSite] = useState('');
   const [transferId, setTransferId] = useState('');
-  const [allBin, setAllBin] = useState('');
+  const [sameBin, setSameBin] = useState('');
   const [lines, setLines] = useState<Record<string, Line>>(() =>
-    Object.fromEntries(crate.items.map((i) => [i.id, { receivedQty: i.qty, binLocation: '', newBinLocation: '' }]))
+    Object.fromEntries(crate.items.map((i) => [i.id, { receivedQty: i.qty, recoveryBin: '' }]))
   );
   const receive = useReceiveCrate();
   const chosenSite = site || sites[0] || '';
 
   const set = (id: string, patch: Partial<Line>) => setLines((l) => ({ ...l, [id]: { ...l[id]!, ...patch } }));
-  const missingBin = crate.items.filter((i) => lines[i.id]!.receivedQty > 0 && !lines[i.id]!.binLocation.trim());
+  const missingBin = crate.items.filter((i) => lines[i.id]!.receivedQty > 0 && !lines[i.id]!.recoveryBin.trim());
   const ready = !!transferId.trim() && !!chosenSite && missingBin.length === 0;
 
   return (
     <div className="space-y-3 p-3">
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap items-end gap-3">
         <label className="text-[11px] font-semibold text-textMuted">
-          Cetaris transfer #
-          <Input value={transferId} onChange={(e) => setTransferId(e.target.value)} className="mt-1 min-h-[36px] w-40" />
+          Cetaris Transfer #
+          <input value={transferId} onChange={(e) => setTransferId(e.target.value)} className={cn(FIELD, 'mt-1 w-44')} />
         </label>
         <label className="text-[11px] font-semibold text-textMuted">
-          Williston site
-          <select
-            value={chosenSite}
-            onChange={(e) => setSite(e.target.value)}
-            className="mt-1 block min-h-[36px] rounded-btn border border-border bg-surface px-2 text-xs text-textPri"
-          >
+          District Inventory Site
+          <select value={chosenSite} onChange={(e) => setSite(e.target.value)} className={cn(FIELD, 'mt-1 w-48 pr-8')}>
             {sites.map((s) => (
               <option key={s}>{s}</option>
             ))}
           </select>
         </label>
-        <label className="text-[11px] font-semibold text-textMuted">
-          One bin for everything
-          <span className="mt-1 flex gap-1">
-            <Input value={allBin} onChange={(e) => setAllBin(e.target.value)} className="min-h-[36px] w-28" />
+        {/* For a crate that goes into one recovery bin whole: type it once rather than per part. */}
+        <label className="text-[11px] font-semibold text-textMuted" title="Puts every part in the crate into the same recovery bin">
+          Same recovery bin for all
+          <span className="mt-1 flex gap-1.5">
+            <input
+              value={sameBin}
+              onChange={(e) => setSameBin(e.target.value)}
+              placeholder="e.g. A-1-3"
+              className={cn(FIELD, 'w-32 uppercase placeholder:normal-case')}
+            />
             <button
               type="button"
-              disabled={!allBin.trim()}
+              disabled={!sameBin.trim()}
               onClick={() =>
-                setLines((l) => Object.fromEntries(Object.entries(l).map(([id, v]) => [id, { ...v, binLocation: allBin.trim() }])))
+                setLines((l) => Object.fromEntries(Object.entries(l).map(([id, v]) => [id, { ...v, recoveryBin: sameBin.trim() }])))
               }
-              className={SECONDARY}
+              className={cn(SECONDARY, 'h-11')}
             >
-              Fill
+              Apply to all
             </button>
           </span>
         </label>
       </div>
 
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[560px] text-xs">
+        <table className="w-full min-w-[480px] text-xs">
           <thead>
             <tr className="text-left text-[10px] font-semibold uppercase tracking-wide text-textMuted">
               <th className="py-1 pr-2">Part</th>
               <th className="w-16 py-1 pr-2 text-right">Sent</th>
-              <th className="w-20 py-1 pr-2">Arrived</th>
-              <th className="w-28 py-1 pr-2">Bin</th>
-              <th className="w-28 py-1">Recovery bin</th>
+              <th className="w-24 py-1 pr-2">Arrived</th>
+              <th className="w-36 py-1">Recovery bin</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
@@ -532,7 +571,7 @@ function ReceiveForm({ crate, onCancel }: { crate: Crate; onCancel: () => void }
                 <tr key={i.id}>
                   <td className="py-1.5 pr-2">
                     <span className="block font-semibold text-textPri">{i.sku}</span>
-                    <span className="block max-w-[260px] truncate text-textMuted">{i.description}</span>
+                    <span className="block max-w-[300px] truncate text-textMuted">{i.description}</span>
                   </td>
                   <td className="py-1.5 pr-2 text-right font-semibold text-textPri">{i.qty}</td>
                   <td className="py-1.5 pr-2">
@@ -543,25 +582,17 @@ function ReceiveForm({ crate, onCancel }: { crate: Crate; onCancel: () => void }
                       onChange={(e) => set(i.id, { receivedQty: Math.max(0, Math.trunc(Number(e.target.value)) || 0) })}
                       aria-label={`How many of ${i.sku} arrived`}
                       className={cn(
-                        'w-16 rounded-btn border bg-surface px-1.5 py-1 text-right text-xs text-textPri',
+                        'h-9 w-20 rounded-btn border bg-surface px-2 text-right text-xs text-textPri',
                         line.receivedQty !== i.qty ? 'border-amber-500' : 'border-border'
                       )}
                     />
                   </td>
-                  <td className="py-1.5 pr-2">
-                    <input
-                      value={line.binLocation}
-                      onChange={(e) => set(i.id, { binLocation: e.target.value })}
-                      aria-label={`Bin for ${i.sku}`}
-                      className="w-24 rounded-btn border border-border bg-surface px-1.5 py-1 text-xs uppercase text-textPri"
-                    />
-                  </td>
                   <td className="py-1.5">
                     <input
-                      value={line.newBinLocation}
-                      onChange={(e) => set(i.id, { newBinLocation: e.target.value })}
+                      value={line.recoveryBin}
+                      onChange={(e) => set(i.id, { recoveryBin: e.target.value })}
                       aria-label={`Recovery bin for ${i.sku}`}
-                      className="w-24 rounded-btn border border-border bg-surface px-1.5 py-1 text-xs uppercase text-textPri"
+                      className="h-9 w-32 rounded-btn border border-border bg-surface px-2 text-xs uppercase text-textPri"
                     />
                   </td>
                 </tr>
@@ -573,7 +604,7 @@ function ReceiveForm({ crate, onCancel }: { crate: Crate; onCancel: () => void }
 
       <div className="flex flex-wrap items-center justify-end gap-2">
         {missingBin.length > 0 && (
-          <span className="text-[11px] text-textMuted">{plural(missingBin.length, 'part')} still need a bin.</span>
+          <span className="text-[11px] text-textMuted">{plural(missingBin.length, 'part')} still need a recovery bin.</span>
         )}
         <button type="button" onClick={onCancel} className={SECONDARY}>
           Cancel
@@ -589,8 +620,7 @@ function ReceiveForm({ crate, onCancel }: { crate: Crate; onCancel: () => void }
               items: crate.items.map((i) => ({
                 id: i.id,
                 receivedQty: lines[i.id]!.receivedQty,
-                binLocation: lines[i.id]!.binLocation.trim().toUpperCase(),
-                newBinLocation: lines[i.id]!.newBinLocation.trim().toUpperCase(),
+                recoveryBin: lines[i.id]!.recoveryBin.trim().toUpperCase(),
               })),
             })
           }
